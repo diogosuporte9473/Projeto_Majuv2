@@ -116,7 +116,7 @@
     "overrides": {
       "tailwindcss>nanoid": "3.3.7"
     },
-    "allowedBuildScripts": [
+    "onlyBuiltDependencies": [
       "@tailwindcss/oxide",
       "esbuild"
     ]
