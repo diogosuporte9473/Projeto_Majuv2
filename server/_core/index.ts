@@ -27,7 +27,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-async function startServer() {
+export async function createApp() {
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
@@ -50,6 +50,12 @@ async function startServer() {
     serveStatic(app);
   }
 
+  return { app, server };
+}
+
+async function startServer() {
+  const { app, server } = await createApp();
+
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
 
@@ -62,4 +68,6 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error);
+if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+  startServer().catch(console.error);
+}
