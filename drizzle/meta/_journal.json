@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1772215953133,
+      "tag": "0000_lucky_xavin",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1772216068404,
+      "tag": "0001_secret_payback",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1772218227312,
+      "tag": "0002_cloudy_whirlwind",
+      "breakpoints": true
+    }
+  ]
+}
