@@ -2,10 +2,25 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
-import { Loader2 } from "lucide-react";
+import { Loader2, LogIn } from "lucide-react";
+import { supabase } from "@/lib/supabase.js";
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
+
+  const handleSupabaseLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error("Supabase login error:", error);
+    }
+  };
 
   if (loading) {
     return (
@@ -20,6 +35,8 @@ export default function Home() {
 
   if (!isAuthenticated) {
     const loginUrl = getLoginUrl();
+    const hasSupabase = !!import.meta.env.VITE_SUPABASE_URL;
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
         <div className="text-center max-w-md mx-auto px-4">
@@ -27,20 +44,34 @@ export default function Home() {
           <p className="text-lg mb-8 text-primary-foreground/90">
             Organize your team work with powerful task management
           </p>
-          {loginUrl ? (
-            <Button
-              onClick={() => (window.location.href = loginUrl)}
-              className="bg-accent text-accent-foreground hover:bg-accent/90 px-8 py-3 text-lg font-semibold"
-            >
-              Sign In
-            </Button>
-          ) : (
-            <div className="p-4 bg-white/10 rounded-lg border border-white/20">
-              <p className="text-sm text-white/80">
-                Configuration required: VITE_OAUTH_PORTAL_URL and VITE_APP_ID are missing in environment variables.
-              </p>
-            </div>
-          )}
+
+          <div className="flex flex-col gap-4">
+            {hasSupabase && (
+              <Button
+                onClick={handleSupabaseLogin}
+                className="bg-white text-primary hover:bg-white/90 px-8 py-3 text-lg font-semibold flex items-center gap-2"
+              >
+                <LogIn className="w-5 h-5" />
+                Sign In with Google
+              </Button>
+            )}
+
+            {loginUrl ? (
+              <Button
+                onClick={() => (window.location.href = loginUrl)}
+                variant="outline"
+                className="border-white text-white hover:bg-white/10 px-8 py-3 text-lg font-semibold"
+              >
+                Sign In with OAuth Portal
+              </Button>
+            ) : !hasSupabase && (
+              <div className="p-4 bg-white/10 rounded-lg border border-white/20">
+                <p className="text-sm text-white/80">
+                  Configuration required: VITE_SUPABASE_URL or VITE_OAUTH_PORTAL_URL is missing.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

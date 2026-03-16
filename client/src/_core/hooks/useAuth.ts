@@ -2,6 +2,7 @@ import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
+import { supabase } from "@/lib/supabase.js";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -26,7 +27,10 @@ export function useAuth(options?: UseAuthOptions) {
 
   const logout = useCallback(async () => {
     try {
-      await logoutMutation.mutateAsync();
+      await Promise.all([
+        logoutMutation.mutateAsync(),
+        supabase.auth.signOut()
+      ]);
     } catch (error: unknown) {
       if (
         error instanceof TRPCClientError &&
@@ -34,6 +38,8 @@ export function useAuth(options?: UseAuthOptions) {
       ) {
         return;
       }
+      // Also try to sign out from supabase even if trpc fails
+      await supabase.auth.signOut().catch(() => {});
       throw error;
     } finally {
       utils.auth.me.setData(undefined, null);
