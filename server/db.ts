@@ -16,8 +16,8 @@ import {
   cardChecklists,
   cardCustomFields,
   projectDates,
-} from "../drizzle/schema.ts";
-import { ENV } from './_core/env.ts';
+} from "../drizzle/schema.js";
+import { ENV } from './_core/env.js';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 

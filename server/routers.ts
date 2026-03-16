@@ -1,8 +1,8 @@
-import { COOKIE_NAME } from "../shared/const.ts";
+import { COOKIE_NAME } from "../shared/const.js";
 import { and } from "drizzle-orm";
-import { getSessionCookieOptions } from "./_core/cookies.ts";
-import { systemRouter } from "./_core/systemRouter.ts";
-import { publicProcedure, router, protectedProcedure } from "./_core/trpc.ts";
+import { getSessionCookieOptions } from "./_core/cookies.js";
+import { systemRouter } from "./_core/systemRouter.js";
+import { publicProcedure, router, protectedProcedure } from "./_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
@@ -14,7 +14,7 @@ import {
   getListCards,
   getCardById,
   getMirroredCards,
-} from "./db.ts";
+} from "./db.js";
 import {
   boards,
   boardMembers,
@@ -25,8 +25,8 @@ import {
   notifications,
   userPreferences,
   users,
-} from "../drizzle/schema.ts";
-import { getDb } from "./db.ts";
+} from "../drizzle/schema.js";
+import { getDb } from "./db.js";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
