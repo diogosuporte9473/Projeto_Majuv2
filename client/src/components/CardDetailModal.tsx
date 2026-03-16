@@ -98,9 +98,9 @@ export default function CardDetailModal({
     }
   };
 
-  const handleToggleChecklist = async (id: number, currentStatus: number) => {
+  const handleToggleChecklist = async (id: number, currentStatus: boolean) => {
     try {
-      await updateChecklistMutation.mutateAsync({ id, completed: currentStatus === 0 });
+      await updateChecklistMutation.mutateAsync({ id, completed: !currentStatus });
     } catch (error) {
       toast.error("Erro ao atualizar item");
     }
@@ -276,13 +276,13 @@ export default function CardDetailModal({
                     <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted border border-border">
                       <input
                         type="checkbox"
-                        checked={item.completed === 1}
+                        checked={item.completed}
                         onChange={() => handleToggleChecklist(item.id, item.completed)}
                         className="w-5 h-5 rounded cursor-pointer"
                       />
                       <span
                         className={`flex-1 ${
-                          item.completed === 1
+                          item.completed
                             ? "line-through text-muted-foreground"
                             : "text-foreground"
                         }`}
