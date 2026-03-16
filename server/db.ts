@@ -17,6 +17,7 @@ import {
   cardCustomFields,
   projectDates,
 } from "../drizzle/schema.js";
+import { InsertCard } from "../drizzle/schema.js";
 import { ENV } from './_core/env.js';
 
 let _db: ReturnType<typeof drizzle> | null = null;

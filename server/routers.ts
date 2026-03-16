@@ -25,6 +25,10 @@ import {
   notifications,
   userPreferences,
   users,
+  cardLabels,
+  cardChecklists,
+  cardCustomFields,
+  projectDates,
 } from "../drizzle/schema.js";
 import { invokeLLM, Message as LLMMessage } from "./_core/llm.js";
 import { getDb } from "./db.js";
@@ -762,9 +766,9 @@ export const appRouter = router({
       const db = await getDb();
       if (!db) return { totalBoards: 0, totalCards: 0, totalUsers: 0 };
       
-      const [boardsCount] = await db.select({ count: z.any() }).from(boards);
-      const [cardsCount] = await db.select({ count: z.any() }).from(cards);
-      const [usersCount] = await db.select({ count: z.any() }).from(users);
+      const [boardsCount] = await db.select({ count: z.any() as any }).from(boards);
+      const [cardsCount] = await db.select({ count: z.any() as any }).from(cards);
+      const [usersCount] = await db.select({ count: z.any() as any }).from(users);
       
       return {
         totalBoards: Number(boardsCount?.count || 0),
