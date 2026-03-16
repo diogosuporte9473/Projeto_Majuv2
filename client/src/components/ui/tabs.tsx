@@ -18,6 +18,7 @@ function Tabs({
 
 function TabsList({
   className,
+  children,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.List>) {
   return (
@@ -28,12 +29,15 @@ function TabsList({
         className
       )}
       {...props}
-    />
+    >
+      {children}
+    </TabsPrimitive.List>
   );
 }
 
 function TabsTrigger({
   className,
+  children,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
@@ -44,12 +48,15 @@ function TabsTrigger({
         className
       )}
       {...props}
-    />
+    >
+      {children}
+    </TabsPrimitive.Trigger>
   );
 }
 
 function TabsContent({
   className,
+  children,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Content>) {
   return (
@@ -57,7 +64,9 @@ function TabsContent({
       data-slot="tabs-content"
       className={cn("flex-1 outline-none", className)}
       {...props}
-    />
+    >
+      {children}
+    </TabsPrimitive.Content>
   );
 }
 

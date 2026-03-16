@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
-import { Loader2 } from "lucide-react";
+import { Loader2, Layout, CheckSquare, Sparkles, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -100,16 +100,63 @@ export default function Home() {
   return (
     <TrelloDashboardLayout>
       <div className="p-8">
-        <div className="max-w-6xl">
-          <h2 className="text-3xl font-bold text-foreground mb-2">Welcome, {user?.name}!</h2>
-          <p className="text-muted-foreground mb-8">
-            Select a board from the sidebar or create a new one to get started.
-          </p>
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-12">
+            <h1 className="text-4xl font-extrabold text-foreground mb-3">Bem-vindo, {user?.name}! 👋</h1>
+            <p className="text-xl text-muted-foreground">
+              Seu centro de produtividade pessoal. Comece a organizar suas tarefas hoje.
+            </p>
+          </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-card rounded-lg p-6 border border-border">
-              <h3 className="font-semibold mb-2">Getting Started</h3>
-              <p className="text-sm text-muted-foreground">Create your first board and start organizing tasks with your team.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="bg-card p-8 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all group">
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+                <Layout className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-foreground">Quadros Dinâmicos</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Crie quadros para diferentes projetos e organize suas tarefas em listas personalizáveis.
+              </p>
+            </div>
+
+            <div className="bg-card p-8 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all group">
+              <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-accent/20 transition-colors">
+                <CheckSquare className="w-6 h-6 text-accent" />
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-foreground">Checklists & Etiquetas</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Adicione detalhes minuciosos aos seus cartões com checklists e etiquetas coloridas para fácil identificação.
+              </p>
+            </div>
+
+            <div className="bg-card p-8 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all group">
+              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-green-500/20 transition-colors">
+                <Sparkles className="w-6 h-6 text-green-500" />
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-foreground">Assistente IA</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Use nossa inteligência artificial integrada para sugerir passos de projeto e organizar seu fluxo de trabalho.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-16 p-8 bg-gradient-to-r from-primary to-primary/80 rounded-3xl text-primary-foreground shadow-xl">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+              <div className="flex-1">
+                <h2 className="text-3xl font-bold mb-4">Pronto para começar?</h2>
+                <p className="text-primary-foreground/80 text-lg">
+                  Crie seu primeiro quadro agora e experimente uma nova forma de gerenciar projetos.
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col items-center">
+                   <p className="text-sm font-medium mb-2 opacity-80 italic">Dica: Use o botão de chat na visualização do quadro para falar com a Maju AI!</p>
+                   <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full border border-white/20">
+                     <MessageSquare className="w-4 h-4" />
+                     <span className="text-sm font-semibold">Assistente IA Ativo</span>
+                   </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Shield } from "lucide-react";
+import { Plus, Trash2, Shield, BarChart2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -17,6 +17,11 @@ export default function Admin() {
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
 
   // Queries
+  const { data: stats } = trpc.stats.getGeneral.useQuery(
+    undefined,
+    { enabled: user?.role === "admin" }
+  );
+
   const { data: users, isLoading: usersLoading } = trpc.admin.users.list.useQuery(
     undefined,
     { enabled: user?.role === "admin" }
@@ -117,10 +122,32 @@ export default function Admin() {
         </div>
 
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="users">Usuários</TabsTrigger>
             <TabsTrigger value="permissions">Permissões</TabsTrigger>
+            <TabsTrigger value="stats">Estatísticas</TabsTrigger>
           </TabsList>
+
+          {/* Aba de Estatísticas */}
+          <TabsContent value="stats" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="p-6 flex flex-col items-center justify-center text-center">
+                <BarChart2 className="w-12 h-12 text-primary mb-4" />
+                <h3 className="text-lg font-semibold text-muted-foreground uppercase tracking-wider">Total de Quadros</h3>
+                <p className="text-4xl font-bold text-foreground">{stats?.totalBoards || 0}</p>
+              </Card>
+              <Card className="p-6 flex flex-col items-center justify-center text-center">
+                <BarChart2 className="w-12 h-12 text-accent mb-4" />
+                <h3 className="text-lg font-semibold text-muted-foreground uppercase tracking-wider">Total de Cartões</h3>
+                <p className="text-4xl font-bold text-foreground">{stats?.totalCards || 0}</p>
+              </Card>
+              <Card className="p-6 flex flex-col items-center justify-center text-center">
+                <BarChart2 className="w-12 h-12 text-green-500 mb-4" />
+                <h3 className="text-lg font-semibold text-muted-foreground uppercase tracking-wider">Total de Usuários</h3>
+                <p className="text-4xl font-bold text-foreground">{stats?.totalUsers || 0}</p>
+              </Card>
+            </div>
+          </TabsContent>
 
           {/* Aba de Usuários */}
           <TabsContent value="users" className="space-y-6">

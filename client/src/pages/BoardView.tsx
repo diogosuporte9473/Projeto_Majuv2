@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, MessageSquare, X } from "lucide-react";
 import { useState } from "react";
 import {
   DndContext,
@@ -17,6 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { DraggableCard } from "@/components/DraggableCard";
+import { AIChatBox, Message } from "@/components/AIChatBox";
 
 export default function BoardView() {
   const [, params] = useRoute("/board/:id");
@@ -36,8 +37,26 @@ export default function BoardView() {
   const [newListName, setNewListName] = useState("");
   const [showNewList, setShowNewList] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    { role: "system", content: "You are a helpful assistant for the Maju Task Manager. You can help users organize their tasks, suggest project steps, and answer questions about their boards." }
+  ]);
+
   const createListMutation = trpc.lists.create.useMutation();
   const reorderCardMutation = trpc.cards.reorder.useMutation();
+  const aiChatMutation = trpc.ai.chat.useMutation();
+
+  const handleSendMessage = async (content: string) => {
+    const newMessages: Message[] = [...messages, { role: "user", content }];
+    setMessages(newMessages);
+    
+    try {
+      const response = await aiChatMutation.mutateAsync({ messages: newMessages });
+      setMessages(prev => [...prev, { role: "assistant", content: response }]);
+    } catch (error) {
+      toast.error("Erro ao falar com a IA");
+    }
+  };
 
   const handleCreateList = async () => {
     if (!newListName.trim() || !boardId) return;
@@ -184,6 +203,42 @@ export default function BoardView() {
             ) : null}
           </DragOverlay>
         </DndContext>
+
+        {/* AI Chat Button */}
+        <div className="fixed bottom-8 right-8 z-50">
+          {showAIChat ? (
+            <div className="w-96 h-[500px] shadow-2xl transition-all duration-300 transform scale-100 opacity-100 origin-bottom-right">
+              <div className="bg-primary text-primary-foreground p-3 rounded-t-lg flex items-center justify-between border-b border-primary-foreground/10">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="font-semibold">Maju AI</span>
+                </div>
+                <Button 
+                  onClick={() => setShowAIChat(false)} 
+                  variant="ghost" 
+                  size="icon-sm"
+                  className="hover:bg-primary-foreground/10 text-primary-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <AIChatBox 
+                messages={messages}
+                onSendMessage={handleSendMessage}
+                isLoading={aiChatMutation.isPending}
+                height="100%"
+                className="rounded-t-none border-t-0"
+              />
+            </div>
+          ) : (
+            <Button
+              onClick={() => setShowAIChat(true)}
+              className="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+            >
+              <MessageSquare className="w-6 h-6" />
+            </Button>
+          )}
+        </div>
       </div>
     </TrelloDashboardLayout>
   );

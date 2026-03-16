@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Plus, Trash2, Tag, CheckSquare, Calendar } from "lucide-react";
+import { X, Plus, Trash2, Tag, CheckSquare, Calendar, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 interface CardDetailModalProps {
   isOpen: boolean;
@@ -21,75 +22,118 @@ export default function CardDetailModal({
   cardTitle,
   cardDescription,
 }: CardDetailModalProps) {
-  const [labels, setLabels] = useState<Array<{ id: number; label: string; color: string }>>([]);
-  const [checklists, setChecklists] = useState<Array<{ id: number; title: string; completed: number }>>([]);
-  const [customFields, setCustomFields] = useState<Array<{ id: number; fieldName: string; fieldValue: string; fieldType: string }>>([]);
-  const [projectDates, setProjectDates] = useState<{ projectStartDate?: Date; projectEndDate?: Date } | null>(null);
+  const utils = trpc.useUtils();
+
+  // Queries
+  const { data: labels, isLoading: labelsLoading } = trpc.cardDetails.getLabels.useQuery({ cardId });
+  const { data: checklists, isLoading: checklistsLoading } = trpc.cardDetails.getChecklists.useQuery({ cardId });
+  const { data: projectDates, isLoading: datesLoading } = trpc.cardDetails.getProjectDates.useQuery({ cardId });
+
+  // Mutations
+  const addLabelMutation = trpc.cardDetails.addLabel.useMutation({
+    onSuccess: () => utils.cardDetails.getLabels.invalidate({ cardId }),
+  });
+  const deleteLabelMutation = trpc.cardDetails.deleteLabel.useMutation({
+    onSuccess: () => utils.cardDetails.getLabels.invalidate({ cardId }),
+  });
+  const addChecklistMutation = trpc.cardDetails.addChecklist.useMutation({
+    onSuccess: () => utils.cardDetails.getChecklists.invalidate({ cardId }),
+  });
+  const updateChecklistMutation = trpc.cardDetails.updateChecklist.useMutation({
+    onSuccess: () => utils.cardDetails.getChecklists.invalidate({ cardId }),
+  });
+  const deleteChecklistMutation = trpc.cardDetails.deleteChecklist.useMutation({
+    onSuccess: () => utils.cardDetails.getChecklists.invalidate({ cardId }),
+  });
+  const upsertDatesMutation = trpc.cardDetails.upsertProjectDates.useMutation({
+    onSuccess: () => utils.cardDetails.getProjectDates.invalidate({ cardId }),
+  });
+  const updateDescriptionMutation = trpc.cardDetails.updateDescription.useMutation({
+    onSuccess: () => {
+      utils.cards.getByList.invalidate();
+      toast.success("Descrição atualizada");
+    }
+  });
 
   const [newLabel, setNewLabel] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#4b4897");
   const [newChecklistTitle, setNewChecklistTitle] = useState("");
-  const [newFieldName, setNewFieldName] = useState("");
-  const [newFieldValue, setNewFieldValue] = useState("");
-  const [newFieldType, setNewFieldType] = useState<"text" | "select" | "date" | "number">("text");
+  const [description, setDescription] = useState(cardDescription || "");
 
-  const handleAddLabel = () => {
+  const handleAddLabel = async () => {
     if (!newLabel.trim()) {
       toast.error("Nome da etiqueta é obrigatório");
       return;
     }
-    setLabels([...labels, { id: Date.now(), label: newLabel, color: newLabelColor }]);
-    setNewLabel("");
-    setNewLabelColor("#4b4897");
-    toast.success("Etiqueta adicionada");
+    try {
+      await addLabelMutation.mutateAsync({ cardId, label: newLabel, color: newLabelColor });
+      setNewLabel("");
+      setNewLabelColor("#4b4897");
+      toast.success("Etiqueta adicionada");
+    } catch (error) {
+      toast.error("Erro ao adicionar etiqueta");
+    }
   };
 
-  const handleRemoveLabel = (id: number) => {
-    setLabels(labels.filter((l) => l.id !== id));
-    toast.success("Etiqueta removida");
+  const handleRemoveLabel = async (id: number) => {
+    try {
+      await deleteLabelMutation.mutateAsync({ id });
+      toast.success("Etiqueta removida");
+    } catch (error) {
+      toast.error("Erro ao remover etiqueta");
+    }
   };
 
-  const handleAddChecklist = () => {
+  const handleAddChecklist = async () => {
     if (!newChecklistTitle.trim()) {
       toast.error("Título do checklist é obrigatório");
       return;
     }
-    setChecklists([...checklists, { id: Date.now(), title: newChecklistTitle, completed: 0 }]);
-    setNewChecklistTitle("");
-    toast.success("Item de checklist adicionado");
-  };
-
-  const handleToggleChecklist = (id: number) => {
-    setChecklists(
-      checklists.map((c) =>
-        c.id === id ? { ...c, completed: c.completed === 0 ? 1 : 0 } : c
-      )
-    );
-  };
-
-  const handleRemoveChecklist = (id: number) => {
-    setChecklists(checklists.filter((c) => c.id !== id));
-    toast.success("Item de checklist removido");
-  };
-
-  const handleAddCustomField = () => {
-    if (!newFieldName.trim() || !newFieldValue.trim()) {
-      toast.error("Nome e valor do campo são obrigatórios");
-      return;
+    try {
+      await addChecklistMutation.mutateAsync({ cardId, title: newChecklistTitle });
+      setNewChecklistTitle("");
+      toast.success("Item de checklist adicionado");
+    } catch (error) {
+      toast.error("Erro ao adicionar item");
     }
-    setCustomFields([
-      ...customFields,
-      { id: Date.now(), fieldName: newFieldName, fieldValue: newFieldValue, fieldType: newFieldType },
-    ]);
-    setNewFieldName("");
-    setNewFieldValue("");
-    setNewFieldType("text");
-    toast.success("Campo personalizado adicionado");
   };
 
-  const handleRemoveCustomField = (id: number) => {
-    setCustomFields(customFields.filter((f) => f.id !== id));
-    toast.success("Campo personalizado removido");
+  const handleToggleChecklist = async (id: number, currentStatus: number) => {
+    try {
+      await updateChecklistMutation.mutateAsync({ id, completed: currentStatus === 0 });
+    } catch (error) {
+      toast.error("Erro ao atualizar item");
+    }
+  };
+
+  const handleRemoveChecklist = async (id: number) => {
+    try {
+      await deleteChecklistMutation.mutateAsync({ id });
+      toast.success("Item de checklist removido");
+    } catch (error) {
+      toast.error("Erro ao remover item");
+    }
+  };
+
+  const handleUpdateDates = async (start?: string, end?: string) => {
+    try {
+      await upsertDatesMutation.mutateAsync({
+        cardId,
+        startDate: start ? new Date(start) : undefined,
+        endDate: end ? new Date(end) : undefined,
+      });
+      toast.success("Datas atualizadas");
+    } catch (error) {
+      toast.error("Erro ao atualizar datas");
+    }
+  };
+
+  const handleUpdateDescription = async () => {
+    try {
+      await updateDescriptionMutation.mutateAsync({ cardId, description });
+    } catch (error) {
+      toast.error("Erro ao atualizar descrição");
+    }
   };
 
   return (
@@ -120,10 +164,20 @@ export default function CardDetailModal({
             <div className="p-4 rounded-lg bg-muted border border-border">
               <h3 className="font-semibold text-foreground mb-3">Descrição</h3>
               <textarea
-                defaultValue={cardDescription || ""}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder="Adicione uma descrição mais detalhada..."
-                className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent min-h-[120px]"
+                className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent min-h-[120px] mb-2"
               />
+              <Button 
+                onClick={handleUpdateDescription}
+                disabled={updateDescriptionMutation.isPending}
+                size="sm"
+                className="bg-accent text-accent-foreground hover:bg-accent/90"
+              >
+                {updateDescriptionMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Salvar Descrição
+              </Button>
             </div>
           </TabsContent>
 
@@ -150,9 +204,10 @@ export default function CardDetailModal({
                   </div>
                   <Button
                     onClick={handleAddLabel}
+                    disabled={addLabelMutation.isPending}
                     className="bg-accent text-accent-foreground hover:bg-accent/90 ml-auto"
                   >
-                    <Plus className="w-4 h-4 mr-2" />
+                    {addLabelMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
                     Adicionar
                   </Button>
                 </div>
@@ -161,7 +216,9 @@ export default function CardDetailModal({
 
             <div className="space-y-2">
               <h3 className="font-semibold text-foreground">Etiquetas</h3>
-              {labels.length === 0 ? (
+              {labelsLoading ? (
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              ) : !labels || labels.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Nenhuma etiqueta adicionada</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -198,9 +255,10 @@ export default function CardDetailModal({
                 />
                 <Button
                   onClick={handleAddChecklist}
+                  disabled={addChecklistMutation.isPending}
                   className="bg-accent text-accent-foreground hover:bg-accent/90"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
+                  {addChecklistMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
                   Adicionar
                 </Button>
               </div>
@@ -208,7 +266,9 @@ export default function CardDetailModal({
 
             <div className="space-y-2">
               <h3 className="font-semibold text-foreground">Itens do Checklist</h3>
-              {checklists.length === 0 ? (
+              {checklistsLoading ? (
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              ) : !checklists || checklists.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Nenhum item de checklist</p>
               ) : (
                 <div className="space-y-2">
@@ -217,7 +277,7 @@ export default function CardDetailModal({
                       <input
                         type="checkbox"
                         checked={item.completed === 1}
-                        onChange={() => handleToggleChecklist(item.id)}
+                        onChange={() => handleToggleChecklist(item.id, item.completed)}
                         className="w-5 h-5 rounded cursor-pointer"
                       />
                       <span
@@ -245,108 +305,37 @@ export default function CardDetailModal({
           <TabsContent value="dates" className="space-y-4">
             <Card className="p-4 border border-border">
               <h3 className="font-semibold text-foreground mb-4">Datas do Projeto</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Data de Início
-                  </label>
-                  <input
-                    type="date"
-                    defaultValue={projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : ""}
-                    onChange={(e) =>
-                      setProjectDates({
-                        ...projectDates,
-                        projectStartDate: e.target.value ? new Date(e.target.value) : undefined,
-                      })
-                    }
-                    className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Data de Término
-                  </label>
-                  <input
-                    type="date"
-                    defaultValue={projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : ""}
-                    onChange={(e) =>
-                      setProjectDates({
-                        ...projectDates,
-                        projectEndDate: e.target.value ? new Date(e.target.value) : undefined,
-                      })
-                    }
-                    className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-4 border border-border">
-              <h3 className="font-semibold text-foreground mb-4">Campos Personalizados</h3>
-              <div className="space-y-3 mb-4">
-                <input
-                  type="text"
-                  value={newFieldName}
-                  onChange={(e) => setNewFieldName(e.target.value)}
-                  placeholder="Nome do campo"
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-                <input
-                  type="text"
-                  value={newFieldValue}
-                  onChange={(e) => setNewFieldValue(e.target.value)}
-                  placeholder="Valor do campo"
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-                <select
-                  value={newFieldType}
-                  onChange={(e) => setNewFieldType(e.target.value as any)}
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                >
-                  <option value="text">Texto</option>
-                  <option value="select">Seleção</option>
-                  <option value="date">Data</option>
-                  <option value="number">Número</option>
-                </select>
-                <Button
-                  onClick={handleAddCustomField}
-                  className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Adicionar Campo
-                </Button>
-              </div>
-
-              {customFields.length > 0 && (
-                <div className="space-y-2">
-                  {customFields.map((field) => (
-                    <div key={field.id} className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border">
-                      <div>
-                        <p className="font-medium text-foreground">{field.fieldName}</p>
-                        <p className="text-sm text-muted-foreground">{field.fieldValue}</p>
-                      </div>
-                      <button
-                        onClick={() => handleRemoveCustomField(field.id)}
-                        className="text-destructive hover:text-destructive/80"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+              {datesLoading ? (
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Data de Início
+                    </label>
+                    <input
+                      type="date"
+                      defaultValue={projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : ""}
+                      onChange={(e) => handleUpdateDates(e.target.value, projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : undefined)}
+                      className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Data de Término
+                    </label>
+                    <input
+                      type="date"
+                      defaultValue={projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : ""}
+                      onChange={(e) => handleUpdateDates(projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : undefined, e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
                 </div>
               )}
             </Card>
           </TabsContent>
         </Tabs>
-
-        <div className="flex gap-3 justify-end mt-6">
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button className="bg-accent text-accent-foreground hover:bg-accent/90" onClick={onClose}>
-            Salvar Alterações
-          </Button>
-        </div>
       </DialogContent>
     </Dialog>
   );

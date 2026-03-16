@@ -4,8 +4,9 @@ import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { Loader2, User, Bell } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 export default function Settings() {
@@ -166,18 +167,19 @@ function NotificationSettings() {
   const { data: preferences, isLoading } = trpc.settings.getPreferences.useQuery();
   const updatePrefsMutation = trpc.settings.updatePreferences.useMutation();
 
-  const [emailOnCardAssigned, setEmailOnCardAssigned] = useState(
-    preferences?.emailOnCardAssigned ?? true
-  );
-  const [emailOnCardUpdated, setEmailOnCardUpdated] = useState(
-    preferences?.emailOnCardUpdated ?? true
-  );
-  const [emailOnMirroredCard, setEmailOnMirroredCard] = useState(
-    preferences?.emailOnMirroredCard ?? true
-  );
-  const [emailOnDueDate, setEmailOnDueDate] = useState(
-    preferences?.emailOnDueDate ?? true
-  );
+  const [emailOnCardAssigned, setEmailOnCardAssigned] = useState(true);
+  const [emailOnCardUpdated, setEmailOnCardUpdated] = useState(true);
+  const [emailOnMirroredCard, setEmailOnMirroredCard] = useState(true);
+  const [emailOnDueDate, setEmailOnDueDate] = useState(true);
+
+  useEffect(() => {
+    if (preferences) {
+      setEmailOnCardAssigned(preferences.emailOnCardAssigned);
+      setEmailOnCardUpdated(preferences.emailOnCardUpdated);
+      setEmailOnMirroredCard(preferences.emailOnMirroredCard);
+      setEmailOnDueDate(preferences.emailOnDueDate);
+    }
+  }, [preferences]);
 
   const handleUpdatePreferences = async () => {
     try {
@@ -217,14 +219,10 @@ function NotificationSettings() {
                   Receba email quando um cartão for atribuído a você
                 </p>
               </div>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={emailOnCardAssigned}
-                  onChange={(e) => setEmailOnCardAssigned(e.target.checked)}
-                  className="w-5 h-5 rounded border-border"
-                />
-              </label>
+              <Switch
+                checked={emailOnCardAssigned}
+                onCheckedChange={setEmailOnCardAssigned}
+              />
             </div>
 
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted border border-border">
@@ -234,14 +232,10 @@ function NotificationSettings() {
                   Receba email quando um cartão for atualizado
                 </p>
               </div>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={emailOnCardUpdated}
-                  onChange={(e) => setEmailOnCardUpdated(e.target.checked)}
-                  className="w-5 h-5 rounded border-border"
-                />
-              </label>
+              <Switch
+                checked={emailOnCardUpdated}
+                onCheckedChange={setEmailOnCardUpdated}
+              />
             </div>
 
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted border border-border">
@@ -251,14 +245,10 @@ function NotificationSettings() {
                   Receba email quando um cartão for espelhado
                 </p>
               </div>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={emailOnMirroredCard}
-                  onChange={(e) => setEmailOnMirroredCard(e.target.checked)}
-                  className="w-5 h-5 rounded border-border"
-                />
-              </label>
+              <Switch
+                checked={emailOnMirroredCard}
+                onCheckedChange={setEmailOnMirroredCard}
+              />
             </div>
 
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted border border-border">
@@ -268,14 +258,10 @@ function NotificationSettings() {
                   Receba alerta quando a data de vencimento estiver próxima
                 </p>
               </div>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={emailOnDueDate}
-                  onChange={(e) => setEmailOnDueDate(e.target.checked)}
-                  className="w-5 h-5 rounded border-border"
-                />
-              </label>
+              <Switch
+                checked={emailOnDueDate}
+                onCheckedChange={setEmailOnDueDate}
+              />
             </div>
           </div>
         </div>
