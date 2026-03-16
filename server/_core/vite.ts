@@ -2,9 +2,13 @@ import express, { type Express } from "express";
 import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
+import { fileURLToPath } from "url";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export async function setupVite(app: any, server: Server) {
   const serverOptions = {
@@ -14,7 +18,7 @@ export async function setupVite(app: any, server: Server) {
   };
 
   const vite = await createViteServer({
-    ...viteConfig as any,
+    ...(viteConfig as any),
     configFile: false,
     server: serverOptions,
     appType: "custom",
@@ -26,7 +30,7 @@ export async function setupVite(app: any, server: Server) {
 
     try {
       const clientTemplate = path.resolve(
-        import.meta.dirname,
+        __dirname,
         "../..",
         "client",
         "index.html"
@@ -50,8 +54,8 @@ export async function setupVite(app: any, server: Server) {
 export function serveStatic(app: any) {
   const distPath =
     process.env.NODE_ENV === "development"
-      ? path.resolve(import.meta.dirname, "../..", "dist")
-      : path.resolve(import.meta.dirname);
+      ? path.resolve(__dirname, "../..", "dist")
+      : path.resolve(__dirname);
   if (!fs.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
