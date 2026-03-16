@@ -2,7 +2,7 @@ import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
-import { supabase } from "@/lib/supabase.js";
+import { supabase } from "@/lib/supabase";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;

@@ -3,7 +3,7 @@ import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
 import { Loader2, LogIn } from "lucide-react";
-import { supabase } from "@/lib/supabase.js";
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
