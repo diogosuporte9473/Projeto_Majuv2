@@ -436,10 +436,10 @@ export const appRouter = router({
       }
 
       return {
-        emailOnCardAssigned: prefs[0].emailOnCardAssigned === 1,
-        emailOnCardUpdated: prefs[0].emailOnCardUpdated === 1,
-        emailOnMirroredCard: prefs[0].emailOnMirroredCard === 1,
-        emailOnDueDate: prefs[0].emailOnDueDate === 1,
+        emailOnCardAssigned: prefs[0].emailOnCardAssigned,
+        emailOnCardUpdated: prefs[0].emailOnCardUpdated,
+        emailOnMirroredCard: prefs[0].emailOnMirroredCard,
+        emailOnDueDate: prefs[0].emailOnDueDate,
       };
     }),
     updatePreferences: protectedProcedure
@@ -469,21 +469,21 @@ export const appRouter = router({
         if (existing.length === 0) {
           await db.insert(userPreferences).values({
             userId: ctx.user.id,
-            emailOnCardAssigned: input.emailOnCardAssigned ? 1 : 0,
-            emailOnCardUpdated: input.emailOnCardUpdated ? 1 : 0,
-            emailOnMirroredCard: input.emailOnMirroredCard ? 1 : 0,
-            emailOnDueDate: input.emailOnDueDate ? 1 : 0,
+            emailOnCardAssigned: input.emailOnCardAssigned ?? true,
+            emailOnCardUpdated: input.emailOnCardUpdated ?? true,
+            emailOnMirroredCard: input.emailOnMirroredCard ?? true,
+            emailOnDueDate: input.emailOnDueDate ?? true,
           });
         } else {
           const updateData: any = {};
           if (input.emailOnCardAssigned !== undefined)
-            updateData.emailOnCardAssigned = input.emailOnCardAssigned ? 1 : 0;
+            updateData.emailOnCardAssigned = input.emailOnCardAssigned;
           if (input.emailOnCardUpdated !== undefined)
-            updateData.emailOnCardUpdated = input.emailOnCardUpdated ? 1 : 0;
+            updateData.emailOnCardUpdated = input.emailOnCardUpdated;
           if (input.emailOnMirroredCard !== undefined)
-            updateData.emailOnMirroredCard = input.emailOnMirroredCard ? 1 : 0;
+            updateData.emailOnMirroredCard = input.emailOnMirroredCard;
           if (input.emailOnDueDate !== undefined)
-            updateData.emailOnDueDate = input.emailOnDueDate ? 1 : 0;
+            updateData.emailOnDueDate = input.emailOnDueDate;
 
           await db
             .update(userPreferences)
@@ -570,7 +570,7 @@ export const appRouter = router({
           cardId: input.cardId,
           title: input.title,
           position: input.position || 0,
-          completed: 0,
+          completed: false,
         });
       }),
     updateChecklist: protectedProcedure
@@ -580,7 +580,7 @@ export const appRouter = router({
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         return await db
           .update(cardChecklists)
-          .set({ completed: input.completed ? 1 : 0 })
+          .set({ completed: input.completed })
           .where(eq(cardChecklists.id, input.id));
       }),
     deleteChecklist: protectedProcedure

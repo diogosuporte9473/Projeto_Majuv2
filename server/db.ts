@@ -255,10 +255,10 @@ export async function getCardChecklists(cardId: number) {
 export async function addCardChecklist(cardId: number, title: string, position: number = 0) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return await db.insert(cardChecklists).values({ cardId, title, position, completed: 0 });
+  return await db.insert(cardChecklists).values({ cardId, title, position, completed: false });
 }
 
-export async function updateCardChecklist(checklistId: number, completed: number) {
+export async function updateCardChecklist(checklistId: number, completed: boolean) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return await db.update(cardChecklists).set({ completed }).where(eq(cardChecklists.id, checklistId));

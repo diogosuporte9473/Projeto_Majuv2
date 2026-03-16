@@ -122,7 +122,7 @@ export const notifications = pgTable("notifications", {
   cardId: integer("cardId"),
   title: varchar("title", { length: 255 }).notNull(),
   message: text("message"),
-  read: integer("read").default(0).notNull(),
+  read: boolean("read").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -133,10 +133,10 @@ export type InsertNotification = typeof notifications.$inferInsert;
 export const userPreferences = pgTable("userPreferences", {
   id: serial("id").primaryKey(),
   userId: integer("userId").notNull().unique(),
-  emailOnCardAssigned: integer("emailOnCardAssigned").default(1).notNull(),
-  emailOnCardUpdated: integer("emailOnCardUpdated").default(1).notNull(),
-  emailOnMirroredCard: integer("emailOnMirroredCard").default(1).notNull(),
-  emailOnDueDate: integer("emailOnDueDate").default(1).notNull(),
+  emailOnCardAssigned: boolean("emailOnCardAssigned").default(true).notNull(),
+  emailOnCardUpdated: boolean("emailOnCardUpdated").default(true).notNull(),
+  emailOnMirroredCard: boolean("emailOnMirroredCard").default(true).notNull(),
+  emailOnDueDate: boolean("emailOnDueDate").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -161,7 +161,7 @@ export const cardChecklists = pgTable("cardChecklists", {
   id: serial("id").primaryKey(),
   cardId: integer("cardId").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
-  completed: integer("completed").default(0).notNull(),
+  completed: boolean("completed").default(false).notNull(),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
