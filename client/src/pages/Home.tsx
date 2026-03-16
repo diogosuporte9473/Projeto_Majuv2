@@ -1,76 +1,96 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
-import { Loader2, LogIn } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { Loader2 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
 
-  const handleSupabaseLogin = async () => {
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error("Supabase login error:", error);
+      if (isSignUp) {
+        const { error } = await (supabase.auth as any).signUp({ email, password });
+        if (error) throw error;
+        toast.success("Check your email for the confirmation link!");
+      } else {
+        const { error } = await (supabase.auth as any).signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Authentication failed");
+    } finally {
+      setAuthLoading(false);
     }
   };
 
-  if (loading) {
+  // Only show the full-page loader on initial session check or when explicitly needed
+  if (loading && !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">Carregando sessão...</p>
         </div>
       </div>
     );
   }
 
   if (!isAuthenticated) {
-    const loginUrl = getLoginUrl();
-    const hasSupabase = !!import.meta.env.VITE_SUPABASE_URL;
-
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-        <div className="text-center max-w-md mx-auto px-4">
-          <h1 className="text-4xl font-bold mb-4">Maju Task Manager</h1>
-          <p className="text-lg mb-8 text-primary-foreground/90">
-            Organize your team work with powerful task management
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-primary-foreground p-4">
+        <div className="bg-white text-foreground p-8 rounded-xl shadow-2xl w-full max-w-md">
+          <h1 className="text-3xl font-bold mb-2 text-center text-primary">Maju Task Manager</h1>
+          <p className="text-muted-foreground mb-8 text-center">
+            {isSignUp ? "Create your account" : "Sign in to manage your tasks"}
           </p>
+          
+          <form onSubmit={handleAuth} className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-2 border rounded-md"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full p-2 border rounded-md"
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={authLoading}
+              className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-2"
+            >
+              {authLoading ? <Loader2 className="animate-spin mr-2" /> : null}
+              {isSignUp ? "Sign Up" : "Sign In"}
+            </Button>
+          </form>
 
-          <div className="flex flex-col gap-4">
-            {hasSupabase && (
-              <Button
-                onClick={handleSupabaseLogin}
-                className="bg-white text-primary hover:bg-white/90 px-8 py-3 text-lg font-semibold flex items-center gap-2"
-              >
-                <LogIn className="w-5 h-5" />
-                Sign In with Google
-              </Button>
-            )}
-
-            {loginUrl ? (
-              <Button
-                onClick={() => (window.location.href = loginUrl)}
-                variant="outline"
-                className="border-white text-white hover:bg-white/10 px-8 py-3 text-lg font-semibold"
-              >
-                Sign In with OAuth Portal
-              </Button>
-            ) : !hasSupabase && (
-              <div className="p-4 bg-white/10 rounded-lg border border-white/20">
-                <p className="text-sm text-white/80">
-                  Configuration required: VITE_SUPABASE_URL or VITE_OAUTH_PORTAL_URL is missing.
-                </p>
-              </div>
-            )}
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-primary hover:underline text-sm"
+            >
+              {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
+            </button>
           </div>
         </div>
       </div>
