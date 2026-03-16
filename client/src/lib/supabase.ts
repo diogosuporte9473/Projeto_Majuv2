@@ -7,7 +7,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn("Supabase URL or Anon Key is missing in environment variables.");
 }
 
+// Ensure the URL is valid, otherwise createClient might throw
+const finalUrl = supabaseUrl?.startsWith("http") ? supabaseUrl : "https://placeholder.supabase.co";
+
 export const supabase = createClient(
-  supabaseUrl || "",
-  supabaseAnonKey || ""
+  finalUrl,
+  supabaseAnonKey || "placeholder-key"
 );

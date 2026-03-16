@@ -1,5 +1,5 @@
-import { trpc } from "@/lib/trpc";
-import { UNAUTHED_ERR_MSG } from '@shared/const';
+import { trpc } from "./lib/trpc";
+import { UNAUTHED_ERR_MSG } from "../../shared/const";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
@@ -50,26 +50,47 @@ const trpcClient = trpc.createClient({
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
-      async fetch(input, init) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const headers = new Headers(init?.headers);
-        if (session?.access_token) {
-          headers.set("Authorization", `Bearer ${session.access_token}`);
+      async headers() {
+        let session = null;
+        try {
+          const { data } = await supabase.auth.getSession();
+          session = data.session;
+        } catch (e) {
+          console.warn("[Auth] Failed to get session:", e);
         }
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          headers,
-          credentials: "include",
-        });
+
+        if (session?.access_token) {
+          return {
+            Authorization: `Bearer ${session.access_token}`,
+          };
+        }
+        return {};
       },
     }),
   ],
 });
 
-createRoot(document.getElementById("root")!).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </trpc.Provider>
-);
+const rootElement = document.getElementById("root");
+
+if (!rootElement) {
+  console.error("Failed to find the root element");
+} else {
+  try {
+    createRoot(rootElement).render(
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </trpc.Provider>
+    );
+  } catch (error) {
+    console.error("Failed to render the app:", error);
+    rootElement.innerHTML = `
+      <div style="padding: 20px; text-align: center; font-family: sans-serif;">
+        <h1>Something went wrong</h1>
+        <p>The application failed to start. Please check the console for details.</p>
+        <button onclick="window.location.reload()">Reload</button>
+      </div>
+    `;
+  }
+}
