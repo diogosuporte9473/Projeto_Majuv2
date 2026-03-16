@@ -15,10 +15,17 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (typeof window === "undefined") return;
 
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
-
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  // Do not redirect to login page if user is already at the home page,
+  // let the Home component handle the unauthenticated state (showing a Sign In button).
+  if (window.location.pathname === "/") return;
+
+  const loginUrl = getLoginUrl();
+  // Only redirect if a valid external URL is returned
+  if (loginUrl.startsWith("http")) {
+    window.location.href = loginUrl;
+  }
 };
 
 queryClient.getQueryCache().subscribe(event => {

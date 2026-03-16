@@ -7,7 +7,7 @@ export const getLoginUrl = () => {
 
   if (!oauthPortalUrl || !appId) {
     console.warn("VITE_OAUTH_PORTAL_URL or VITE_APP_ID is not defined in environment variables.");
-    return "/404"; // Fallback to a safe route
+    return ""; // Return empty string if variables are missing
   }
 
   try {
@@ -23,6 +23,6 @@ export const getLoginUrl = () => {
     return url.toString();
   } catch (error) {
     console.error("Error generating login URL:", error);
-    return "/404";
+    return "";
   }
 };

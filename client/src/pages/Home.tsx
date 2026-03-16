@@ -19,6 +19,7 @@ export default function Home() {
   }
 
   if (!isAuthenticated) {
+    const loginUrl = getLoginUrl();
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
         <div className="text-center max-w-md mx-auto px-4">
@@ -26,12 +27,20 @@ export default function Home() {
           <p className="text-lg mb-8 text-primary-foreground/90">
             Organize your team work with powerful task management
           </p>
-          <Button
-            onClick={() => (window.location.href = getLoginUrl())}
-            className="bg-accent text-accent-foreground hover:bg-accent/90 px-8 py-3 text-lg font-semibold"
-          >
-            Sign In
-          </Button>
+          {loginUrl ? (
+            <Button
+              onClick={() => (window.location.href = loginUrl)}
+              className="bg-accent text-accent-foreground hover:bg-accent/90 px-8 py-3 text-lg font-semibold"
+            >
+              Sign In
+            </Button>
+          ) : (
+            <div className="p-4 bg-white/10 rounded-lg border border-white/20">
+              <p className="text-sm text-white/80">
+                Configuration required: VITE_OAUTH_PORTAL_URL and VITE_APP_ID are missing in environment variables.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
