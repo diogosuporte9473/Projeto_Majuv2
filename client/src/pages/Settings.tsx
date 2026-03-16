@@ -164,7 +164,7 @@ function ProfileSettings({ user }: { user: any }) {
 }
 
 function NotificationSettings() {
-  const { data: preferences, isLoading } = trpc.settings.getPreferences.useQuery();
+  const { data: preferences, isLoading } = trpc.settings.getPreferences.useQuery(undefined);
   const updatePrefsMutation = trpc.settings.updatePreferences.useMutation();
 
   const [emailOnCardAssigned, setEmailOnCardAssigned] = useState(true);

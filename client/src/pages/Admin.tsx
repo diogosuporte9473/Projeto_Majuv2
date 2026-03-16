@@ -19,22 +19,22 @@ export default function Admin() {
   // Queries
   const { data: stats } = trpc.stats.getGeneral.useQuery(
     undefined,
-    { enabled: user?.role === "admin" }
+    { enabled: user?.role === "admin" } as any
   );
 
   const { data: users, isLoading: usersLoading } = trpc.admin.users.list.useQuery(
     undefined,
-    { enabled: user?.role === "admin" }
+    { enabled: user?.role === "admin" } as any
   );
 
   const { data: boards } = trpc.boards.list.useQuery(
     undefined,
-    { enabled: user?.role === "admin" }
+    { enabled: user?.role === "admin" } as any
   );
 
   const { data: boardMembers, isLoading: membersLoading } = trpc.admin.permissions.getByBoard.useQuery(
     { boardId: selectedBoardId || 0 },
-    { enabled: !!selectedBoardId && user?.role === "admin" }
+    { enabled: !!selectedBoardId && user?.role === "admin" } as any
   );
 
   // Mutations

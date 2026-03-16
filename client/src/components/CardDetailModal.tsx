@@ -30,30 +30,13 @@ export default function CardDetailModal({
   const { data: projectDates, isLoading: datesLoading } = trpc.cardDetails.getProjectDates.useQuery({ cardId });
 
   // Mutations
-  const addLabelMutation = trpc.cardDetails.addLabel.useMutation({
-    onSuccess: () => utils.cardDetails.getLabels.invalidate({ cardId }),
-  });
-  const deleteLabelMutation = trpc.cardDetails.deleteLabel.useMutation({
-    onSuccess: () => utils.cardDetails.getLabels.invalidate({ cardId }),
-  });
-  const addChecklistMutation = trpc.cardDetails.addChecklist.useMutation({
-    onSuccess: () => utils.cardDetails.getChecklists.invalidate({ cardId }),
-  });
-  const updateChecklistMutation = trpc.cardDetails.updateChecklist.useMutation({
-    onSuccess: () => utils.cardDetails.getChecklists.invalidate({ cardId }),
-  });
-  const deleteChecklistMutation = trpc.cardDetails.deleteChecklist.useMutation({
-    onSuccess: () => utils.cardDetails.getChecklists.invalidate({ cardId }),
-  });
-  const upsertDatesMutation = trpc.cardDetails.upsertProjectDates.useMutation({
-    onSuccess: () => utils.cardDetails.getProjectDates.invalidate({ cardId }),
-  });
-  const updateDescriptionMutation = trpc.cardDetails.updateDescription.useMutation({
-    onSuccess: () => {
-      utils.cards.getByList.invalidate();
-      toast.success("Descrição atualizada");
-    }
-  });
+  const addLabelMutation = trpc.cardDetails.addLabel.useMutation();
+  const deleteLabelMutation = trpc.cardDetails.deleteLabel.useMutation();
+  const addChecklistMutation = trpc.cardDetails.addChecklist.useMutation();
+  const updateChecklistMutation = trpc.cardDetails.updateChecklist.useMutation();
+  const deleteChecklistMutation = trpc.cardDetails.deleteChecklist.useMutation();
+  const upsertDatesMutation = trpc.cardDetails.upsertProjectDates.useMutation();
+  const updateDescriptionMutation = trpc.cardDetails.updateDescription.useMutation();
 
   const [newLabel, setNewLabel] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#4b4897");
@@ -67,6 +50,7 @@ export default function CardDetailModal({
     }
     try {
       await addLabelMutation.mutateAsync({ cardId, label: newLabel, color: newLabelColor });
+      await utils.cardDetails.getLabels.invalidate({ cardId });
       setNewLabel("");
       setNewLabelColor("#4b4897");
       toast.success("Etiqueta adicionada");
@@ -78,6 +62,7 @@ export default function CardDetailModal({
   const handleRemoveLabel = async (id: number) => {
     try {
       await deleteLabelMutation.mutateAsync({ id });
+      await utils.cardDetails.getLabels.invalidate({ cardId });
       toast.success("Etiqueta removida");
     } catch (error) {
       toast.error("Erro ao remover etiqueta");
@@ -91,6 +76,7 @@ export default function CardDetailModal({
     }
     try {
       await addChecklistMutation.mutateAsync({ cardId, title: newChecklistTitle });
+      await utils.cardDetails.getChecklists.invalidate({ cardId });
       setNewChecklistTitle("");
       toast.success("Item de checklist adicionado");
     } catch (error) {
@@ -101,6 +87,7 @@ export default function CardDetailModal({
   const handleToggleChecklist = async (id: number, currentStatus: boolean) => {
     try {
       await updateChecklistMutation.mutateAsync({ id, completed: !currentStatus });
+      await utils.cardDetails.getChecklists.invalidate({ cardId });
     } catch (error) {
       toast.error("Erro ao atualizar item");
     }
@@ -109,6 +96,7 @@ export default function CardDetailModal({
   const handleRemoveChecklist = async (id: number) => {
     try {
       await deleteChecklistMutation.mutateAsync({ id });
+      await utils.cardDetails.getChecklists.invalidate({ cardId });
       toast.success("Item de checklist removido");
     } catch (error) {
       toast.error("Erro ao remover item");
@@ -122,6 +110,7 @@ export default function CardDetailModal({
         startDate: start ? new Date(start) : undefined,
         endDate: end ? new Date(end) : undefined,
       });
+      await utils.cardDetails.getProjectDates.invalidate({ cardId });
       toast.success("Datas atualizadas");
     } catch (error) {
       toast.error("Erro ao atualizar datas");
@@ -131,6 +120,8 @@ export default function CardDetailModal({
   const handleUpdateDescription = async () => {
     try {
       await updateDescriptionMutation.mutateAsync({ cardId, description });
+      await utils.cards.getByList.invalidate();
+      toast.success("Descrição atualizada");
     } catch (error) {
       toast.error("Erro ao atualizar descrição");
     }

@@ -26,12 +26,12 @@ export default function BoardView() {
 
   const { data: board, isLoading: boardLoading } = trpc.boards.get.useQuery(
     { id: boardId || 0 },
-    { enabled: !!boardId }
+    { enabled: !!boardId } as any
   );
 
   const { data: lists, isLoading: listsLoading } = trpc.lists.getByBoard.useQuery(
     { boardId: boardId || 0 },
-    { enabled: !!boardId }
+    { enabled: !!boardId } as any
   );
 
   const [newListName, setNewListName] = useState("");

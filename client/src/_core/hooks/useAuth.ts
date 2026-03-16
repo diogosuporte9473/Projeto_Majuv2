@@ -17,13 +17,9 @@ export function useAuth(options?: UseAuthOptions) {
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
-  });
+  } as any);
 
-  const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => {
-      utils.auth.me.setData(undefined, null);
-    },
-  });
+  const logoutMutation = trpc.auth.logout.useMutation();
 
   const logout = useCallback(async () => {
     try {
@@ -31,6 +27,7 @@ export function useAuth(options?: UseAuthOptions) {
         logoutMutation.mutateAsync(),
         supabase.auth.signOut()
       ]);
+      utils.auth.me.setData(undefined, null);
     } catch (error: unknown) {
       if (
         error instanceof TRPCClientError &&
