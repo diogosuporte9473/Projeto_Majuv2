@@ -314,3 +314,9 @@ export async function upsertProjectDate(cardId: number, projectStartDate?: Date,
     return await db.insert(projectDates).values({ cardId, projectStartDate, projectEndDate });
   }
 }
+
+export async function updateCard(cardId: number, data: Partial<InsertCard>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.update(cards).set(data).where(eq(cards.id, cardId));
+}

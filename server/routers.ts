@@ -26,6 +26,7 @@ import {
   userPreferences,
   users,
 } from "../drizzle/schema.js";
+import { invokeLLM, Message as LLMMessage } from "./_core/llm.js";
 import { getDb } from "./db.js";
 
 export const appRouter = router({
@@ -519,7 +520,149 @@ export const appRouter = router({
 
         return { success: true };
       }),
-    }),
+  }),
+
+  // Labels, Checklists, Custom Fields and Project Dates
+  cardDetails: router({
+    getLabels: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return await db.select().from(cardLabels).where(eq(cardLabels.cardId, input.cardId));
+      }),
+    addLabel: protectedProcedure
+      .input(z.object({ cardId: z.number(), label: z.string(), color: z.string().optional() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        return await db.insert(cardLabels).values({
+          cardId: input.cardId,
+          label: input.label,
+          color: input.color || "#4b4897",
+        });
+      }),
+    deleteLabel: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        return await db.delete(cardLabels).where(eq(cardLabels.id, input.id));
+      }),
+
+    getChecklists: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return await db
+          .select()
+          .from(cardChecklists)
+          .where(eq(cardChecklists.cardId, input.cardId))
+          .orderBy(cardChecklists.position);
+      }),
+    addChecklist: protectedProcedure
+      .input(z.object({ cardId: z.number(), title: z.string(), position: z.number().optional() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        return await db.insert(cardChecklists).values({
+          cardId: input.cardId,
+          title: input.title,
+          position: input.position || 0,
+          completed: 0,
+        });
+      }),
+    updateChecklist: protectedProcedure
+      .input(z.object({ id: z.number(), completed: z.boolean() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        return await db
+          .update(cardChecklists)
+          .set({ completed: input.completed ? 1 : 0 })
+          .where(eq(cardChecklists.id, input.id));
+      }),
+    deleteChecklist: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        return await db.delete(cardChecklists).where(eq(cardChecklists.id, input.id));
+      }),
+
+    getCustomFields: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return await db.select().from(cardCustomFields).where(eq(cardCustomFields.cardId, input.cardId));
+      }),
+    addCustomField: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        fieldName: z.string(),
+        fieldValue: z.string(),
+        fieldType: z.enum(["text", "select", "date", "number"]).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        return await db.insert(cardCustomFields).values({
+          cardId: input.cardId,
+          fieldName: input.fieldName,
+          fieldValue: input.fieldValue,
+          fieldType: input.fieldType || "text",
+        });
+      }),
+    deleteCustomField: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        return await db.delete(cardCustomFields).where(eq(cardCustomFields.id, input.id));
+      }),
+
+    getProjectDates: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return null;
+        const result = await db.select().from(projectDates).where(eq(projectDates.cardId, input.cardId)).limit(1);
+        return result.length > 0 ? result[0] : null;
+      }),
+    upsertProjectDates: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        
+        const existing = await db.select().from(projectDates).where(eq(projectDates.cardId, input.cardId)).limit(1);
+        if (existing.length > 0) {
+          return await db.update(projectDates)
+            .set({ projectStartDate: input.startDate, projectEndDate: input.endDate })
+            .where(eq(projectDates.cardId, input.cardId));
+        } else {
+          return await db.insert(projectDates).values({
+            cardId: input.cardId,
+            projectStartDate: input.startDate,
+            projectEndDate: input.endDate,
+          });
+        }
+      }),
+    updateDescription: protectedProcedure
+      .input(z.object({ cardId: z.number(), description: z.string() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(cards).set({ description: input.description }).where(eq(cards.id, input.cardId));
+        return { success: true };
+      }),
+  }),
 
   // Admin routers - User management
   admin: router({
@@ -611,6 +754,50 @@ export const appRouter = router({
           return { success: true };
         }),
     }),
+  }),
+
+  // Statistics/Dashboard
+  stats: router({
+    getGeneral: protectedProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return { totalBoards: 0, totalCards: 0, totalUsers: 0 };
+      
+      const [boardsCount] = await db.select({ count: z.any() }).from(boards);
+      const [cardsCount] = await db.select({ count: z.any() }).from(cards);
+      const [usersCount] = await db.select({ count: z.any() }).from(users);
+      
+      return {
+        totalBoards: Number(boardsCount?.count || 0),
+        totalCards: Number(cardsCount?.count || 0),
+        totalUsers: Number(usersCount?.count || 0),
+      };
+    }),
+  }),
+
+  // AI Chat Assistant
+  ai: router({
+    chat: protectedProcedure
+      .input(z.object({
+        messages: z.array(z.object({
+          role: z.enum(["user", "assistant", "system"]),
+          content: z.string(),
+        }))
+      }))
+      .mutation(async ({ input }) => {
+        const response = await invokeLLM({
+          messages: input.messages as LLMMessage[],
+        });
+        
+        const content = response.choices[0]?.message?.content;
+        if (typeof content !== "string") {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Unexpected AI response format",
+          });
+        }
+        
+        return content;
+      }),
   }),
 });
 
