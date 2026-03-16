@@ -4,9 +4,10 @@ import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
-import type { User } from "../../drizzle/schema";
-import * as db from "../db";
-import { ENV } from "./env";
+import { createClient } from "@supabase/supabase-js";
+import type { User } from "../../drizzle/schema.ts";
+import * as db from "../db.ts";
+import { ENV } from "./env.ts";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
@@ -85,10 +86,12 @@ const createOAuthHttpClient = (): AxiosInstance =>
 class SDKServer {
   private readonly client: AxiosInstance;
   private readonly oauthService: OAuthService;
+  private readonly supabase;
 
   constructor(client: AxiosInstance = createOAuthHttpClient()) {
     this.client = client;
     this.oauthService = new OAuthService(this.client);
+    this.supabase = createClient(ENV.supabaseUrl, ENV.supabaseAnonKey);
   }
 
   private deriveLoginMethod(
@@ -257,7 +260,29 @@ class SDKServer {
   }
 
   async authenticateRequest(req: any): Promise<User> {
-    // Regular authentication flow
+    // 1. Try Supabase Auth first
+    const authHeader = req.headers?.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      const { data: { user: supabaseUser }, error } = await this.supabase.auth.getUser(token);
+
+      if (!error && supabaseUser) {
+        let user = await db.getUserByOpenId(supabaseUser.id);
+        if (!user) {
+          await db.upsertUser({
+            openId: supabaseUser.id,
+            name: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split("@")[0] || "User",
+            email: supabaseUser.email,
+            loginMethod: "supabase",
+            lastSignedIn: new Date(),
+          });
+          user = await db.getUserByOpenId(supabaseUser.id);
+        }
+        if (user) return user;
+      }
+    }
+
+    // 2. Fallback to regular session cookie authentication
     const cookies = this.parseCookies(req.headers?.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
