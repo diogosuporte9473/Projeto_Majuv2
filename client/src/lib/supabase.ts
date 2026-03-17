@@ -1,13 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.split(' ')[0]?.trim();
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.split(' ').find(part => part.startsWith('eyJ'))?.trim() || import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+// Helper to sanitize environment variables
+const sanitize = (val: string | undefined) => val?.split(' ')[0]?.trim() || '';
+
+const supabaseUrl = sanitize(import.meta.env.VITE_SUPABASE_URL);
+const supabaseAnonKey = sanitize(import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error(
-    '❌ ERRO: Credenciais do Supabase não encontradas!\n' +
-    'Certifique-se de configurar VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env ou no Vercel.'
+    '❌ CRITICAL: Supabase credentials missing or malformed!\n' +
+    'Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel dashboard.'
   );
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+// Ensure the client doesn't crash on invalid URL, but logs clearly
+export const supabase = (supabaseUrl && supabaseUrl.startsWith('https://'))
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : (null as any);
