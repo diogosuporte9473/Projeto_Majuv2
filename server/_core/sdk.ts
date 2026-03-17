@@ -27,7 +27,7 @@ class SDKServer {
       }
     }
 
-    throw ForbiddenError("Invalid session");
+    throw new ForbiddenError("Invalid session");
   }
 }
 
