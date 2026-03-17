@@ -1,48 +1,29 @@
 import { ForbiddenError } from "../../shared/_core/errors.js";
-import { createClient } from "@supabase/supabase-js";
 import type { User } from "../../drizzle/schema.js";
 import * as db from "../db.js";
-import { ENV } from "./env.js";
+import { COOKIE_NAME } from "../../shared/const.js";
+import { jwtVerify } from "jose";
+
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key");
 
 class SDKServer {
-  private readonly supabase: any;
-
-  constructor() {
-    this.supabase = createClient(ENV.supabaseUrl, ENV.supabaseAnonKey);
-  }
-
   async authenticateRequest(req: any): Promise<User> {
-    // 1. Try Supabase Auth first
-    const authHeader = req.headers?.authorization;
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.split(" ")[1];
-      const {
-        data: { user: supabaseUser },
-        error,
-      } = await this.supabase.auth.getUser(token);
-
-      if (!error && supabaseUser) {
-        let user = await db.getUserByOpenId(supabaseUser.id);
-        if (!user) {
-          await db.upsertUser({
-            openId: supabaseUser.id,
-            name:
-              supabaseUser.user_metadata?.full_name ||
-              supabaseUser.email?.split("@")[0] ||
-              "User",
-            email: supabaseUser.email,
-            loginMethod: "supabase",
-            lastSignedIn: new Date(),
-          });
-          user = await db.getUserByOpenId(supabaseUser.id);
+    // 1. Try Cookie Auth (JWT)
+    const token = req.cookies?.[COOKIE_NAME];
+    
+    if (token) {
+      try {
+        const { payload } = await jwtVerify(token, JWT_SECRET);
+        const userId = payload.sub ? parseInt(payload.sub) : null;
+        
+        if (userId) {
+          const user = await db.getUserById(userId);
+          if (user) {
+            return user;
+          }
         }
-        if (user) {
-          await db.upsertUser({
-            openId: user.openId,
-            lastSignedIn: new Date(),
-          });
-          return user;
-        }
+      } catch (e) {
+        console.warn("[Auth] Invalid JWT token");
       }
     }
 

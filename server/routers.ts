@@ -6,6 +6,8 @@ import { publicProcedure, router, protectedProcedure } from "./_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+import { SignJWT } from "jose";
 import {
   getUserBoards,
   getBoardById,
@@ -14,6 +16,8 @@ import {
   getListCards,
   getCardById,
   getMirroredCards,
+  getUserByUsername,
+  getDb,
 } from "./db.js";
 import {
   boards,
@@ -31,13 +35,80 @@ import {
   projectDates,
 } from "../drizzle/schema.js";
 import { invokeLLM, Message as LLMMessage } from "./_core/llm.js";
-import { getDb } from "./db.js";
+
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key");
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => {
+      if (!opts.ctx.user) return null;
+      const { password, ...userWithoutPassword } = opts.ctx.user;
+      return userWithoutPassword;
+    }),
+    login: publicProcedure
+      .input(z.object({ username: z.string(), password: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByUsername(input.username);
+        if (!user) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "User not found" });
+        }
+
+        const valid = await bcrypt.compare(input.password, user.password);
+        if (!valid) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid password" });
+        }
+
+        const token = await new SignJWT({})
+          .setProtectedHeader({ alg: "HS256" })
+          .setSubject(user.id.toString())
+          .setIssuedAt()
+          .setExpirationTime("30d")
+          .sign(JWT_SECRET);
+
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, {
+          ...cookieOptions,
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
+
+        return user;
+      }),
+    register: publicProcedure
+      .input(z.object({ username: z.string(), password: z.string(), name: z.string().optional() }))
+      .mutation(async ({ input, ctx }) => {
+        const existing = await getUserByUsername(input.username);
+        if (existing) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Username already exists" });
+        }
+
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        const hashedPassword = await bcrypt.hash(input.password, 10);
+        const [user] = await db.insert(users).values({
+          username: input.username,
+          password: hashedPassword,
+          name: input.name || input.username.split('@')[0],
+          role: "user",
+        }).returning();
+
+        const token = await new SignJWT({})
+          .setProtectedHeader({ alg: "HS256" })
+          .setSubject(user.id.toString())
+          .setIssuedAt()
+          .setExpirationTime("30d")
+          .sign(JWT_SECRET);
+
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, {
+          ...cookieOptions,
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
+
+        return user;
+      }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -501,7 +572,7 @@ export const appRouter = router({
       .input(
         z.object({
           name: z.string().min(1).max(255).optional(),
-          email: z.string().email().optional(),
+          username: z.string().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -515,7 +586,7 @@ export const appRouter = router({
 
         const updateData: any = {};
         if (input.name) updateData.name = input.name;
-        if (input.email) updateData.email = input.email;
+        if (input.username) updateData.username = input.username;
 
         await db
           .update(users)
@@ -677,11 +748,12 @@ export const appRouter = router({
         }
         const db = await getDb();
         if (!db) return [];
-        return await db.select().from(users);
+        const result = await db.select().from(users);
+        return result.map(({ password, ...u }) => u);
       }),
       
       create: protectedProcedure
-        .input(z.object({ email: z.string().email(), name: z.string() }))
+        .input(z.object({ username: z.string(), password: z.string(), name: z.string() }))
         .mutation(async ({ ctx, input }) => {
           if (ctx.user.role !== 'admin') {
             throw new TRPCError({ code: 'FORBIDDEN' });
@@ -689,9 +761,10 @@ export const appRouter = router({
           const db = await getDb();
           if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
           
+          const hashedPassword = await bcrypt.hash(input.password, 10);
           await db.insert(users).values({
-            openId: `temp-${Date.now()}`,
-            email: input.email,
+            username: input.username,
+            password: hashedPassword,
             name: input.name,
             role: 'user',
           });
