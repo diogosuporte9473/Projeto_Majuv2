@@ -31,7 +31,7 @@ export default function Settings() {
           <p className="text-muted-foreground">Gerencie seu perfil e preferências</p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="profile" className="flex items-center gap-2">
               <User className="w-4 h-4" />
