@@ -53,11 +53,22 @@ const trpcClient = trpc.createClient({
         }
         return {};
       },
-      fetch(input, init) {
-        return globalThis.fetch(input, {
+      async fetch(input, init) {
+        const response = await globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",
         });
+
+        // Se o servidor retornar HTML (começa com <), provavelmente é um erro 500 da Vercel
+        // Vamos interceptar para evitar o erro de JSON "Unexpected token A"
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("text/html")) {
+          const text = await response.text();
+          console.error("❌ Servidor retornou HTML em vez de JSON. Possível erro 500 ou queda do backend.");
+          throw new TRPCClientError("Erro no servidor (Backend Offline ou Erro 500). Verifique os logs da Vercel.");
+        }
+
+        return response;
       },
     }),
   ],

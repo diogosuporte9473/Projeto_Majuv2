@@ -7,7 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 export default function Home() {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, refresh } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -18,12 +18,14 @@ export default function Home() {
     setAuthLoading(true);
     try {
       if (isSignUp) {
-        const { error } = await (supabase.auth as any).signUp({ email, password });
+        const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         toast.success("Check your email for the confirmation link!");
       } else {
-        const { error } = await (supabase.auth as any).signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        // Após o login no Supabase, atualizamos a sessão no tRPC
+        await refresh();
       }
     } catch (error: any) {
       toast.error(error.message || "Authentication failed");

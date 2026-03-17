@@ -16,4 +16,4 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Ensure the client doesn't crash on invalid URL, but logs clearly
 export const supabase = (supabaseUrl && supabaseUrl.startsWith('https://'))
   ? createClient(supabaseUrl, supabaseAnonKey)
-  : (null as any);
+  : createClient('https://placeholder.supabase.co', 'placeholder');
