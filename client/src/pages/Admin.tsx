@@ -12,8 +12,9 @@ import { toast } from "sonner";
 
 export default function Admin() {
   const { user } = useAuth();
-  const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserName, setNewUserName] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newName, setNewName] = useState("");
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
 
   // Queries
@@ -54,18 +55,20 @@ export default function Admin() {
   }
 
   const handleCreateUser = async () => {
-    if (!newUserEmail.trim() || !newUserName.trim()) {
-      toast.error("Email e nome são obrigatórios");
+    if (!newUserName.trim() || !newUserPassword.trim() || !newName.trim()) {
+      toast.error("Usuário, senha e nome são obrigatórios");
       return;
     }
 
     try {
       await createUserMutation.mutateAsync({
-        email: newUserEmail,
-        name: newUserName,
+        username: newUserName,
+        password: newUserPassword,
+        name: newName,
       });
-      setNewUserEmail("");
       setNewUserName("");
+      setNewUserPassword("");
+      setNewName("");
       toast.success("Usuário criado com sucesso");
     } catch (error) {
       toast.error("Erro ao criar usuário");
@@ -155,16 +158,22 @@ export default function Admin() {
               <h2 className="text-xl font-semibold text-foreground mb-4">Adicionar Novo Usuário</h2>
               <div className="space-y-4">
                 <Input
-                  placeholder="Email"
-                  value={newUserEmail}
-                  onChange={(e) => setNewUserEmail(e.target.value)}
-                  type="email"
+                  placeholder="Usuário (Email)"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
                   className="bg-background border-border"
                 />
                 <Input
-                  placeholder="Nome"
-                  value={newUserName}
-                  onChange={(e) => setNewUserName(e.target.value)}
+                  placeholder="Senha"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  type="password"
+                  className="bg-background border-border"
+                />
+                <Input
+                  placeholder="Nome Completo"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
                   className="bg-background border-border"
                 />
                 <Button
@@ -192,7 +201,7 @@ export default function Admin() {
                     <div key={u.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                       <div>
                         <p className="font-medium text-foreground">{u.name}</p>
-                        <p className="text-sm text-muted-foreground">{u.email}</p>
+                        <p className="text-sm text-muted-foreground">{u.username}</p>
                       </div>
                       <Select
                         value={u.role}

@@ -1,34 +1,36 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
 import { Loader2, Layout, CheckSquare, Sparkles, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 export default function Home() {
   const { user, loading, isAuthenticated, refresh } = useAuth();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+
+  const loginMutation = trpc.auth.login.useMutation();
+  const registerMutation = trpc.auth.register.useMutation();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true);
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        toast.success("Check your email for the confirmation link!");
+        await registerMutation.mutateAsync({ username, password, name });
+        toast.success("Conta criada com sucesso!");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        // Após o login no Supabase, atualizamos a sessão no tRPC
-        await refresh();
+        await loginMutation.mutateAsync({ username, password });
+        toast.success("Login realizado com sucesso!");
       }
+      await refresh();
     } catch (error: any) {
-      toast.error(error.message || "Authentication failed");
+      toast.error(error.message || "Falha na autenticação");
     } finally {
       setAuthLoading(false);
     }
@@ -56,18 +58,32 @@ export default function Home() {
           </p>
           
           <form onSubmit={handleAuth} className="space-y-4">
+            {isSignUp && (
+              <div>
+                <label className="text-sm font-medium">Nome</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  placeholder="Seu nome"
+                  required
+                />
+              </div>
+            )}
             <div>
-              <label className="text-sm font-medium">Email</label>
+              <label className="text-sm font-medium">Usuário (Email)</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full p-2 border rounded-md"
+                placeholder="exemplo@email.com"
                 required
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Password</label>
+              <label className="text-sm font-medium">Senha</label>
               <input
                 type="password"
                 value={password}
