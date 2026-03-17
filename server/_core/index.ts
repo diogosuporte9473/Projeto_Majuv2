@@ -33,9 +33,8 @@ export async function createApp() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
-  // tRPC API
+
+  // tRPC API with global JSON error handler
   app.use(
     "/api/trpc",
     createExpressMiddleware({
@@ -43,6 +42,17 @@ export async function createApp() {
       createContext,
     })
   );
+
+  // Global error handler to ensure JSON response for API routes
+  app.use("/api", (err: any, req: any, res: any, next: any) => {
+    console.error("[API Error]", err);
+    res.status(err.status || 500).json({
+      error: {
+        message: err.message || "Internal Server Error",
+        code: err.code || "INTERNAL_SERVER_ERROR",
+      },
+    });
+  });
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
