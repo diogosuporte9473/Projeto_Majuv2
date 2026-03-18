@@ -1,6 +1,6 @@
 import "dotenv/config";
-import express from "express";
-import * as cookieParser from "cookie-parser";
+import express, { Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -34,7 +34,7 @@ export async function createApp() {
   app.use(cookieParser());
   
   // Health check for debugging Vercel 500 errors
-  app.get("/api/health", (req, res) => {
+  app.get("/api/health", (req: Request, res: Response) => {
     res.json({ status: "ok", time: new Date().toISOString(), env: process.env.NODE_ENV });
   });
 
@@ -48,7 +48,7 @@ export async function createApp() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
-      onError({ error, path, req }) {
+      onError({ error, path }) {
         console.error(`❌ tRPC Error on path "${path}":`, error);
         // Ensure error response is always JSON by setting content-type
         // though tRPC handles this, we can log extra info here
@@ -57,7 +57,7 @@ export async function createApp() {
   );
 
   // Fallback 404 handler for API routes
-  app.use("/api", (req, res) => {
+  app.use("/api", (req: Request, res: Response) => {
     res.status(404).json({
       error: {
         message: `API endpoint "${req.originalUrl}" not found`,
@@ -67,7 +67,7 @@ export async function createApp() {
   });
 
   // Global error handler to ensure JSON response for API routes
-  app.use("/api", (err: any, req: any, res: any, next: any) => {
+  app.use("/api", (err: any, req: Request, res: Response, next: NextFunction) => {
     console.error("[API Error]", err);
     res.status(err.status || 500).json({
       error: {
