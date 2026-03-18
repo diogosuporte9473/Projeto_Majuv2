@@ -614,6 +614,22 @@ export const appRouter = router({
       }),
   }),
 
+  // Notes routers (conforme SQL)
+  notes: router({
+    list: protectedProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      return await db.select().from(notes);
+    }),
+    create: protectedProcedure
+      .input(z.object({ title: z.string() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        return await db.insert(notes).values({ title: input.title });
+      }),
+  }),
+
   // Labels, Checklists, Custom Fields and Project Dates
   cardDetails: router({
     getLabels: protectedProcedure
@@ -664,6 +680,12 @@ export const appRouter = router({
           position: input.position || 0,
           completed: false,
         });
+      }),
+
+    getMirroredCards: protectedProcedure
+      .input(z.object({ boardId: z.number() }))
+      .query(async ({ input }) => {
+        return await getMirroredCards(input.boardId);
       }),
     updateChecklist: protectedProcedure
       .input(z.object({ id: z.number(), completed: z.boolean() }))

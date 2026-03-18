@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, varchar, pgEnum, integer, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, varchar, pgEnum, integer, boolean, uniqueIndex, bigint } from "drizzle-orm/pg-core";
 
 /**
  * Enums para PostgreSQL
@@ -19,9 +19,9 @@ export const users = pgTable("users", {
   name: text("name"),
   email: text("email"),
   role: roleEnum("role").default("user").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;
@@ -34,8 +34,8 @@ export const boards = pgTable("boards", {
   description: text("description"),
   color: varchar("color", { length: 7 }).default("#4b4897").notNull(),
   ownerId: integer("ownerId").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Board = typeof boards.$inferSelect;
@@ -47,7 +47,7 @@ export const boardMembers = pgTable("boardMembers", {
   boardId: integer("boardId").notNull(),
   userId: integer("userId").notNull(),
   role: memberRoleEnum("role").default("viewer").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type BoardMember = typeof boardMembers.$inferSelect;
@@ -59,8 +59,8 @@ export const lists = pgTable("lists", {
   boardId: integer("boardId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   position: integer("position").notNull().default(0),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type List = typeof lists.$inferSelect;
@@ -73,11 +73,11 @@ export const cards = pgTable("cards", {
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   position: integer("position").notNull().default(0),
-  dueDate: timestamp("dueDate"),
+  dueDate: timestamp("dueDate", { withTimezone: true }),
   assignedTo: integer("assignedTo"),
   createdBy: integer("createdBy").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Card = typeof cards.$inferSelect;
@@ -91,8 +91,8 @@ export const mirroredCards = pgTable("mirroredCards", {
   originalBoardId: integer("originalBoardId").notNull(),
   mirrorBoardId: integer("mirrorBoardId").notNull(),
   syncStatus: syncStatusEnum("syncStatus").default("synced").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type MirroredCard = typeof mirroredCards.$inferSelect;
@@ -108,7 +108,7 @@ export const cardAttachments = pgTable("cardAttachments", {
   mimeType: varchar("mimeType", { length: 100 }).notNull(),
   fileSize: integer("fileSize").notNull(),
   uploadedBy: integer("uploadedBy").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type CardAttachment = typeof cardAttachments.$inferSelect;
@@ -119,11 +119,12 @@ export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
   userId: integer("userId").notNull(),
   type: notificationTypeEnum("type").notNull(),
-  cardId: integer("cardId"),
+  relatedCardId: integer("relatedCardId"),
+  relatedBoardId: integer("relatedBoardId"),
   title: varchar("title", { length: 255 }).notNull(),
   message: text("message"),
   read: boolean("read").default(false).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Notification = typeof notifications.$inferSelect;
@@ -137,8 +138,8 @@ export const userPreferences = pgTable("userPreferences", {
   emailOnCardUpdated: boolean("emailOnCardUpdated").default(true).notNull(),
   emailOnMirroredCard: boolean("emailOnMirroredCard").default(true).notNull(),
   emailOnDueDate: boolean("emailOnDueDate").default(true).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type UserPreference = typeof userPreferences.$inferSelect;
@@ -150,7 +151,7 @@ export const cardLabels = pgTable("cardLabels", {
   cardId: integer("cardId").notNull(),
   label: varchar("label", { length: 50 }).notNull(),
   color: varchar("color", { length: 7 }).default("#4b4897").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type CardLabel = typeof cardLabels.$inferSelect;
@@ -163,8 +164,8 @@ export const cardChecklists = pgTable("cardChecklists", {
   title: varchar("title", { length: 255 }).notNull(),
   completed: boolean("completed").default(false).notNull(),
   position: integer("position").notNull().default(0),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type CardChecklist = typeof cardChecklists.$inferSelect;
@@ -177,8 +178,8 @@ export const cardCustomFields = pgTable("cardCustomFields", {
   fieldName: varchar("fieldName", { length: 255 }).notNull(),
   fieldValue: text("fieldValue"),
   fieldType: fieldTypeEnum("fieldType").default("text").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type CardCustomField = typeof cardCustomFields.$inferSelect;
@@ -188,11 +189,20 @@ export type InsertCardCustomField = typeof cardCustomFields.$inferInsert;
 export const projectDates = pgTable("projectDates", {
   id: serial("id").primaryKey(),
   cardId: integer("cardId").notNull().unique(),
-  projectStartDate: timestamp("projectStartDate"),
-  projectEndDate: timestamp("projectEndDate"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  projectStartDate: timestamp("projectStartDate", { withTimezone: true }),
+  projectEndDate: timestamp("projectEndDate", { withTimezone: true }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ProjectDate = typeof projectDates.$inferSelect;
 export type InsertProjectDate = typeof projectDates.$inferInsert;
+
+// Notes table - Notas simples (conforme SQL)
+export const notes = pgTable("notes", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  title: text("title").notNull(),
+});
+
+export type Note = typeof notes.$inferSelect;
+export type InsertNote = typeof notes.$inferInsert;
