@@ -48,8 +48,23 @@ export async function createApp() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
+      onError({ error, path, req }) {
+        console.error(`❌ tRPC Error on path "${path}":`, error);
+        // Ensure error response is always JSON by setting content-type
+        // though tRPC handles this, we can log extra info here
+      },
     })
   );
+
+  // Fallback 404 handler for API routes
+  app.use("/api", (req, res) => {
+    res.status(404).json({
+      error: {
+        message: `API endpoint "${req.originalUrl}" not found`,
+        code: "NOT_FOUND",
+      },
+    });
+  });
 
   // Global error handler to ensure JSON response for API routes
   app.use("/api", (err: any, req: any, res: any, next: any) => {
