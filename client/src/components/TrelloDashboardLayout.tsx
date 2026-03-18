@@ -55,7 +55,7 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm truncate">{user?.name || "User"}</p>
-              <p className="text-xs text-primary-foreground/70 truncate">{user?.email}</p>
+              <p className="text-xs text-primary-foreground/70 truncate">{user?.username}</p>
             </div>
           </div>
         </div>
