@@ -33,6 +33,7 @@ import {
   cardChecklists,
   cardCustomFields,
   projectDates,
+  notes,
 } from "../drizzle/schema.js";
 import { invokeLLM, Message as LLMMessage } from "./_core/llm.js";
 
