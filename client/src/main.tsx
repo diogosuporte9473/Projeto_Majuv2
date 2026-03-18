@@ -51,7 +51,13 @@ const trpcClient = trpc.createClient({
         if (contentType && contentType.includes("text/html")) {
           const text = await response.text();
           console.error("❌ Servidor retornou HTML em vez de JSON. Possível erro 500 ou queda do backend.");
-          throw new TRPCClientError("Erro no servidor (Backend Offline ou Erro 500). Verifique os logs da Vercel.");
+          
+          // Se for erro de Rollup missing module, vamos dar uma mensagem mais específica
+          if (text.includes("Cannot find module '@rollup/rollup-linux-x64-gnu'")) {
+            throw new TRPCClientError("Erro de dependência nativa no servidor: Rollup binário faltando.");
+          }
+          
+          throw new TRPCClientError("Erro no servidor (Backend retornou HTML). Verifique os logs da Vercel.");
         }
 
         return response;
