@@ -58,7 +58,6 @@ export default function Settings() {
 
 function ProfileSettings({ user }: { user: any }) {
   const [name, setName] = useState(user.name || "");
-  const [email, setEmail] = useState(user.email || "");
   const updateProfileMutation = trpc.settings.updateProfile.useMutation();
 
   const handleUpdateProfile = async () => {
@@ -70,7 +69,6 @@ function ProfileSettings({ user }: { user: any }) {
     try {
       await updateProfileMutation.mutateAsync({
         name: name.trim(),
-        email: email.trim() || undefined,
       });
       toast.success("Perfil atualizado com sucesso!");
     } catch (error) {
@@ -96,19 +94,6 @@ function ProfileSettings({ user }: { user: any }) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Seu nome"
-                className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu.email@exemplo.com"
                 className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>

@@ -262,7 +262,7 @@ export default function Admin() {
                         <div key={u.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                           <div>
                             <p className="font-medium text-foreground">{u.name}</p>
-                            <p className="text-sm text-muted-foreground">{u.email}</p>
+                            <p className="text-sm text-muted-foreground">{u.username}</p>
                           </div>
                           <div className="flex gap-2">
                             {member ? (
