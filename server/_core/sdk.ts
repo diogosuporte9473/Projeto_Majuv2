@@ -17,13 +17,23 @@ class SDKServer {
         const userId = payload.sub ? parseInt(payload.sub) : null;
         
         if (userId) {
-          const user = await db.getUserById(userId);
-          if (user) {
-            return user;
+          try {
+            const user = await db.getUserById(userId);
+            if (user) {
+              return user;
+            }
+          } catch (dbError) {
+            console.error("[Auth] Database error during authentication:", dbError);
+            throw dbError; // Repassa o erro do banco para ser capturado no context/router
           }
         }
       } catch (e) {
-        console.warn("[Auth] Invalid JWT token");
+        if ((e as any).code === "ERR_JWT_EXPIRED" || (e as any).code === "ERR_JWS_INVALID") {
+          console.warn("[Auth] Invalid or expired JWT token");
+        } else {
+          console.error("[Auth] JWT verification error:", e);
+          throw e;
+        }
       }
     }
 

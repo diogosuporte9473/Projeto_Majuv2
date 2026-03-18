@@ -42,10 +42,19 @@ export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => {
-      if (!opts.ctx.user) return null;
-      const { password, ...userWithoutPassword } = opts.ctx.user;
-      return userWithoutPassword;
+    me: publicProcedure.query(async (opts) => {
+      try {
+        if (!opts.ctx.user) return null;
+        const { password, ...userWithoutPassword } = opts.ctx.user;
+        return userWithoutPassword;
+      } catch (error) {
+        console.error("[tRPC auth.me Error]", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Erro ao buscar dados do usuário",
+          cause: error,
+        });
+      }
     }),
     login: publicProcedure
       .input(z.object({ username: z.string(), password: z.string() }))

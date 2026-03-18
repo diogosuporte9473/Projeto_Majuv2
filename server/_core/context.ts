@@ -17,6 +17,10 @@ export async function createContext(
     user = await sdk.authenticateRequest(opts.req);
   } catch (error) {
     // Authentication is optional for public procedures.
+    // Mas vamos logar se for algo diferente de "Invalid session" para debugar erro 500
+    if (error instanceof Error && error.message !== "Invalid session") {
+      console.error("[Context] Auth error:", error);
+    }
     user = null;
   }
 
