@@ -85,7 +85,12 @@ export const appRouter = router({
         return user;
       }),
     register: publicProcedure
-      .input(z.object({ username: z.string(), password: z.string(), name: z.string().optional() }))
+      .input(z.object({ 
+        username: z.string(), 
+        password: z.string(), 
+        name: z.string().optional(),
+        email: z.string().email().optional()
+      }))
       .mutation(async ({ input, ctx }) => {
         const existing = await getUserByUsername(input.username);
         if (existing) {
@@ -100,6 +105,7 @@ export const appRouter = router({
           username: input.username,
           password: hashedPassword,
           name: input.name || input.username.split('@')[0],
+          email: input.email || (input.username.includes('@') ? input.username : undefined),
           role: "user",
         }).returning();
 
@@ -582,6 +588,7 @@ export const appRouter = router({
         z.object({
           name: z.string().min(1).max(255).optional(),
           username: z.string().optional(),
+          email: z.string().email().optional().or(z.literal("")),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -596,6 +603,7 @@ export const appRouter = router({
         const updateData: any = {};
         if (input.name) updateData.name = input.name;
         if (input.username) updateData.username = input.username;
+        if (input.email !== undefined) updateData.email = input.email;
 
         await db
           .update(users)
@@ -762,7 +770,12 @@ export const appRouter = router({
       }),
       
       create: protectedProcedure
-        .input(z.object({ username: z.string(), password: z.string(), name: z.string() }))
+        .input(z.object({ 
+          username: z.string(), 
+          password: z.string(), 
+          name: z.string(),
+          email: z.string().email().optional()
+        }))
         .mutation(async ({ ctx, input }) => {
           if (ctx.user.role !== 'admin') {
             throw new TRPCError({ code: 'FORBIDDEN' });
@@ -775,6 +788,7 @@ export const appRouter = router({
             username: input.username,
             password: hashedPassword,
             name: input.name,
+            email: input.email || (input.username.includes('@') ? input.username : undefined),
             role: 'user',
           });
           return { success: true };

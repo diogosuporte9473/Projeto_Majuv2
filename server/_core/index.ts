@@ -1,7 +1,9 @@
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
-import cookieParser from "cookie-parser";
+import _cookieParser from "cookie-parser";
 import { createServer } from "http";
+
+const cookieParser = (_cookieParser as any).default || _cookieParser;
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../routers.js";
