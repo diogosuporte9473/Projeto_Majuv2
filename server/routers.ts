@@ -6,7 +6,7 @@ import { publicProcedure, router, protectedProcedure } from "./_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import * as bcrypt from "bcryptjs";
+import bcrypt from "bcryptjs";
 import { SignJWT } from "jose";
 import {
   getUserBoards,
