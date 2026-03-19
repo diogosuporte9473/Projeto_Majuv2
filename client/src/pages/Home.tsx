@@ -1,3 +1,10 @@
+import { useAuth } from "@/_core/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
+import { Loader2, Layout, CheckSquare, Sparkles, MessageSquare } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 
 export default function Home() {
