@@ -37,6 +37,8 @@ import {
 } from "../drizzle/schema.js";
 import { invokeLLM, Message as LLMMessage } from "./_core/llm.js";
 
+import { supabase } from "./_core/supabase.js";
+
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key");
 
 export const appRouter = router({
@@ -60,14 +62,51 @@ export const appRouter = router({
     login: publicProcedure
       .input(z.object({ username: z.string(), password: z.string() }))
       .mutation(async ({ input, ctx }) => {
-        const user = await getUserByUsername(input.username);
-        if (!user) {
-          throw new TRPCError({ code: "UNAUTHORIZED", message: "User not found" });
+        // 1. Tentar login via Supabase Auth
+        // Como o Supabase exige email, vamos transformar o username em email
+        const email = input.username.includes('@') ? input.username : `${input.username}@projeto-maju.com`;
+        
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email,
+          password: input.password,
+        });
+
+        if (authError) {
+          console.warn("[Auth] Supabase login failed, trying Drizzle fallback:", authError.message);
+          
+          // 2. Fallback para o banco Drizzle (usuários antigos)
+          const user = await getUserByUsername(input.username);
+          if (!user) {
+            throw new TRPCError({ code: "UNAUTHORIZED", message: "User not found" });
+          }
+
+          const valid = await bcrypt.compare(input.password, user.password);
+          if (!valid) {
+            throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid password" });
+          }
+
+          // Gerar token manual (comportamento antigo)
+          const token = await new SignJWT({})
+            .setProtectedHeader({ alg: "HS256" })
+            .setSubject(user.id.toString())
+            .setIssuedAt()
+            .setExpirationTime("30d")
+            .sign(JWT_SECRET);
+
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.cookie(COOKIE_NAME, token, {
+            ...cookieOptions,
+            maxAge: 30 * 24 * 60 * 60 * 1000,
+          });
+
+          return user;
         }
 
-        const valid = await bcrypt.compare(input.password, user.password);
-        if (!valid) {
-          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid password" });
+        // 3. Se o login no Supabase funcionou, buscar o usuário no Drizzle
+        // (Assume-se que o Supabase e o Drizzle estão em sincronia via Triggers ou manual)
+        const user = await getUserByUsername(input.username);
+        if (!user) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "User found in Auth but not in Database" });
         }
 
         const token = await new SignJWT({})
@@ -92,11 +131,28 @@ export const appRouter = router({
         name: z.string().optional()
       }))
       .mutation(async ({ input, ctx }) => {
-        const existing = await getUserByUsername(input.username);
-        if (existing) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Username already exists" });
+        const email = input.username.includes('@') ? input.username : `${input.username}@projeto-maju.com`;
+
+        // 1. Criar no Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password: input.password,
+          options: {
+            data: {
+              name: input.name || input.username,
+              username: input.username
+            }
+          }
+        });
+
+        if (authError) {
+          throw new TRPCError({ 
+            code: "BAD_REQUEST", 
+            message: `Erro no Supabase Auth: ${authError.message}` 
+          });
         }
 
+        // 2. Criar no banco Drizzle
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
