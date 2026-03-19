@@ -19,6 +19,7 @@ import {
 } from "../drizzle/schema.js";
 import { InsertCard } from "../drizzle/schema.js";
 import { ENV } from './_core/env.js';
+import { supabase } from "./_core/supabase.js";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -113,15 +114,29 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 }
 
 export async function getUserByUsername(username: string) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
+  try {
+    // MÉTODO SIMPLES: Usar a API REST do Supabase em vez de conexão direta Postgres
+    // Isso evita o erro "Tenant or user not found" definitivamente
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("username", username)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[Database] Error fetching user via REST:", error);
+      // Fallback para Drizzle apenas se necessário
+      const db = await getDb();
+      if (!db) return undefined;
+      const results = await db.select().from(users).where(eq(users.username, username)).limit(1);
+      return results[0] || undefined;
+    }
+
+    return (data as any) || undefined;
+  } catch (error) {
+    console.error("[Database] getUserByUsername failed:", error);
     return undefined;
   }
-
-  const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
-
-  return result.length > 0 ? result[0] : undefined;
 }
 
 export async function getUserById(id: number) {
