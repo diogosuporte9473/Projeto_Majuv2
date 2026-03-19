@@ -1,10 +1,4 @@
-import { useAuth } from "@/_core/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
-import { Loader2, Layout, CheckSquare, Sparkles, MessageSquare } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
-import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
 
 export default function Home() {
   const { user, loading, isAuthenticated, refresh } = useAuth();
@@ -13,9 +7,29 @@ export default function Home() {
   const [name, setName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  const [, setLocation] = useLocation();
 
-  const loginMutation = trpc.auth.login.useMutation();
-  const registerMutation = trpc.auth.register.useMutation();
+  const loginMutation = trpc.auth.login.useMutation({
+    onSuccess: async () => {
+      await refresh();
+      setLocation("/");
+      toast.success("Login realizado com sucesso!");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Falha na autenticação");
+    }
+  });
+
+  const registerMutation = trpc.auth.register.useMutation({
+    onSuccess: async () => {
+      await refresh();
+      setLocation("/");
+      toast.success("Conta criada com sucesso!");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Falha no registro");
+    }
+  });
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,14 +37,9 @@ export default function Home() {
     try {
       if (isSignUp) {
         await registerMutation.mutateAsync({ username, password, name });
-        toast.success("Conta criada com sucesso!");
       } else {
         await loginMutation.mutateAsync({ username, password });
-        toast.success("Login realizado com sucesso!");
       }
-      await refresh();
-    } catch (error: any) {
-      toast.error(error.message || "Falha na autenticação");
     } finally {
       setAuthLoading(false);
     }
