@@ -26,6 +26,10 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
+      // DEBUG: Log the database URL format to check Vercel env vars
+      const urlForLogging = process.env.DATABASE_URL.replace(/:([^:]+)@/, ':[REDACTED]@');
+      console.log("[Database] Attempting to connect with URL format:", urlForLogging);
+
       console.log("[Database] Connecting to:", process.env.DATABASE_URL.split('@')[1] || "local");
       const queryClient = postgres(process.env.DATABASE_URL, {
         connect_timeout: 10,
