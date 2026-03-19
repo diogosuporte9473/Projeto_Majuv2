@@ -30,6 +30,7 @@ export async function getDb() {
       const queryClient = postgres(process.env.DATABASE_URL, {
         connect_timeout: 10,
         max: 10,
+        prepare: false, // Necessário para modo Transaction do Supavisor/PgBouncer
       });
       _db = drizzle(queryClient);
     } catch (error) {

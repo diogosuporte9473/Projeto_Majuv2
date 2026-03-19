@@ -5,12 +5,10 @@ import type { TrpcContext } from "./_core/context.js";
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
 function createTestContext(userId: number = 1): TrpcContext {
-  const user: AuthenticatedUser = {
+  const user: any = {
     id: userId,
-    openId: `test-user-${userId}`,
-    email: `user${userId}@example.com`,
+    username: `test-user-${userId}`,
     name: `Test User ${userId}`,
-    loginMethod: "test",
     role: "user",
     createdAt: new Date(),
     updatedAt: new Date(),
