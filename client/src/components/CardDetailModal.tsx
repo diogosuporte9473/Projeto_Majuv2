@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -70,13 +70,13 @@ export default function CardDetailModal({
   const [isEditingCustomFields, setIsEditingCustomFields] = useState(false);
 
   // Scroll references
-  const descriptionRef = React.useRef<HTMLDivElement>(null);
-  const customFieldsRef = React.useRef<HTMLDivElement>(null);
-  const checklistRef = React.useRef<HTMLDivElement>(null);
-  const labelsRef = React.useRef<HTMLDivElement>(null);
-  const datesRef = React.useRef<HTMLDivElement>(null);
+  const descriptionRef = useRef<HTMLDivElement>(null);
+  const customFieldsRef = useRef<HTMLDivElement>(null);
+  const checklistRef = useRef<HTMLDivElement>(null);
+  const labelsRef = useRef<HTMLDivElement>(null);
+  const datesRef = useRef<HTMLDivElement>(null);
 
-  const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
