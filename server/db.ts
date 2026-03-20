@@ -166,22 +166,40 @@ export async function getUserById(id: number) {
 
 // Board queries
 export async function getUserBoards(userId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  
-  const result = await db
-    .select()
-    .from(boards)
-    .where(
-      or(
-        eq(boards.ownerId, userId),
-        inArray(
-          boards.id,
-          db.select({ id: boardMembers.boardId }).from(boardMembers).where(eq(boardMembers.userId, userId))
-        )
-      )
-    );
-  return result;
+  try {
+    // MÉTODO SIMPLES: Usar a API REST para evitar erro de conexão TCP no roteador
+    const { data, error } = await supabase
+      .from("boards")
+      .select("*")
+      .or(`ownerId.eq.${userId},id.in.(select boardId from board_members where userId.eq.${userId})`);
+
+    if (error) {
+      console.error("[Database] Error fetching boards via REST:", error);
+      // Fallback para Drizzle
+      const db = await getDb();
+      if (!db) return [];
+      return await db
+        .select()
+        .from(boards)
+        .where(
+          or(
+            eq(boards.ownerId, userId),
+            inArray(
+              boards.id,
+              db
+                .select({ id: boardMembers.boardId })
+                .from(boardMembers)
+                .where(eq(boardMembers.userId, userId))
+            )
+          )
+        );
+    }
+
+    return (data as any[]) || [];
+  } catch (error) {
+    console.error("[Database] getUserBoards failed:", error);
+    return [];
+  }
 }
 
 export async function getBoardById(boardId: number, userId: number) {
