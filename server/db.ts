@@ -203,22 +203,31 @@ export async function getUserBoards(userId: number) {
 }
 
 export async function getBoardById(boardId: number, userId: number) {
-  const db = await getDb();
-  if (!db) return null;
-  
-  // Check if user has access to this board
-  const board = await db.select().from(boards).where(eq(boards.id, boardId)).limit(1);
-  if (!board.length) return null;
-  
-  const isOwner = board[0].ownerId === userId;
-  const isMember = await db
-    .select()
-    .from(boardMembers)
-    .where(and(eq(boardMembers.boardId, boardId), eq(boardMembers.userId, userId)))
-    .limit(1);
-  
-  if (!isOwner && !isMember.length) return null;
-  return board[0];
+  try {
+    // MÉTODO SIMPLES: Usar API REST para evitar erro de conexão TCP
+    const { data: board, error: boardError } = await supabase
+      .from("boards")
+      .select("*")
+      .eq("id", boardId)
+      .maybeSingle();
+
+    if (boardError || !board) return null;
+
+    const isOwner = board.ownerId === userId;
+    
+    const { data: membership, error: memberError } = await supabase
+      .from("board_members")
+      .select("*")
+      .eq("boardId", boardId)
+      .eq("userId", userId)
+      .maybeSingle();
+
+    if (!isOwner && !membership) return null;
+    return board as any;
+  } catch (error) {
+    console.error("[Database] getBoardById failed:", error);
+    return null;
+  }
 }
 
 export async function getBoardMembers(boardId: number) {
@@ -240,39 +249,69 @@ export async function getBoardMembers(boardId: number) {
 
 // List queries
 export async function getBoardLists(boardId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  
-  return await db
-    .select()
-    .from(lists)
-    .where(eq(lists.boardId, boardId))
-    .orderBy(lists.position);
+  try {
+    const { data, error } = await supabase
+      .from("lists")
+      .select("*")
+      .eq("boardId", boardId)
+      .order("position");
+
+    if (error) {
+      console.error("[Database] Error fetching lists via REST:", error);
+      const db = await getDb();
+      if (!db) return [];
+      return await db.select().from(lists).where(eq(lists.boardId, boardId)).orderBy(lists.position);
+    }
+
+    return (data as any[]) || [];
+  } catch (error) {
+    console.error("[Database] getBoardLists failed:", error);
+    return [];
+  }
 }
 
 // Card queries
 export async function getListCards(listId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  
-  return await db
-    .select({
-      id: cards.id,
-      listId: cards.listId,
-      title: cards.title,
-      description: cards.description,
-      position: cards.position,
-      dueDate: cards.dueDate,
-      assignedTo: cards.assignedTo,
-      assignedToName: users.name,
-      createdBy: cards.createdBy,
-      createdAt: cards.createdAt,
-      updatedAt: cards.updatedAt,
-    })
-    .from(cards)
-    .leftJoin(users, eq(cards.assignedTo, users.id))
-    .where(eq(cards.listId, listId))
-    .orderBy(cards.position);
+  try {
+    const { data, error } = await supabase
+      .from("cards")
+      .select("*, assignedToUser:users!assignedTo(name)")
+      .eq("listId", listId)
+      .order("position");
+
+    if (error) {
+      console.error("[Database] Error fetching cards via REST:", error);
+      const db = await getDb();
+      if (!db) return [];
+      return await db
+        .select({
+          id: cards.id,
+          listId: cards.listId,
+          title: cards.title,
+          description: cards.description,
+          position: cards.position,
+          dueDate: cards.dueDate,
+          assignedTo: cards.assignedTo,
+          assignedToName: users.name,
+          createdBy: cards.createdBy,
+          createdAt: cards.createdAt,
+          updatedAt: cards.updatedAt,
+        })
+        .from(cards)
+        .leftJoin(users, eq(cards.assignedTo, users.id))
+        .where(eq(cards.listId, listId))
+        .orderBy(cards.position);
+    }
+
+    // Adaptar formato para o que o frontend espera (assignedToName)
+    return (data as any[]).map(card => ({
+      ...card,
+      assignedToName: card.assignedToUser?.name || null
+    })) || [];
+  } catch (error) {
+    console.error("[Database] getListCards failed:", error);
+    return [];
+  }
 }
 
 export async function getCardById(cardId: number) {

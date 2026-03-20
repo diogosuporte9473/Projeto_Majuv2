@@ -214,22 +214,28 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) {
+        // MÉTODO SIMPLES: Usar API REST para evitar erro de conexão TCP no roteador
+        const { data, error } = await supabase
+          .from("boards")
+          .insert({
+            name: input.name,
+            description: input.description,
+            color: input.color,
+            ownerId: ctx.user.id,
+          })
+          .select("id")
+          .single();
+
+        if (error) {
+          console.error("[Database] Error creating board via REST:", error);
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
+            message: "Erro ao criar quadro no banco de dados",
+            cause: error,
           });
         }
 
-        const result = await db.insert(boards).values({
-          name: input.name,
-          description: input.description,
-          color: input.color,
-          ownerId: ctx.user.id,
-        });
-
-        return { id: (result as any).insertId };
+        return { id: data.id };
       }),
     update: protectedProcedure
       .input(
@@ -379,14 +385,6 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
-        }
-
         const board = await getBoardById(input.boardId, ctx.user.id);
         if (!board) {
           throw new TRPCError({
@@ -398,13 +396,27 @@ export const appRouter = router({
         const boardLists = await getBoardLists(input.boardId);
         const position = boardLists.length;
 
-        const result = await db.insert(lists).values({
-          boardId: input.boardId,
-          name: input.name,
-          position,
-        });
+        // MÉTODO SIMPLES: Usar API REST para evitar erro de conexão TCP
+        const { data, error } = await supabase
+          .from("lists")
+          .insert({
+            boardId: input.boardId,
+            name: input.name,
+            position,
+          })
+          .select("id")
+          .single();
 
-        return { id: (result as any).insertId };
+        if (error) {
+          console.error("[Database] Error creating list via REST:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Erro ao criar lista no banco de dados",
+            cause: error,
+          });
+        }
+
+        return { id: data.id };
       }),
   }),
 
@@ -425,35 +437,33 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
-        }
-
-        const cardList = await db.select().from(lists).where(eq(lists.id, input.listId)).limit(1);
-        if (!cardList.length) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "List not found",
-          });
-        }
-
         const listCards = await getListCards(input.listId);
         const position = listCards.length;
 
-        const result = await db.insert(cards).values({
-          listId: input.listId,
-          title: input.title,
-          description: input.description,
-          position,
-          dueDate: input.dueDate,
-          createdBy: ctx.user.id,
-        });
+        // MÉTODO SIMPLES: Usar API REST para evitar erro de conexão TCP
+        const { data, error } = await supabase
+          .from("cards")
+          .insert({
+            listId: input.listId,
+            title: input.title,
+            description: input.description,
+            position,
+            dueDate: input.dueDate?.toISOString(),
+            createdBy: ctx.user.id,
+          })
+          .select("id")
+          .single();
 
-        return { id: (result as any).insertId };
+        if (error) {
+          console.error("[Database] Error creating card via REST:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Erro ao criar cartão no banco de dados",
+            cause: error,
+          });
+        }
+
+        return { id: data.id };
       }),
     update: protectedProcedure
       .input(
