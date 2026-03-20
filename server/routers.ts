@@ -436,33 +436,40 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const listCards = await getListCards(input.listId);
-        const position = listCards.length;
+        try {
+          const listCards = await getListCards(input.listId);
+          const position = listCards.length;
 
-        // MÉTODO SIMPLES: Usar API REST para evitar erro de conexão TCP
-        const { data, error } = await supabase
-          .from("cards")
-          .insert({
-            listId: input.listId,
-            title: input.title,
-            description: input.description,
-            position,
-            dueDate: input.dueDate?.toISOString(),
-            createdBy: ctx.user.id,
-          })
-          .select("id")
-          .single();
+          // MÉTODO DIRETO REST: Garante criação mesmo com instabilidade no pooler
+          const { data, error } = await supabase
+            .from("cards")
+            .insert({
+              listId: input.listId,
+              title: input.title,
+              description: input.description || "",
+              position,
+              dueDate: input.dueDate ? input.dueDate.toISOString() : null,
+              createdBy: ctx.user?.id || null, // Permite nulo se não houver usuário na sessão
+            })
+            .select("id")
+            .single();
 
-        if (error) {
-          console.error("[Database] Error creating card via REST:", error);
+          if (error) {
+            console.error("[Database] Card creation failed via REST:", error);
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Erro ao criar cartão: ${error.message}`,
+            });
+          }
+
+          return { id: data.id };
+        } catch (err: any) {
+          console.error("[Database] Unexpected error during card creation:", err);
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "Erro ao criar cartão no banco de dados",
-            cause: error,
+            message: err.message || "Erro inesperado ao criar cartão",
           });
         }
-
-        return { id: data.id };
       }),
     update: protectedProcedure
       .input(
