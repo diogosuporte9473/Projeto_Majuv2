@@ -393,6 +393,63 @@ export async function getCardCustomFields(cardId: number) {
   }
 }
 
+// Board members queries
+export async function getBoardMembers(boardId: number) {
+  try {
+    const { data, error } = await supabase
+      .from("board_members")
+      .select("*, user:users(*)")
+      .eq("boardId", boardId);
+
+    if (error) {
+      console.error("[Database] Error fetching board members via REST:", error);
+      const db = await getDb();
+      if (!db) return [];
+      return await db
+        .select({
+          id: boardMembers.id,
+          boardId: boardMembers.boardId,
+          userId: boardMembers.userId,
+          role: boardMembers.role,
+          joinedAt: boardMembers.joinedAt,
+          user: users,
+        })
+        .from(boardMembers)
+        .leftJoin(users, eq(boardMembers.userId, users.id))
+        .where(eq(boardMembers.boardId, boardId));
+    }
+
+    return (data as any[]).map(m => ({
+      ...m,
+      user: m.user
+    })) || [];
+  } catch (error) {
+    return [];
+  }
+}
+
+// Mirrored cards queries
+export async function getMirroredCards(cardId: number) {
+  try {
+    const { data, error } = await supabase
+      .from("mirrored_cards")
+      .select("*")
+      .or(`originalCardId.eq.${cardId},mirrorCardId.eq.${cardId}`);
+
+    if (error) {
+      const db = await getDb();
+      if (!db) return [];
+      return await db
+        .select()
+        .from(mirroredCards)
+        .where(or(eq(mirroredCards.originalCardId, cardId), eq(mirroredCards.mirrorCardId, cardId)));
+    }
+    return data || [];
+  } catch (error) {
+    return [];
+  }
+}
+
 // Project Dates queries
 export async function getProjectDate(cardId: number) {
   const db = await getDb();
