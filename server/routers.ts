@@ -214,41 +214,27 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        try {
-          const db = await getDb();
-          if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
-
-          const [result] = await db.insert(boards).values({
+        // MÉTODO DIRETO REST: Evita o erro de conexão do Drizzle/Postgres
+        const { data, error } = await supabase
+          .from("boards")
+          .insert({
             name: input.name,
-            description: input.description,
+            description: input.description || "",
             color: input.color,
             ownerId: ctx.user.id,
-          }).returning();
+          })
+          .select("id")
+          .single();
 
-          return { id: result.id };
-        } catch (error: any) {
-          console.error("[Database] Board creation failed, trying REST fallback:", error.message);
-          
-          // Fallback para REST se o Drizzle der erro de conexão
-          const { data, error: restError } = await supabase
-            .from("boards")
-            .insert({
-              name: input.name,
-              description: input.description,
-              color: input.color,
-              ownerId: ctx.user.id,
-            })
-            .select("id")
-            .single();
-
-          if (restError) {
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: `Falha total na criação: ${restError.message}`,
-            });
-          }
-          return { id: data.id };
+        if (error) {
+          console.error("[Database] Board creation failed via REST:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao criar quadro: ${error.message}`,
+          });
         }
+
+        return { id: data.id };
       }),
     update: protectedProcedure
       .input(
