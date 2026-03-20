@@ -167,12 +167,24 @@ export async function getUserById(id: number) {
 // Board queries
 export async function getUserBoards(userId: number) {
   try {
-    // MÉTODO SIMPLES: Buscar boards onde o usuário é dono ou membro
-    // Corrigido para usar underline no board_members conforme o banco físico
-    const { data, error } = await supabase
-      .from("boards")
-      .select("*")
-      .or(`ownerId.eq.${userId},id.in.(select boardId from board_members where userId.eq.${userId})`);
+    // 1. Buscar IDs dos boards onde o usuário é membro
+    const { data: memberships } = await supabase
+      .from("board_members")
+      .select("boardId")
+      .eq("userId", userId);
+
+    const boardIds = memberships?.map(m => m.boardId) || [];
+
+    // 2. Buscar boards onde o usuário é dono OU é membro
+    let query = supabase.from("boards").select("*");
+    
+    if (boardIds.length > 0) {
+      query = query.or(`ownerId.eq.${userId},id.in.(${boardIds.join(",")})`);
+    } else {
+      query = query.eq("ownerId", userId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("[Database] Error fetching boards via REST:", error);
