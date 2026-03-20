@@ -140,15 +140,28 @@ export async function getUserByUsername(username: string) {
 }
 
 export async function getUserById(id: number) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
+  try {
+    // MÉTODO SIMPLES: Usar a API REST do Supabase para evitar erro de conexão TCP
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[Database] Error fetching user by ID via REST:", error);
+      // Fallback para Drizzle
+      const db = await getDb();
+      if (!db) return undefined;
+      const results = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      return results[0] || undefined;
+    }
+
+    return (data as any) || undefined;
+  } catch (error) {
+    console.error("[Database] getUserById failed:", error);
     return undefined;
   }
-
-  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-
-  return result.length > 0 ? result[0] : undefined;
 }
 
 // Board queries

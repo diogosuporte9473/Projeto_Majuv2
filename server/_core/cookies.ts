@@ -42,7 +42,7 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    sameSite: "lax", // Mais seguro e compatível que "none" para apps no mesmo domínio
+    secure: process.env.NODE_ENV === "production", // Sempre true em produção (Vercel)
   };
 }
