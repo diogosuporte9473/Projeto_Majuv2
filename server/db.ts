@@ -167,7 +167,8 @@ export async function getUserById(id: number) {
 // Board queries
 export async function getUserBoards(userId: number) {
   try {
-    // MÉTODO SIMPLES: Usar a API REST para evitar erro de conexão TCP no roteador
+    // MÉTODO SIMPLES: Buscar boards onde o usuário é dono ou membro
+    // Corrigido para usar underline no board_members conforme o banco físico
     const { data, error } = await supabase
       .from("boards")
       .select("*")
@@ -175,24 +176,7 @@ export async function getUserBoards(userId: number) {
 
     if (error) {
       console.error("[Database] Error fetching boards via REST:", error);
-      // Fallback para Drizzle
-      const db = await getDb();
-      if (!db) return [];
-      return await db
-        .select()
-        .from(boards)
-        .where(
-          or(
-            eq(boards.ownerId, userId),
-            inArray(
-              boards.id,
-              db
-                .select({ id: boardMembers.boardId })
-                .from(boardMembers)
-                .where(eq(boardMembers.userId, userId))
-            )
-          )
-        );
+      return [];
     }
 
     return (data as any[]) || [];
