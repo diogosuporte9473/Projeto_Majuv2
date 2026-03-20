@@ -9,6 +9,7 @@ interface DraggableCardProps {
   title: string;
   description?: string;
   dueDate?: Date;
+  listName?: string;
 }
 
 export function DraggableCard({
@@ -16,6 +17,7 @@ export function DraggableCard({
   title,
   description,
   dueDate,
+  listName,
 }: DraggableCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const {
@@ -71,6 +73,7 @@ export function DraggableCard({
           cardId={id}
           cardTitle={title}
           cardDescription={description}
+          listName={listName}
         />
       )}
     </>

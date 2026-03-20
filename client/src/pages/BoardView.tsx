@@ -289,6 +289,7 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
                 title={card.title}
                 description={card.description || undefined}
                 dueDate={card.dueDate ? new Date(card.dueDate) : undefined}
+                listName={listName}
               />
             ))
           ) : (
