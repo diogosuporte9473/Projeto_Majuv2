@@ -6,6 +6,7 @@ import CardDetailModal from "./CardDetailModal";
 
 interface DraggableCardProps {
   id: number;
+  listId: number;
   title: string;
   description?: string;
   dueDate?: Date;
@@ -14,6 +15,7 @@ interface DraggableCardProps {
 
 export function DraggableCard({
   id,
+  listId,
   title,
   description,
   dueDate,
@@ -27,7 +29,7 @@ export function DraggableCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: `card-${id}` });
+  } = useSortable({ id: `card-${id}-${listId}` });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -41,12 +43,11 @@ export function DraggableCard({
         ref={setNodeRef}
         style={style}
         {...attributes}
-        {...listeners}
         className="p-3"
       >
         <Card
+          {...listeners}
           onClick={(e) => {
-            e.stopPropagation();
             if (!isDragging) {
               setIsModalOpen(true);
             }

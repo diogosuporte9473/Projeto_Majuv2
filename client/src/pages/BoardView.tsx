@@ -11,9 +11,14 @@ import {
   DragEndEvent,
   DragOverlay,
   closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
 } from "@dnd-kit/core";
 import {
   SortableContext,
+  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { DraggableCard } from "@/components/DraggableCard";
@@ -43,6 +48,17 @@ export default function BoardView() {
   const [messages, setMessages] = useState<Message[]>([
     { role: "system", content: "You are a helpful assistant for the Maju Task Manager. You can help users organize their tasks, suggest project steps, and answer questions about their boards." }
   ]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const createListMutation = trpc.lists.create.useMutation();
   const reorderCardMutation = trpc.cards.reorder.useMutation();
@@ -141,6 +157,7 @@ export default function BoardView() {
         </div>
 
         <DndContext
+          sensors={sensors}
           collisionDetection={closestCorners}
           onDragEnd={handleDragEnd}
           onDragStart={(event) => {
@@ -286,6 +303,7 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
               <DraggableCard
                 key={card.id}
                 id={card.id}
+                listId={listId}
                 title={card.title}
                 description={card.description || undefined}
                 dueDate={card.dueDate ? new Date(card.dueDate) : undefined}
