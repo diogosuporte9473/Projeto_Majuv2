@@ -226,23 +226,6 @@ export async function getBoardById(boardId: number, userId: number) {
   }
 }
 
-export async function getBoardMembers(boardId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  
-  return await db
-    .select({
-      id: boardMembers.id,
-      userId: boardMembers.userId,
-      role: boardMembers.role,
-      userName: users.name,
-      userUsername: users.username,
-    })
-    .from(boardMembers)
-    .leftJoin(users, eq(boardMembers.userId, users.id))
-    .where(eq(boardMembers.boardId, boardId));
-}
-
 // List queries
 export async function getBoardLists(boardId: number) {
   try {
