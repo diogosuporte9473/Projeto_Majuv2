@@ -69,6 +69,17 @@ export default function CardDetailModal({
   const [description, setDescription] = useState(cardDescription || "");
   const [isEditingCustomFields, setIsEditingCustomFields] = useState(false);
 
+  // Scroll references
+  const descriptionRef = React.useRef<HTMLDivElement>(null);
+  const customFieldsRef = React.useRef<HTMLDivElement>(null);
+  const checklistRef = React.useRef<HTMLDivElement>(null);
+  const labelsRef = React.useRef<HTMLDivElement>(null);
+  const datesRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   useEffect(() => {
     setDescription(cardDescription || "");
   }, [cardDescription]);
@@ -208,23 +219,43 @@ export default function CardDetailModal({
           </div>
 
           <div className="flex flex-wrap gap-2 mb-8">
-            <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2"
+              onClick={() => scrollToSection(descriptionRef)}
+            >
               <Plus className="w-4 h-4" /> Adicionar
             </Button>
-            <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2"
+              onClick={() => scrollToSection(labelsRef)}
+            >
               <Tag className="w-4 h-4" /> Etiquetas
             </Button>
-            <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2"
+              onClick={() => scrollToSection(datesRef)}
+            >
               <Clock className="w-4 h-4" /> Datas
             </Button>
-            <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2"
+              onClick={() => scrollToSection(checklistRef)}
+            >
               <CheckSquare className="w-4 h-4" /> Checklist
             </Button>
           </div>
 
           <div className="space-y-8">
             {/* Descrição */}
-            <section>
+            <section ref={descriptionRef}>
               <div className="flex items-center gap-2 mb-3">
                 <AlignLeft className="w-5 h-5 text-gray-400" />
                 <h3 className="font-semibold text-lg">Descrição</h3>
@@ -241,7 +272,7 @@ export default function CardDetailModal({
             </section>
 
             {/* Campos Personalizados */}
-            <section>
+            <section ref={customFieldsRef}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <LayoutGrid className="w-5 h-5 text-gray-400" />
@@ -269,7 +300,7 @@ export default function CardDetailModal({
                     <SelectTrigger className="bg-[#2a2a2a] border-none text-gray-400 h-10">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#2a2a2a] border-[#333] text-white">
+                    <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
                       <SelectItem value="Baixo">Baixo</SelectItem>
                       <SelectItem value="Médio">Médio</SelectItem>
                       <SelectItem value="Alto">Alto</SelectItem>
@@ -289,7 +320,7 @@ export default function CardDetailModal({
                     <SelectTrigger className="bg-[#2a2a2a] border-none text-gray-400 h-10">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#2a2a2a] border-[#333] text-white">
+                    <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
                       <SelectItem value="Aguardando">Aguardando</SelectItem>
                       <SelectItem value="Em progresso">Em progresso</SelectItem>
                       <SelectItem value="Concluído">Concluído</SelectItem>
@@ -309,7 +340,7 @@ export default function CardDetailModal({
                     <SelectTrigger className="bg-[#2a2a2a] border-none text-gray-400 h-10">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#2a2a2a] border-[#333] text-white">
+                    <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
                       <SelectItem value="Bronze">Bronze</SelectItem>
                       <SelectItem value="Prata">Prata</SelectItem>
                       <SelectItem value="Ouro">Ouro</SelectItem>
@@ -362,12 +393,25 @@ export default function CardDetailModal({
             </section>
 
             {/* Checklist */}
-            <section>
+            <section ref={checklistRef}>
               <div className="flex items-center gap-2 mb-4">
                 <CheckSquare className="w-5 h-5 text-gray-400" />
                 <h3 className="font-semibold text-lg">Checklist</h3>
               </div>
               <div className="ml-7 space-y-3">
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={newChecklistTitle}
+                    onChange={(e) => setNewChecklistTitle(e.target.value)}
+                    placeholder="Adicionar item..."
+                    className="flex-1 bg-[#2a2a2a] border-none rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-gray-400"
+                    onKeyDown={(e) => e.key === "Enter" && handleAddChecklist()}
+                  />
+                  <Button onClick={handleAddChecklist} size="sm" className="bg-[#2a2a2a] hover:bg-[#333] text-white">
+                    Adicionar
+                  </Button>
+                </div>
                 {checklistsLoading ? (
                   <Loader2 className="w-6 h-6 animate-spin" />
                 ) : checklists?.map((item) => (
@@ -389,29 +433,35 @@ export default function CardDetailModal({
                     </button>
                   </div>
                 ))}
-                <div className="flex gap-2 pt-2">
-                  <input
-                    type="text"
-                    value={newChecklistTitle}
-                    onChange={(e) => setNewChecklistTitle(e.target.value)}
-                    placeholder="Adicionar item..."
-                    className="flex-1 bg-[#2a2a2a] border-none rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-gray-400"
-                    onKeyDown={(e) => e.key === "Enter" && handleAddChecklist()}
-                  />
-                  <Button onClick={handleAddChecklist} size="sm" variant="ghost" className="text-gray-400">
-                    Adicionar
-                  </Button>
-                </div>
               </div>
             </section>
 
             {/* Etiquetas */}
-            <section>
+            <section ref={labelsRef}>
               <div className="flex items-center gap-2 mb-4">
                 <Tag className="w-5 h-5 text-gray-400" />
                 <h3 className="font-semibold text-lg">Etiquetas</h3>
               </div>
               <div className="ml-7 flex flex-wrap gap-2">
+                <div className="flex items-center gap-2 w-full mb-4">
+                  <input
+                    type="text"
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    placeholder="Nova etiqueta..."
+                    className="bg-[#2a2a2a] border-none rounded px-3 py-2 text-sm flex-1"
+                    onKeyDown={(e) => e.key === "Enter" && handleAddLabel()}
+                  />
+                  <input
+                    type="color"
+                    value={newLabelColor}
+                    onChange={(e) => setNewLabelColor(e.target.value)}
+                    className="w-8 h-8 rounded bg-transparent border-none cursor-pointer p-0"
+                  />
+                  <Button onClick={handleAddLabel} size="sm" className="bg-[#2a2a2a] hover:bg-[#333] text-white">
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
                 {labels?.map((label) => (
                   <div
                     key={label.id}
@@ -424,52 +474,39 @@ export default function CardDetailModal({
                     </button>
                   </div>
                 ))}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={newLabel}
-                    onChange={(e) => setNewLabel(e.target.value)}
-                    placeholder="Nova etiqueta..."
-                    className="bg-[#2a2a2a] border-none rounded px-3 py-1 text-xs w-24"
-                    onKeyDown={(e) => e.key === "Enter" && handleAddLabel()}
-                  />
-                  <input
-                    type="color"
-                    value={newLabelColor}
-                    onChange={(e) => setNewLabelColor(e.target.value)}
-                    className="w-6 h-6 rounded bg-transparent border-none cursor-pointer p-0"
-                  />
-                  <Button onClick={handleAddLabel} size="sm" variant="ghost" className="p-1 h-auto">
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
               </div>
             </section>
 
             {/* Datas */}
-            <section>
+            <section ref={datesRef}>
               <div className="flex items-center gap-2 mb-4">
                 <Calendar className="w-5 h-5 text-gray-400" />
                 <h3 className="font-semibold text-lg">Datas do Projeto</h3>
               </div>
               <div className="ml-7 grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Início</label>
-                  <input
-                    type="date"
-                    defaultValue={projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : ""}
-                    onChange={(e) => handleUpdateDates(e.target.value, projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : undefined)}
-                    className="w-full bg-[#2a2a2a] border-none rounded-lg px-3 py-2 text-sm text-white"
-                  />
+                  <label className="block text-xs text-gray-400 mb-2">Início</label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      defaultValue={projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : ""}
+                      onChange={(e) => handleUpdateDates(e.target.value, projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : undefined)}
+                      className="w-full bg-[#2a2a2a] border-none rounded-lg px-4 py-3 text-sm text-white appearance-none"
+                    />
+                    <Calendar className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Término</label>
-                  <input
-                    type="date"
-                    defaultValue={projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : ""}
-                    onChange={(e) => handleUpdateDates(projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : undefined, e.target.value)}
-                    className="w-full bg-[#2a2a2a] border-none rounded-lg px-3 py-2 text-sm text-white"
-                  />
+                  <label className="block text-xs text-gray-400 mb-2">Término</label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      defaultValue={projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : ""}
+                      onChange={(e) => handleUpdateDates(projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : undefined, e.target.value)}
+                      className="w-full bg-[#2a2a2a] border-none rounded-lg px-4 py-3 text-sm text-white appearance-none"
+                    />
+                    <Calendar className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
                 </div>
               </div>
             </section>
