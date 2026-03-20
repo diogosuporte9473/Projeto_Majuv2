@@ -179,7 +179,9 @@ export const cardCustomFields = pgTable("cardCustomFields", {
   fieldType: fieldTypeEnum("fieldType").default("text").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  cardFieldIdx: uniqueIndex("card_field_idx").on(table.cardId, table.fieldName),
+}));
 
 export type CardCustomField = typeof cardCustomFields.$inferSelect;
 export type InsertCardCustomField = typeof cardCustomFields.$inferInsert;
