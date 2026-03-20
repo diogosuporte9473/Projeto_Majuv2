@@ -394,7 +394,6 @@ export async function getBoardMembers(boardId: number) {
           boardId: boardMembers.boardId,
           userId: boardMembers.userId,
           role: boardMembers.role,
-          joinedAt: boardMembers.joinedAt,
           user: users,
         })
         .from(boardMembers)
