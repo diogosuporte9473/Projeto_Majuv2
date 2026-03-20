@@ -214,28 +214,41 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        // MÉTODO SIMPLES: Usar API REST para evitar erro de conexão TCP no roteador
-        const { data, error } = await supabase
-          .from("boards")
-          .insert({
+        try {
+          const db = await getDb();
+          if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+          const [result] = await db.insert(boards).values({
             name: input.name,
             description: input.description,
             color: input.color,
             ownerId: ctx.user.id,
-          })
-          .select("id")
-          .single();
+          }).returning();
 
-        if (error) {
-          console.error("[Database] Error creating board via REST:", error);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Erro ao criar quadro no banco de dados",
-            cause: error,
-          });
+          return { id: result.id };
+        } catch (error: any) {
+          console.error("[Database] Board creation failed, trying REST fallback:", error.message);
+          
+          // Fallback para REST se o Drizzle der erro de conexão
+          const { data, error: restError } = await supabase
+            .from("boards")
+            .insert({
+              name: input.name,
+              description: input.description,
+              color: input.color,
+              ownerId: ctx.user.id,
+            })
+            .select("id")
+            .single();
+
+          if (restError) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Falha total na criação: ${restError.message}`,
+            });
+          }
+          return { id: data.id };
         }
-
-        return { id: data.id };
       }),
     update: protectedProcedure
       .input(
