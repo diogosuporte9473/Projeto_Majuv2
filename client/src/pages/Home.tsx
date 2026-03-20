@@ -15,9 +15,12 @@ export default function Home() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
 
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      // Atualizar o cache do tRPC manualmente para garantir que a UI mude instantaneamente
+      utils.auth.me.setData(undefined, data as any);
       await refresh();
       setLocation("/");
       toast.success("Login realizado com sucesso!");
@@ -28,7 +31,8 @@ export default function Home() {
   });
 
   const registerMutation = trpc.auth.register.useMutation({
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      utils.auth.me.setData(undefined, data as any);
       await refresh();
       setLocation("/");
       toast.success("Conta criada com sucesso!");
