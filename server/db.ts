@@ -311,98 +311,86 @@ export async function getListCards(listId: number) {
 }
 
 export async function getCardById(cardId: number) {
-  const db = await getDb();
-  if (!db) return null;
-  
-  const result = await db
-    .select()
-    .from(cards)
-    .where(eq(cards.id, cardId))
-    .limit(1);
-  
-  return result.length > 0 ? result[0] : null;
-}
+  try {
+    const { data, error } = await supabase
+      .from("cards")
+      .select("*")
+      .eq("id", cardId)
+      .maybeSingle();
 
-// Mirrored cards queries
-export async function getMirroredCards(cardId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  
-  return await db
-    .select()
-    .from(mirroredCards)
-    .where(or(eq(mirroredCards.originalCardId, cardId), eq(mirroredCards.mirrorCardId, cardId)));
+    if (error) {
+      console.error("[Database] Error fetching card via REST:", error);
+      const db = await getDb();
+      if (!db) return null;
+      const result = await db.select().from(cards).where(eq(cards.id, cardId)).limit(1);
+      return result.length > 0 ? result[0] : null;
+    }
+    return data || null;
+  } catch (error) {
+    console.error("[Database] getCardById failed:", error);
+    return null;
+  }
 }
-
-// TODO: add more feature queries here as your schema grows.
 
 // Card Labels queries
 export async function getCardLabels(cardId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  return await db.select().from(cardLabels).where(eq(cardLabels.cardId, cardId));
-}
+  try {
+    const { data, error } = await supabase
+      .from("card_labels")
+      .select("*")
+      .eq("cardId", cardId);
 
-export async function addCardLabel(cardId: number, label: string, color: string = "#4b4897") {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.insert(cardLabels).values({ cardId, label, color });
-}
-
-export async function deleteCardLabel(labelId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.delete(cardLabels).where(eq(cardLabels.id, labelId));
+    if (error) {
+      console.error("[Database] Error fetching labels via REST:", error);
+      const db = await getDb();
+      if (!db) return [];
+      return await db.select().from(cardLabels).where(eq(cardLabels.cardId, cardId));
+    }
+    return data || [];
+  } catch (error) {
+    return [];
+  }
 }
 
 // Card Checklist queries
 export async function getCardChecklists(cardId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  return await db.select().from(cardChecklists).where(eq(cardChecklists.cardId, cardId)).orderBy(cardChecklists.position);
-}
+  try {
+    const { data, error } = await supabase
+      .from("card_checklists")
+      .select("*")
+      .eq("cardId", cardId)
+      .order("position");
 
-export async function addCardChecklist(cardId: number, title: string, position: number = 0) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.insert(cardChecklists).values({ cardId, title, position, completed: false });
-}
-
-export async function updateCardChecklist(checklistId: number, completed: boolean) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.update(cardChecklists).set({ completed }).where(eq(cardChecklists.id, checklistId));
-}
-
-export async function deleteCardChecklist(checklistId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.delete(cardChecklists).where(eq(cardChecklists.id, checklistId));
+    if (error) {
+      console.error("[Database] Error fetching checklists via REST:", error);
+      const db = await getDb();
+      if (!db) return [];
+      return await db.select().from(cardChecklists).where(eq(cardChecklists.cardId, cardId)).orderBy(cardChecklists.position);
+    }
+    return data || [];
+  } catch (error) {
+    return [];
+  }
 }
 
 // Card Custom Fields queries
 export async function getCardCustomFields(cardId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  return await db.select().from(cardCustomFields).where(eq(cardCustomFields.cardId, cardId));
-}
+  try {
+    const { data, error } = await supabase
+      .from("card_custom_fields")
+      .select("*")
+      .eq("cardId", cardId);
 
-export async function addCardCustomField(cardId: number, fieldName: string, fieldValue: string, fieldType: "text" | "select" | "date" | "number" = "text") {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.insert(cardCustomFields).values({ cardId, fieldName, fieldValue, fieldType });
-}
-
-export async function updateCardCustomField(fieldId: number, fieldValue: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.update(cardCustomFields).set({ fieldValue }).where(eq(cardCustomFields.id, fieldId));
-}
-
-export async function deleteCardCustomField(fieldId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.delete(cardCustomFields).where(eq(cardCustomFields.id, fieldId));
+    if (error) {
+      console.error("[Database] Error fetching custom fields via REST:", error);
+      const db = await getDb();
+      if (!db) return [];
+      return await db.select().from(cardCustomFields).where(eq(cardCustomFields.cardId, cardId));
+    }
+    return data || [];
+  } catch (error) {
+    return [];
+  }
 }
 
 // Project Dates queries

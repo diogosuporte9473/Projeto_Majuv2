@@ -471,6 +471,25 @@ export const appRouter = router({
           });
         }
       }),
+    getDetails: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const card = await getCardById(input.id);
+        if (!card) throw new TRPCError({ code: "NOT_FOUND", message: "Card not found" });
+
+        const [labels, checklists, customFields] = await Promise.all([
+          getCardLabels(input.id),
+          getCardChecklists(input.id),
+          getCardCustomFields(input.id),
+        ]);
+
+        return {
+          ...card,
+          labels,
+          checklists,
+          customFields,
+        };
+      }),
     update: protectedProcedure
       .input(
         z.object({
@@ -482,52 +501,40 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
-        }
-
-        const card = await getCardById(input.id);
-        if (!card) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Card not found",
-          });
-        }
-
         const updateData: any = {};
         if (input.title) updateData.title = input.title;
         if (input.description !== undefined) updateData.description = input.description;
-        if (input.dueDate) updateData.dueDate = input.dueDate;
+        if (input.dueDate) updateData.dueDate = input.dueDate.toISOString();
         if (input.assignedTo !== undefined) updateData.assignedTo = input.assignedTo;
 
-        await db.update(cards).set(updateData).where(eq(cards.id, input.id));
+        const { error } = await supabase
+          .from("cards")
+          .update(updateData)
+          .eq("id", input.id);
+
+        if (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao atualizar cartão: ${error.message}`,
+          });
+        }
 
         return { success: true };
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) {
+        const { error } = await supabase
+          .from("cards")
+          .delete()
+          .eq("id", input.id);
+
+        if (error) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
+            message: `Erro ao excluir cartão: ${error.message}`,
           });
         }
-
-        const card = await getCardById(input.id);
-        if (!card) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Card not found",
-          });
-        }
-
-        await db.delete(cards).where(eq(cards.id, input.id));
 
         return { success: true };
       }),
@@ -540,30 +547,66 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
-        }
-
-        const card = await getCardById(input.cardId);
-        if (!card) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Card not found",
-          });
-        }
-
-        await db
-          .update(cards)
-          .set({
+        const { error } = await supabase
+          .from("cards")
+          .update({
             listId: input.newListId,
             position: input.newPosition,
           })
-          .where(eq(cards.id, input.cardId));
+          .eq("id", input.cardId);
 
+        if (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao reordenar cartão: ${error.message}`,
+          });
+        }
+
+        return { success: true };
+      }),
+    // Checklist mutations
+    toggleChecklist: protectedProcedure
+      .input(z.object({ id: z.number(), completed: z.boolean() }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("card_checklists")
+          .update({ completed: input.completed })
+          .eq("id", input.id);
+        
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
+    addChecklist: protectedProcedure
+      .input(z.object({ cardId: z.number(), title: z.string() }))
+      .mutation(async ({ input }) => {
+        const { data, error } = await supabase
+          .from("card_checklists")
+          .insert({ cardId: input.cardId, title: input.title, completed: false })
+          .select("id")
+          .single();
+        
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { id: data.id };
+      }),
+    // Custom Fields mutations
+    upsertCustomField: protectedProcedure
+      .input(z.object({ 
+        cardId: z.number(), 
+        fieldName: z.string(), 
+        fieldValue: z.string(),
+        fieldType: z.enum(["text", "select", "date", "number"]).default("text")
+      }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("card_custom_fields")
+          .upsert({ 
+            cardId: input.cardId, 
+            fieldName: input.fieldName, 
+            fieldValue: input.fieldValue,
+            fieldType: input.fieldType 
+          }, { onConflict: 'cardId,fieldName' });
+        
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
         return { success: true };
       }),
   }),
