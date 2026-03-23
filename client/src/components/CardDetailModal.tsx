@@ -234,12 +234,15 @@ export default function CardDetailModal({
     }
   };
 
-  const handleUpdateDates = async (start?: string, end?: string) => {
+  const handleUpdateDates = async (start: string | undefined, end: string | undefined) => {
     try {
+      const startDate = start ? new Date(start) : null;
+      const endDate = end ? new Date(end) : null;
+      
       await upsertDatesMutation.mutateAsync({
         cardId,
-        startDate: start ? new Date(start) : undefined,
-        endDate: end ? new Date(end) : undefined,
+        startDate,
+        endDate,
       });
       await utils.cardDetails.getProjectDates.invalidate({ cardId });
       toast.success("Datas atualizadas");
@@ -309,14 +312,6 @@ export default function CardDetailModal({
           </div>
 
           <div className="flex flex-wrap gap-2 mb-8">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2"
-              onClick={() => scrollToSection(descriptionRef)}
-            >
-              <Plus className="w-4 h-4" /> Adicionar
-            </Button>
             <Button 
               variant="outline" 
               size="sm" 

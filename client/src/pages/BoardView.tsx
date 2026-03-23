@@ -5,8 +5,8 @@ import { trpc } from "@/lib/trpc";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Loader2, MessageSquare, X, UserPlus, Users, Shield, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Plus, Loader2, MessageSquare, X, UserPlus, Users, Shield, Trash2, MoreHorizontal, Edit2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -32,6 +32,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function BoardView() {
   const [, params] = useRoute("/board/:id");
@@ -370,13 +376,51 @@ function ShareBoardModal({ isOpen, onClose, boardId }: { isOpen: boolean, onClos
 
 function ListColumn({ listId, listName }: { listId: number; listName: string }) {
   const { data: cards, isLoading } = trpc.cards.getByList.useQuery({ listId });
+  const utils = trpc.useUtils();
+  const deleteListMutation = trpc.lists.delete.useMutation();
+  const updateListMutation = trpc.lists.update.useMutation();
+  const createCardMutation = trpc.cards.create.useMutation();
+
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(listName);
   const [newCardTitle, setNewCardTitle] = useState("");
   const [showNewCard, setShowNewCard] = useState(false);
-  const createCardMutation = trpc.cards.create.useMutation();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditingName && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditingName]);
+
+  const handleDeleteList = async () => {
+    if (!confirm("Tem certeza que deseja excluir esta lista e todos os seus cartões?")) return;
+    try {
+      await deleteListMutation.mutateAsync({ id: listId });
+      toast.success("Lista removida");
+      utils.lists.getByBoard.invalidate();
+    } catch (error) {
+      toast.error("Erro ao remover lista");
+    }
+  };
+
+  const handleUpdateName = async () => {
+    if (!editedName.trim() || editedName === listName) {
+      setIsEditingName(false);
+      setEditedName(listName);
+      return;
+    }
+    try {
+      await updateListMutation.mutateAsync({ id: listId, name: editedName });
+      setIsEditingName(false);
+      utils.lists.getByBoard.invalidate();
+    } catch (error) {
+      toast.error("Erro ao renomear lista");
+    }
+  };
 
   const handleCreateCard = async () => {
     if (!newCardTitle.trim()) return;
-
     try {
       await createCardMutation.mutateAsync({
         listId,
@@ -392,8 +436,42 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
   const cardIds = (cards as DBCard[])?.map((card: DBCard) => `card-${card.id}-${listId}`) || [];
 
   return (
-    <div className="bg-muted rounded-lg p-4 flex flex-col h-full">
-      <h3 className="font-semibold text-foreground mb-4">{listName}</h3>
+    <div className="bg-[#1a1a1a] rounded-lg flex flex-col max-h-full border border-[#333]">
+      <div className="p-3 flex items-center justify-between group/list">
+        {isEditingName ? (
+          <input
+            ref={inputRef}
+            value={editedName}
+            onChange={(e) => setEditedName(e.target.value)}
+            onBlur={handleUpdateName}
+            onKeyDown={(e) => e.key === "Enter" && handleUpdateName()}
+            className="bg-[#2a2a2a] text-white text-sm font-semibold px-2 py-1 rounded w-full outline-none ring-1 ring-accent"
+          />
+        ) : (
+          <h2 
+            onClick={() => setIsEditingName(true)}
+            className="text-sm font-semibold text-white px-2 py-1 cursor-pointer hover:bg-[#2a2a2a] rounded flex-1 truncate"
+          >
+            {listName}
+          </h2>
+        )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="text-gray-400 hover:text-white">
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="bg-[#1a1a1a] border-[#333] text-white">
+            <DropdownMenuItem onClick={() => setIsEditingName(true)} className="flex items-center gap-2 cursor-pointer">
+              <Edit2 className="w-4 h-4" /> Renomear
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDeleteList} className="flex items-center gap-2 text-red-400 cursor-pointer focus:text-red-400 focus:bg-red-400/10">
+              <Trash2 className="w-4 h-4" /> Excluir Lista
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
         <div className="flex-1 space-y-3 overflow-y-auto mb-4">
