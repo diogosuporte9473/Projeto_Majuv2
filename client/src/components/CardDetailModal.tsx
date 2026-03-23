@@ -23,7 +23,9 @@ import {
   Settings2,
   Copy,
   User as UserIcon,
-  CalendarDays
+  CalendarDays,
+  Archive,
+  Trash
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -76,6 +78,8 @@ export default function CardDetailModal({
   const upsertCustomFieldMutation = trpc.cards.upsertCustomField.useMutation();
   const deleteCustomFieldMutation = trpc.cardDetails.deleteCustomField.useMutation();
   const createMirrorMutation = trpc.cardDetails.createMirror.useMutation();
+  const archiveCardMutation = trpc.cardDetails.archiveCard.useMutation();
+  const deleteCardMutation = trpc.cards.delete.useMutation();
 
   const [newLabel, setNewLabel] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#4b4897");
@@ -144,6 +148,29 @@ export default function CardDetailModal({
       setIsMirrorDialogOpen(false);
     } catch (error: any) {
       toast.error("Erro ao espelhar cartão: " + error.message);
+    }
+  };
+
+  const handleArchiveCard = async () => {
+    try {
+      await archiveCardMutation.mutateAsync({ id: cardId, archived: true });
+      toast.success("Cartão arquivado");
+      onClose();
+      utils.cards.getByList.invalidate();
+    } catch (error) {
+      toast.error("Erro ao arquivar cartão");
+    }
+  };
+
+  const handleDeleteCard = async () => {
+    if (!confirm("Tem certeza que deseja excluir permanentemente este cartão?")) return;
+    try {
+      await deleteCardMutation.mutateAsync({ id: cardId });
+      toast.success("Cartão excluído");
+      onClose();
+      utils.cards.getByList.invalidate();
+    } catch (error) {
+      toast.error("Erro ao excluir cartão");
     }
   };
 
@@ -321,6 +348,22 @@ export default function CardDetailModal({
               onClick={() => setIsMirrorDialogOpen(true)}
             >
               <Copy className="w-4 h-4" /> Espelhar
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-[#2a2a2a] border-none hover:bg-amber-600/20 text-white flex items-center gap-2"
+              onClick={handleArchiveCard}
+            >
+              <Archive className="w-4 h-4" /> Arquivar
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-[#2a2a2a] border-none hover:bg-red-600/20 text-white flex items-center gap-2"
+              onClick={handleDeleteCard}
+            >
+              <Trash className="w-4 h-4" /> Excluir
             </Button>
           </div>
 

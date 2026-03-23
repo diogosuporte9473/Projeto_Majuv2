@@ -47,22 +47,22 @@ export function useRealtimeSync(boardId?: number) {
       // Escuta mudanças nos detalhes do cartão (labels, checklists, etc)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "cardLabels" },
+        { event: "*", schema: "public", table: "card_labels" },
         () => utils.cardDetails.getLabels.invalidate()
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "cardChecklists" },
+        { event: "*", schema: "public", table: "card_checklists" },
         () => utils.cardDetails.getChecklists.invalidate()
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "cardCustomFields" },
+        { event: "*", schema: "public", table: "card_custom_fields" },
         () => utils.cardDetails.getCustomFields.invalidate()
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "projectDates" },
+        { event: "*", schema: "public", table: "project_dates" },
         () => utils.cardDetails.getProjectDates.invalidate()
       )
       .subscribe();

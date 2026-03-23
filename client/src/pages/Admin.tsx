@@ -23,16 +23,8 @@ export default function Admin() {
     { enabled: user?.role === "admin" } as any
   );
 
-  const { data: users, isLoading: usersLoading } = trpc.admin.users.list.useQuery(
-    undefined,
-    { enabled: user?.role === "admin" } as any
-  );
-
-  const { data: boards } = trpc.boards.list.useQuery(
-    undefined,
-    { enabled: user?.role === "admin" } as any
-  );
-
+  const { data: users, isLoading: usersLoading } = trpc.admin.users.list.useQuery();
+  const { data: boards } = trpc.boards.list.useQuery();
   const { data: boardMembers, isLoading: membersLoading } = trpc.boards.getMembers.useQuery(
     { boardId: selectedBoardId || 0 },
     { enabled: !!selectedBoardId && user?.role === "admin" } as any
@@ -75,11 +67,11 @@ export default function Admin() {
     }
   };
 
-  const handleUpdateRole = async (userId: number, newRole: "admin" | "user") => {
+  const handleUpdateRole = async (id: number, role: "admin" | "user") => {
     try {
       await updateRoleMutation.mutateAsync({
-        id: userId,
-        role: newRole,
+        id,
+        role,
       });
       toast.success("Função atualizada");
     } catch (error) {
