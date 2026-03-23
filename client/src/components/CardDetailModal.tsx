@@ -76,6 +76,7 @@ export default function CardDetailModal({
   const utils = trpc.useUtils();
 
   // Queries
+  const { data: card, isLoading: cardLoading } = trpc.cards.getDetails.useQuery({ id: cardId });
   const { data: labels } = trpc.cardDetails.getLabels.useQuery({ cardId });
   const { data: checklists, isLoading: checklistsLoading } = trpc.cardDetails.getChecklists.useQuery({ cardId });
   const { data: comments } = trpc.cardDetails.getComments.useQuery({ cardId });
@@ -350,7 +351,13 @@ export default function CardDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`${isMaximized ? "max-w-[98vw] h-[98vh]" : "max-w-3xl max-h-[90vh]"} overflow-y-auto bg-[#1a1a1a] text-white border-[#333] p-0 gap-0 transition-all duration-300`}>
+      <DialogContent 
+        aria-describedby="card-detail-description"
+        className={`${isMaximized ? "max-w-[98vw] h-[98vh]" : "max-w-3xl max-h-[90vh]"} overflow-y-auto bg-[#1a1a1a] text-white border-[#333] p-0 gap-0 transition-all duration-300`}
+      >
+        <div id="card-detail-description" className="sr-only">
+          Detalhes do cartão {cardTitle}
+        </div>
         <DialogHeader className="p-6 pb-2">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">

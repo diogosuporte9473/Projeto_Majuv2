@@ -78,6 +78,7 @@ export default function BoardView() {
     })
   );
 
+  const utils = trpc.useUtils();
   const createListMutation = trpc.lists.create.useMutation();
   const reorderCardMutation = trpc.cards.reorder.useMutation();
   const aiChatMutation = trpc.ai.chat.useMutation();

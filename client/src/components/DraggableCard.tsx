@@ -11,6 +11,7 @@ interface DraggableCardProps {
   description?: string;
   dueDate?: Date;
   listName?: string;
+  assignedToName?: string | null;
 }
 
 export function DraggableCard({
@@ -20,6 +21,7 @@ export function DraggableCard({
   description,
   dueDate,
   listName,
+  assignedToName,
 }: DraggableCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const {
