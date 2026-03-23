@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Loader2, MessageSquare, X, UserPlus, Users, Shield, Trash2, MoreHorizontal, Edit2 } from "lucide-react";
+import { Plus, Loader2, MessageSquare, X, UserPlus, Users, Shield, Trash2, MoreHorizontal, Edit2, Archive } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import {
   DndContext,
@@ -63,6 +63,7 @@ export default function BoardView() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showAIChat, setShowAIChat] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showArchivedModal, setShowArchivedModal] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { role: "system", content: "You are a helpful assistant for the Maju Task Manager. You can help users organize their tasks, suggest project steps, and answer questions about their boards." }
   ]);
@@ -182,11 +183,16 @@ export default function BoardView() {
               <p className="text-muted-foreground">{board.description}</p>
             )}
           </div>
-          {isOwnerOrAdmin && (
-            <Button onClick={() => setShowShareModal(true)} variant="outline" className="flex items-center gap-2">
-              <UserPlus className="w-4 h-4" /> Compartilhar
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setShowArchivedModal(true)} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" title="Itens Arquivados">
+              <Archive className="w-4 h-4" />
             </Button>
-          )}
+            {isOwnerOrAdmin && (
+              <Button onClick={() => setShowShareModal(true)} variant="outline" className="flex items-center gap-2">
+                <UserPlus className="w-4 h-4" /> Compartilhar
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-x-auto overflow-y-hidden px-6 pb-6">
@@ -263,6 +269,15 @@ export default function BoardView() {
             isOpen={showShareModal} 
             onClose={() => setShowShareModal(false)} 
             boardId={boardId} 
+          />
+        )}
+
+        {/* Archived Cards Modal */}
+        {boardId && (
+          <ArchivedCardsModal
+            isOpen={showArchivedModal}
+            onClose={() => setShowArchivedModal(false)}
+            boardId={boardId}
           />
         )}
 
@@ -376,6 +391,84 @@ function ShareBoardModal({ isOpen, onClose, boardId }: { isOpen: boolean, onClos
               ))}
             </div>
           </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ArchivedCardsModal({ isOpen, onClose, boardId }: { isOpen: boolean, onClose: () => void, boardId: number }) {
+  const utils = trpc.useUtils();
+  const { data: archivedCards, isLoading } = trpc.cards.getArchivedByBoard.useQuery({ boardId });
+  const unarchiveMutation = trpc.cardDetails.archiveCard.useMutation();
+  const deleteMutation = trpc.cards.delete.useMutation();
+
+  const handleUnarchive = async (cardId: number) => {
+    try {
+      await unarchiveMutation.mutateAsync({ id: cardId, archived: false });
+      utils.cards.getArchivedByBoard.invalidate({ boardId });
+      utils.cards.getByList.invalidate();
+      toast.success("Cartão restaurado");
+    } catch (error) {
+      toast.error("Erro ao restaurar cartão");
+    }
+  };
+
+  const handleDelete = async (cardId: number) => {
+    if (!confirm("Excluir permanentemente este cartão?")) return;
+    try {
+      await deleteMutation.mutateAsync({ id: cardId });
+      utils.cards.getArchivedByBoard.invalidate({ boardId });
+      toast.success("Cartão excluído");
+    } catch (error) {
+      toast.error("Erro ao excluir cartão");
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl bg-[#1a1a1a] border-[#333] text-white">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Archive className="w-5 h-5 text-accent" />
+            Itens Arquivados
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-4 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-accent" />
+            </div>
+          ) : archivedCards?.length === 0 ? (
+            <p className="text-center py-8 text-gray-500 text-sm">Nenhum cartão arquivado neste quadro.</p>
+          ) : (
+            archivedCards?.map((card: any) => (
+              <div key={card.id} className="flex items-center justify-between p-4 rounded-xl bg-[#222] border border-[#333] group hover:border-accent/30 transition-all">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-sm text-gray-200 truncate">{card.title}</h4>
+                  <p className="text-[10px] text-gray-500 mt-1">Arquivado em: {new Date(card.updated_at).toLocaleDateString()}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleUnarchive(card.id)}
+                    className="text-xs h-8 bg-[#2a2a2a] hover:bg-accent hover:text-white"
+                  >
+                    Restaurar
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => handleDelete(card.id)}
+                    className="h-8 w-8 text-gray-500 hover:text-red-400 hover:bg-red-400/10"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </DialogContent>
     </Dialog>
