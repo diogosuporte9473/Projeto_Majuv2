@@ -33,16 +33,16 @@ export default function Admin() {
     { enabled: user?.role === "admin" } as any
   );
 
-  const { data: boardMembers, isLoading: membersLoading } = trpc.admin.permissions.getByBoard.useQuery(
+  const { data: boardMembers, isLoading: membersLoading } = trpc.boards.getMembers.useQuery(
     { boardId: selectedBoardId || 0 },
     { enabled: !!selectedBoardId && user?.role === "admin" } as any
   );
 
   // Mutations
   const createUserMutation = trpc.admin.users.create.useMutation();
-  const updateRoleMutation = trpc.admin.users.updateRole.useMutation();
-  const grantPermissionMutation = trpc.admin.permissions.grant.useMutation();
-  const revokePermissionMutation = trpc.admin.permissions.revoke.useMutation();
+  const updateRoleMutation = trpc.admin.users.update.useMutation();
+  const grantPermissionMutation = trpc.admin.boards.addMember.useMutation();
+  const revokePermissionMutation = trpc.admin.boards.removeMember.useMutation();
 
   if (user?.role !== "admin") {
     return (
@@ -78,7 +78,7 @@ export default function Admin() {
   const handleUpdateRole = async (userId: number, newRole: "admin" | "user") => {
     try {
       await updateRoleMutation.mutateAsync({
-        userId,
+        id: userId,
         role: newRole,
       });
       toast.success("Função atualizada");
@@ -256,8 +256,8 @@ export default function Admin() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {users?.map((u) => {
-                      const member = boardMembers?.find((m) => m.userId === u.id);
+                    {users?.map((u: any) => {
+                      const member = (boardMembers as any[])?.find((m: any) => m.userId === u.id);
                       return (
                         <div key={u.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                           <div>

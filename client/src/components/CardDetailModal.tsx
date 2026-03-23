@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { 
@@ -15,7 +21,9 @@ import {
   ChevronDown,
   Clock,
   Settings2,
-  Copy
+  Copy,
+  User as UserIcon,
+  CalendarDays
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -27,13 +35,10 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface CardDetailModalProps {
   isOpen: boolean;
@@ -84,6 +89,7 @@ export default function CardDetailModal({
   const [selectedListId, setSelectedListId] = useState<string>("");
 
   const { data: userBoards } = trpc.boards.list.useQuery();
+  const { data: allUsers } = trpc.admin.users.list.useQuery();
   const { data: targetLists } = trpc.lists.getByBoard.useQuery(
     { boardId: parseInt(selectedBoardId) },
     { enabled: !!selectedBoardId }
@@ -182,9 +188,9 @@ export default function CardDetailModal({
     }
   };
 
-  const handleToggleChecklist = async (id: number, currentStatus: boolean) => {
+  const handleUpdateChecklistItem = async (id: number, data: { completed?: boolean, title?: string, dueDate?: Date | null, assignedUserId?: number | null }) => {
     try {
-      await updateChecklistMutation.mutateAsync({ id, completed: !currentStatus });
+      await updateChecklistMutation.mutateAsync({ id, ...data });
       await utils.cardDetails.getChecklists.invalidate({ cardId });
     } catch (error) {
       toast.error("Erro ao atualizar item");
@@ -464,8 +470,8 @@ export default function CardDetailModal({
                   <CheckSquare className="w-5 h-5 text-gray-400" />
                   <h3 className="font-semibold text-lg">Checklist</h3>
                 </div>
-                <div className="ml-7 space-y-3">
-                  <div className="flex gap-2 mb-4">
+                <div className="ml-7 space-y-4">
+                  <div className="flex gap-2 mb-2">
                     <input
                       type="text"
                       value={newChecklistTitle}
@@ -478,27 +484,111 @@ export default function CardDetailModal({
                       Adicionar
                     </Button>
                   </div>
+                  
                   {checklistsLoading ? (
                     <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : checklists?.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 group">
-                      <input
-                        type="checkbox"
-                        checked={item.completed}
-                        onChange={() => handleToggleChecklist(item.id, item.completed)}
-                        className="w-5 h-5 rounded border-gray-600 bg-[#2a2a2a] text-accent focus:ring-offset-0"
-                      />
-                      <span className={`flex-1 ${item.completed ? "line-through text-gray-500" : "text-white"}`}>
-                        {item.title}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveChecklist(item.id)}
-                        className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-opacity"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                  ) : (
+                    <div className="space-y-3">
+                      {checklists?.map((item: any) => {
+                        const assignedUser = allUsers?.find((u: any) => u.id === item.assignedUserId);
+                        
+                        return (
+                          <div key={item.id} className="group bg-[#222] hover:bg-[#2a2a2a] p-3 rounded-lg transition-colors">
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={item.completed}
+                                onChange={() => handleUpdateChecklistItem(item.id, { completed: !item.completed })}
+                                className="w-5 h-5 mt-0.5 rounded border-gray-600 bg-[#2a2a2a] text-accent focus:ring-offset-0"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className={`text-sm flex-1 ${item.completed ? "line-through text-gray-500" : "text-white"}`}>
+                                    {item.title}
+                                  </span>
+                                  <button
+                                    onClick={() => handleRemoveChecklist(item.id)}
+                                    className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-opacity"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                <div className="flex items-center gap-3 mt-2">
+                                  {/* Seletor de Data */}
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded hover:bg-[#333] transition-colors ${item.dueDate ? "text-accent bg-accent/10" : "text-gray-500 bg-[#2a2a2a]"}`}>
+                                        <CalendarDays className="w-3.5 h-3.5" />
+                                        {item.dueDate ? format(new Date(item.dueDate), "dd 'de' MMM", { locale: ptBR }) : "Data"}
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-[#333]">
+                                      <input 
+                                        type="date" 
+                                        className="bg-transparent text-white p-2 outline-none"
+                                        onChange={(e) => handleUpdateChecklistItem(item.id, { dueDate: e.target.value ? new Date(e.target.value) : null })}
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+
+                                  {/* Seletor de Usuário */}
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded hover:bg-[#333] transition-colors ${assignedUser ? "text-green-400 bg-green-400/10" : "text-gray-500 bg-[#2a2a2a]"}`}>
+                                        {assignedUser ? (
+                                          <>
+                                            <Avatar className="w-4 h-4 border border-green-400/20">
+                                              <AvatarFallback className="text-[8px] bg-green-400 text-black">
+                                                {assignedUser.name?.charAt(0).toUpperCase()}
+                                              </AvatarFallback>
+                                            </Avatar>
+                                            <span className="truncate max-w-[80px]">{assignedUser.name}</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <UserIcon className="w-3.5 h-3.5" />
+                                            Atribuir
+                                          </>
+                                        )}
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-64 p-2 bg-[#1a1a1a] border-[#333]">
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-semibold text-gray-400 px-2 py-1 uppercase">Atribuir a um usuário</p>
+                                        <div className="max-h-48 overflow-y-auto">
+                                          <button 
+                                            onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: null })}
+                                            className="w-full text-left px-2 py-1.5 rounded hover:bg-[#2a2a2a] text-sm text-gray-400"
+                                          >
+                                            Remover atribuição
+                                          </button>
+                                          {allUsers?.map((u: any) => (
+                                            <button 
+                                              key={u.id}
+                                              onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: u.id })}
+                                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[#2a2a2a] text-sm text-white"
+                                            >
+                                              <Avatar className="w-5 h-5">
+                                                <AvatarFallback className="text-[10px] bg-accent text-white">
+                                                  {u.name?.charAt(0).toUpperCase()}
+                                                </AvatarFallback>
+                                              </Avatar>
+                                              <span className="truncate">{u.name}</span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
+                  )}
                 </div>
               </section>
             )}
