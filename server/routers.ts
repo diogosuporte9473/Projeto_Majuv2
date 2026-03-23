@@ -211,15 +211,15 @@ export const appRouter = router({
 
         const { data, error } = await supabase
           .from("board_members")
-          .select("userId, role, users(name, username)")
+          .select("user_id, role, users(name, username)")
           .eq("board_id", input.boardId);
 
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
         
         return data.map((m: any) => ({
-          userId: m.userId,
+          userId: m.user_id,
           role: m.role,
-          userName: m.users?.name || m.users?.username || `User ${m.userId}`
+          userName: m.users?.name || m.users?.username || `User ${m.user_id}`
         }));
       }),
     create: protectedProcedure
@@ -712,6 +712,45 @@ export const appRouter = router({
 
   // Labels, Checklists, Custom Fields and Project Dates
   cardDetails: router({
+    updateDescription: protectedProcedure
+      .input(z.object({ cardId: z.number(), description: z.string() }))
+      .mutation(async ({ input }) => {
+        try {
+          const { error } = await supabase
+            .from("cards")
+            .update({ description: input.description })
+            .eq("id", input.cardId);
+
+          if (error) {
+            console.error("[Database] Description update failed via Supabase:", error);
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Erro ao atualizar descrição: ${error.message}`,
+            });
+          }
+
+          return { success: true };
+        } catch (err: any) {
+          console.error("[Database] Unexpected error during description update:", err);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: err.message || "Erro inesperado ao atualizar descrição",
+          });
+        }
+      }),
+
+    archiveCard: protectedProcedure
+      .input(z.object({ id: z.number(), archived: z.boolean() }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("cards")
+          .update({ archived: input.archived })
+          .eq("id", input.id);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
+
     getLabels: protectedProcedure
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {
