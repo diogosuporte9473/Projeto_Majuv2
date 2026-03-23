@@ -222,15 +222,15 @@ export default function CardDetailModal({
           </div>
         </DialogHeader>
 
-        {/* Main content */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left – Main content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-10 custom-scrollbar">
-            {/* Quick info row */}
-            <div className="flex flex-wrap gap-6">
+        {/* Main content - Single Column Layout */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+          
+          {/* Section 1: Quick Info & Actions Row */}
+          <div className="flex flex-col md:flex-row justify-between gap-6 pb-6 border-b border-[#333]/30">
+            <div className="flex flex-wrap gap-8">
               {labels && labels.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-bold text-gray-500 uppercase mb-1.5">Etiquetas</h4>
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Etiquetas</h4>
                   <div className="flex flex-wrap gap-1.5">
                     {labels.map((label: any) => (
                       <div 
@@ -241,102 +241,130 @@ export default function CardDetailModal({
                         {label.label}
                       </div>
                     ))}
+                    <Button variant="ghost" size="icon" className="w-6 h-6 rounded-full bg-[#2a2a2a] hover:bg-[#333]">
+                      <Plus className="w-3 h-3 text-gray-400" />
+                    </Button>
                   </div>
                 </div>
               )}
 
               {card?.dueDate && (
-                <div>
-                  <h4 className="text-xs font-bold text-gray-500 uppercase mb-1.5">Prazo</h4>
-                  <div className={`flex items-center gap-2 px-3 py-1 rounded text-sm ${ 
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Prazo</h4>
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium ${ 
                     new Date(card.dueDate) < new Date() ? "bg-red-950/40 text-red-300" : "bg-[#2a2a2a] text-gray-200" 
                   }`}>
                     <Clock size={14} />
-                    {format(new Date(card.dueDate), "dd MMM yyyy", { locale: ptBR })}
+                    {format(new Date(card.dueDate), "dd 'de' MMM, yyyy", { locale: ptBR })}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Description */}
-            <section className="space-y-3">
-              <div className="flex items-center gap-3">
-                <AlignLeft className="text-gray-400" />
-                <h3 className="font-semibold text-lg">Descrição</h3>
+            <div className="space-y-2">
+              <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Adicionar ao cartão</h4>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
+                  <Tag className="w-3.5 h-3.5 mr-2" /> Etiquetas
+                </Button>
+                <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
+                  <CheckSquare className="w-3.5 h-3.5 mr-2" /> Checklist
+                </Button>
+                <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
+                  <Clock className="w-3.5 h-3.5 mr-2" /> Datas
+                </Button>
+                <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
+                  <Paperclip className="w-3.5 h-3.5 mr-2" /> Anexar
+                </Button>
               </div>
+            </div>
+          </div>
+
+          {/* Section 2: Description */}
+          <section className="space-y-4">
+            <div className="flex items-center gap-3">
+              <AlignLeft className="w-5 h-5 text-gray-400" />
+              <h3 className="font-bold text-lg text-gray-200">Descrição</h3>
+            </div>
+            <div className="pl-8">
               <textarea 
                 value={description} 
                 onChange={(e) => setDescription(e.target.value)} 
                 onBlur={handleUpdateDescription} 
                 placeholder="Adicione uma descrição mais detalhada..." 
-                className="w-full min-h-[140px] bg-[#222] border border-[#333] rounded-lg p-4 text-sm resize-y focus:border-accent/60 focus:bg-[#252525] transition-colors" 
+                className="w-full min-h-[120px] bg-[#222] border border-[#333] rounded-xl p-4 text-sm resize-y focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all outline-none" 
               />
-            </section>
+            </div>
+          </section>
 
-            {/* Custom Fields */}
-            <section className="space-y-3">
+          {/* Section 3: Custom Fields */}
+          <section className="space-y-4">
+            <div className="flex items-center gap-3">
+              <LayoutGrid className="w-5 h-5 text-gray-400" />
+              <h3 className="font-bold text-lg text-gray-200">Campos personalizados</h3>
+            </div>
+            <div className="pl-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Mapa de Calor</label>
+                <Select value={getCustomFieldValue("Mapa de Calor")}>
+                  <SelectTrigger className="bg-[#222] border-[#333] h-10 rounded-lg">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                    <SelectItem value="Baixo">Baixo</SelectItem>
+                    <SelectItem value="Médio">Médio</SelectItem>
+                    <SelectItem value="Alto">Alto</SelectItem>
+                    <SelectItem value="Crítico">Crítico</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Espaço para mais campos */}
+            </div>
+          </section>
+
+          {/* Section 4: Checklist */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <LayoutGrid className="text-gray-400" />
-                <h3 className="font-semibold text-lg">Campos personalizados</h3>
+                <CheckSquare className="w-5 h-5 text-gray-400" />
+                <h3 className="font-bold text-lg text-gray-200">Checklist</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Mapa de Calor</label>
-                  <Select value={getCustomFieldValue("Mapa de Calor")}>
-                    <SelectTrigger className="bg-[#222] border-[#333]">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Baixo">Baixo</SelectItem>
-                      <SelectItem value="Médio">Médio</SelectItem>
-                      <SelectItem value="Alto">Alto</SelectItem>
-                      <SelectItem value="Crítico">Crítico</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </section>
-
-            {/* Checklist */}
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CheckSquare className="text-gray-400" />
-                  <h3 className="font-semibold text-lg">Checklist</h3>
-                </div>
-                <div className="text-sm font-medium text-gray-400">
+              <div className="flex items-center gap-4">
+                <div className="text-sm font-bold text-gray-500 bg-[#222] px-2 py-1 rounded">
                   {Math.round(checklistProgress)}%
                 </div>
               </div>
+            </div>
+            <div className="pl-8 space-y-4">
               <Progress value={checklistProgress} className="h-2 bg-[#222]" />
               
-              <div className="space-y-2 mt-4">
+              <div className="space-y-1">
                 {checklistsLoading ? (
                   <div className="flex justify-center py-4">
                     <Loader2 className="w-6 h-6 animate-spin text-accent" />
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     {checklists?.map((item: any) => {
                       const isOverdue = item.due_date && new Date(item.due_date) < new Date() && !item.completed;
                       return (
-                        <div key={item.id} className="group flex items-start gap-4 p-2 rounded-lg hover:bg-white/5 transition-colors">
+                        <div key={item.id} className="group flex items-start gap-4 p-2.5 rounded-xl hover:bg-white/5 transition-all">
                           <input
                             type="checkbox"
                             checked={item.completed}
                             onChange={() => handleUpdateChecklistItem(item.id, { completed: !item.completed })}
-                            className="w-5 h-5 mt-1 rounded border-[#444] bg-[#1a1a1a] text-accent focus:ring-0 cursor-pointer"
+                            className="w-5 h-5 mt-0.5 rounded border-[#444] bg-[#1a1a1a] text-accent focus:ring-0 cursor-pointer"
                           />
-                          <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
                               <input
                                 defaultValue={item.title}
                                 onBlur={(e) => handleUpdateChecklistItem(item.id, { title: e.target.value })}
-                                className={`text-sm flex-1 bg-transparent border-none p-0 focus:ring-0 focus:outline-none ${item.completed ? "line-through text-gray-500" : "text-gray-200"}`}
+                                className={`text-sm flex-1 bg-transparent border-none p-0 focus:ring-0 focus:outline-none font-medium ${item.completed ? "line-through text-gray-500" : "text-gray-200"}`}
                               />
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <button className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/10">
+                                  <button className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-white/10 transition-all">
                                     <MoreVertical className="w-4 h-4 text-gray-500" />
                                   </button>
                                 </DropdownMenuTrigger>
@@ -348,8 +376,9 @@ export default function CardDetailModal({
                               </DropdownMenu>
                             </div>
                             {item.due_date && (
-                              <div className={`text-[10px] font-bold ${isOverdue ? "text-red-400" : "text-gray-500"}`}>
-                                {format(new Date(item.due_date), "dd MMM", { locale: ptBR })}
+                              <div className={`flex items-center gap-1.5 mt-1 text-[10px] font-bold ${isOverdue ? "text-red-400" : "text-gray-500"}`}>
+                                <Clock className="w-3 h-3" />
+                                {format(new Date(item.due_date), "dd 'de' MMM", { locale: ptBR })}
                               </div>
                             )}
                           </div>
@@ -359,17 +388,49 @@ export default function CardDetailModal({
                   </div>
                 )}
               </div>
-            </section>
+            </div>
+          </section>
 
-            {/* Comments */}
+          {/* Section 5: Attachments */}
+          {attachments && attachments.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-center gap-3">
-                <MessageSquare className="text-gray-400" />
-                <h3 className="font-semibold text-lg">Comentários</h3>
+                <Paperclip className="w-5 h-5 text-gray-400" />
+                <h3 className="font-bold text-lg text-gray-200">Anexos</h3>
               </div>
+              <div className="pl-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {attachments.map((file: any) => (
+                  <a 
+                    key={file.id} 
+                    href={file.file_url} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="flex items-center gap-3 p-3 rounded-xl bg-[#222] hover:bg-[#2a2a2a] transition-all border border-[#333] group"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-[#1a1a1a] flex items-center justify-center flex-shrink-0 group-hover:bg-accent/10 transition-colors">
+                      <Paperclip className="w-4 h-4 text-gray-500 group-hover:text-accent" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-300 truncate">{file.filename}</p>
+                      <p className="text-[10px] text-gray-500 uppercase font-medium">{(file.file_size / 1024).toFixed(0)} KB</p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Section 6: Comments */}
+          <section className="space-y-6 pt-4">
+            <div className="flex items-center gap-3">
+              <MessageSquare className="w-5 h-5 text-gray-400" />
+              <h3 className="font-bold text-lg text-gray-200">Comentários</h3>
+            </div>
+            
+            <div className="pl-8 space-y-8">
               <div className="flex gap-4">
-                <Avatar className="w-9 h-9 flex-shrink-0">
-                  <AvatarFallback className="bg-accent text-white text-xs font-bold">
+                <Avatar className="w-9 h-9 flex-shrink-0 border border-white/5">
+                  <AvatarFallback className="bg-accent text-white text-xs font-bold shadow-lg">
                     {currentUser?.name?.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -378,43 +439,43 @@ export default function CardDetailModal({
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
                     placeholder="Escreva um comentário..."
-                    className="w-full bg-[#222] border border-[#333] rounded-lg p-3 text-sm focus:border-accent/60 focus:bg-[#252525] transition-colors resize-none"
+                    className="w-full bg-[#222] border border-[#333] rounded-xl p-4 text-sm focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all outline-none resize-none min-h-[100px]"
                   />
                   <div className="flex justify-end">
                     <Button 
                       onClick={handleAddComment} 
                       disabled={!newComment.trim()} 
                       size="sm" 
-                      className="bg-accent hover:bg-accent/90"
+                      className="bg-accent hover:bg-accent/90 px-6 rounded-full font-bold text-xs"
                     >
-                      <Send className="w-4 h-4 mr-2" /> Comentar
+                      <Send className="w-3.5 h-3.5 mr-2" /> Comentar
                     </Button>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-4 mt-6">
+              <div className="space-y-6">
                 {comments?.map((comment: any) => (
                   <div key={comment.id} className="flex gap-4 group">
-                    <Avatar className="w-9 h-9 flex-shrink-0">
-                      <AvatarFallback className="bg-[#222] text-gray-500 text-xs font-bold">
+                    <Avatar className="w-9 h-9 flex-shrink-0 border border-white/5">
+                      <AvatarFallback className="bg-[#2a2a2a] text-gray-500 text-xs font-bold">
                         {comment.user?.name?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 space-y-1.5 min-w-0">
+                    <div className="flex-1 space-y-2 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-gray-200">{comment.user?.name || comment.user?.username}</span>
-                        <span className="text-[10px] text-gray-500 font-medium">
-                          {format(new Date(comment.created_at), "dd 'de' MMM 'às' HH:mm", { locale: ptBR })}
+                        <span className="text-[10px] text-gray-500 font-medium bg-[#222] px-2 py-0.5 rounded">
+                          {format(new Date(comment.created_at), "dd 'de' MMM, HH:mm", { locale: ptBR })}
                         </span>
                       </div>
-                      <div className="bg-[#222] p-4 rounded-2xl rounded-tl-none text-sm text-gray-300 border border-[#333]/50 shadow-sm leading-relaxed break-words">
+                      <div className="bg-[#222] p-4 rounded-2xl rounded-tl-none text-sm text-gray-300 border border-[#333]/30 shadow-sm leading-relaxed break-words">
                         {comment.content}
                       </div>
                       {(comment.user_id === currentUser?.id || currentUser?.role === 'admin') && (
                         <button 
                           onClick={() => handleDeleteComment(comment.id)}
-                          className="text-[10px] text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                          className="text-[10px] text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 font-bold ml-2"
                         >
                           Excluir
                         </button>
@@ -423,59 +484,38 @@ export default function CardDetailModal({
                   </div>
                 ))}
               </div>
-            </section>
-
-            {/* Attachments */}
-            {attachments && attachments.length > 0 && (
-              <section className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <Paperclip className="text-gray-400" />
-                  <h3 className="font-semibold text-lg">Anexos</h3>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {attachments.map((file: any) => (
-                    <a 
-                      key={file.id} 
-                      href={file.file_url} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="flex items-center gap-3 p-2 rounded bg-[#222] hover:bg-[#2a2a2a] transition-all border border-[#333] group"
-                    >
-                      <div className="w-10 h-10 rounded bg-[#1a1a1a] flex items-center justify-center flex-shrink-0 group-hover:bg-accent/10 transition-colors">
-                        <Paperclip className="w-4 h-4 text-gray-500 group-hover:text-accent" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-gray-300 truncate">{file.filename}</p>
-                        <p className="text-[10px] text-gray-500 uppercase font-medium">{(file.file_size / 1024).toFixed(0)} KB</p>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
-
-          {/* Right – Sidebar */}
-          <div className="w-72 border-l border-[#333] bg-[#1e1e1e] p-5 space-y-8 overflow-y-auto custom-scrollbar">
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Adicionar ao cartão</h4>
-              <div className="grid grid-cols-1 gap-2">
-                <SidebarActionButton icon={Tag} label="Etiquetas" />
-                <SidebarActionButton icon={CheckSquare} label="Checklist" />
-                <SidebarActionButton icon={Clock} label="Datas" />
-                <SidebarActionButton icon={Paperclip} label="Anexar" />
-              </div>
             </div>
+          </section>
 
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Ações</h4>
-              <div className="space-y-2">
-                <SidebarActionButton icon={Copy} label="Espelhar" onClick={() => setIsMirrorDialogOpen(true)} />
-                <SidebarActionButton icon={Archive} label="Arquivar" variant="amber" onClick={handleArchiveCard} />
-                <Separator className="my-3 bg-[#333]" />
-                <SidebarActionButton icon={Trash} label="Excluir" variant="red" onClick={handleDeleteCard} />
-              </div>
+          {/* Section 7: Final Actions Footer */}
+          <div className="pt-10 pb-6 border-t border-[#333]/30 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setIsMirrorDialogOpen(true)}
+                className="bg-[#222] hover:bg-[#2a2a2a] text-gray-300 gap-2 h-9 px-4 rounded-lg text-xs font-bold"
+              >
+                <Copy className="w-4 h-4" /> Espelhar
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleArchiveCard}
+                className="bg-[#222] hover:bg-amber-950/30 hover:text-amber-400 text-gray-300 gap-2 h-9 px-4 rounded-lg text-xs font-bold transition-all"
+              >
+                <Archive className="w-4 h-4" /> Arquivar
+              </Button>
             </div>
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleDeleteCard}
+              className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 gap-2 h-9 px-4 rounded-lg text-xs font-bold transition-all"
+            >
+              <Trash className="w-4 h-4" /> Excluir Cartão
+            </Button>
           </div>
         </div>
 
