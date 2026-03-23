@@ -226,10 +226,14 @@ export async function getUserBoards(userId: number) {
       return [];
     }
 
-    return (data as any[]).map(board => ({
+    console.log(`[Database] getUserBoards for userId ${userId} (role: ${user?.role}): found ${data?.length || 0} boards`);
+    
+    return (data || []).map((board: any) => ({
       ...board,
-      ownerId: board.owner_id
-    })) || [];
+      ownerId: board.owner_id,
+      createdAt: board.created_at,
+      updatedAt: board.updated_at
+    }));
   } catch (error) {
     console.error("[Database] getUserBoards failed:", error);
     return [];
@@ -302,10 +306,14 @@ export async function getBoardLists(boardId: number) {
       return await db.select().from(lists).where(eq(lists.boardId, boardId)).orderBy(lists.position);
     }
 
-    return (data as any[]).map(list => ({
+    console.log(`[Database] getBoardLists for boardId ${boardId}: found ${data?.length || 0} lists`);
+
+    return (data || []).map((list: any) => ({
       ...list,
-      boardId: list.board_id
-    })) || [];
+      boardId: list.board_id,
+      createdAt: list.created_at,
+      updatedAt: list.updated_at
+    }));
   } catch (error) {
     console.error("[Database] getBoardLists failed:", error);
     return [];
@@ -319,7 +327,6 @@ export async function getListCards(listId: number) {
       .from("cards")
       .select("*, assignedToUser:users!assigned_to(name)")
       .eq("list_id", listId)
-      .eq("archived", false)
       .order("position");
 
     if (error) {
@@ -346,13 +353,16 @@ export async function getListCards(listId: number) {
         .orderBy(cards.position);
     }
 
-    return (data as any[]).map(card => ({
+    return (data || []).map((card: any) => ({
       ...card,
       listId: card.list_id,
       dueDate: card.due_date,
       assignedTo: card.assigned_to,
-      assignedToName: card.assignedToUser?.name || null
-    })) || [];
+      assignedToName: card.assignedToUser?.name || null,
+      createdBy: card.created_by,
+      createdAt: card.created_at,
+      updatedAt: card.updated_at
+    }));
   } catch (error) {
     console.error("[Database] getListCards failed:", error);
     return [];
@@ -407,11 +417,11 @@ export async function getCardLabels(cardId: number) {
       return await db.select().from(cardLabels).where(eq(cardLabels.cardId, cardId));
     }
 
-    return (data as any[]).map(label => ({
+    return (data || []).map((label: any) => ({
       ...label,
       cardId: label.card_id,
       createdAt: label.created_at
-    })) || [];
+    }));
   } catch (error) {
     console.error("[Database] getCardLabels failed:", error);
     return [];
@@ -428,13 +438,13 @@ export async function getCardComments(cardId: number) {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return (data as any[]).map(comment => ({
+    return (data || []).map((comment: any) => ({
       ...comment,
       cardId: comment.card_id,
       userId: comment.user_id,
       createdAt: comment.created_at,
       updatedAt: comment.updated_at
-    })) || [];
+    }));
   } catch (error) {
     console.error("[Database] getCardComments failed:", error);
     return [];
@@ -450,7 +460,7 @@ export async function getCardAttachments(cardId: number) {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return (data as any[]).map(att => ({
+    return (data || []).map((att: any) => ({
       ...att,
       cardId: att.card_id,
       fileUrl: att.file_url,
@@ -459,7 +469,7 @@ export async function getCardAttachments(cardId: number) {
       fileSize: att.file_size,
       uploadedBy: att.uploaded_by,
       createdAt: att.created_at
-    })) || [];
+    }));
   } catch (error) {
     console.error("[Database] getCardAttachments failed:", error);
     return [];
@@ -481,12 +491,12 @@ export async function getCardChecklists(cardId: number) {
       return await db.select().from(cardChecklists).where(eq(cardChecklists.cardId, cardId)).orderBy(cardChecklists.position);
     }
 
-    return (data as any[]).map(item => ({
+    return (data || []).map((item: any) => ({
       ...item,
       cardId: item.card_id,
       assignedUserId: item.assigned_user_id,
       dueDate: item.due_date
-    })) || [];
+    }));
   } catch (error) {
     console.error("[Database] getCardChecklists failed:", error);
     return [];
@@ -508,13 +518,13 @@ export async function getCardCustomFields(cardId: number) {
       return await db.select().from(cardCustomFields).where(eq(cardCustomFields.cardId, cardId));
     }
 
-    return (data as any[]).map(field => ({
+    return (data || []).map((field: any) => ({
       ...field,
       cardId: field.card_id,
       fieldName: field.field_name,
       fieldValue: field.field_value,
       fieldType: field.field_type
-    })) || [];
+    }));
   } catch (error) {
     console.error("[Database] getCardCustomFields failed:", error);
     return [];
@@ -546,12 +556,12 @@ export async function getBoardMembers(boardId: number) {
         .where(eq(boardMembers.boardId, boardId));
     }
 
-    return (data as any[]).map(m => ({
+    return (data || []).map((m: any) => ({
       ...m,
       boardId: m.board_id,
       userId: m.user_id,
       user: m.user
-    })) || [];
+    }));
   } catch (error) {
     return [];
   }
@@ -572,14 +582,14 @@ export async function getMirroredCards(boardId: number) {
       return await db.select().from(mirroredCards).where(or(eq(mirroredCards.originalBoardId, boardId), eq(mirroredCards.mirrorBoardId, boardId)));
     }
 
-    return (data as any[]).map(mc => ({
+    return (data || []).map((mc: any) => ({
       ...mc,
       originalCardId: mc.original_card_id,
       mirrorCardId: mc.mirror_card_id,
       originalBoardId: mc.original_board_id,
       mirrorBoardId: mc.mirror_board_id,
       syncStatus: mc.sync_status
-    })) || [];
+    }));
   } catch (error) {
     console.error("[Database] getMirroredCards failed:", error);
     return [];
@@ -630,7 +640,7 @@ export async function upsertProjectDate(cardId: number, projectStartDate?: Date,
   return { success: true };
 }
 
-export async function updateCard(cardId: number, data: Partial<InsertCard>) {
+export async function updateCard(cardId: number, data: any) {
   const updateData: any = {};
   if (data.title) updateData.title = data.title;
   if (data.description !== undefined) updateData.description = data.description;
@@ -661,12 +671,12 @@ export async function getAllUsers() {
       return await db.select().from(users);
     }
 
-    return (data as any[]).map(user => ({
+    return (data || []).map((user: any) => ({
       ...user,
       createdAt: user.created_at,
       updatedAt: user.updated_at,
       lastSignedIn: user.last_signed_in
-    })) || [];
+    }));
   } catch (error) {
     return [];
   }

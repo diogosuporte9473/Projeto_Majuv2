@@ -75,6 +75,7 @@ export const cards = pgTable("cards", {
   dueDate: timestamp("due_date", { withTimezone: true }),
   assignedTo: integer("assigned_to"),
   createdBy: integer("created_by").notNull(),
+  archived: boolean("archived").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -17,6 +17,8 @@ import {
   getCardById,
   getCardLabels,
   getCardChecklists,
+  getCardComments,
+  getCardAttachments,
   getCardCustomFields,
   getMirroredCards,
   getUserByUsername,
