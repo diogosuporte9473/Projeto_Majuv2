@@ -997,23 +997,33 @@ export const appRouter = router({
         // 2. Get original list to find its boardId
         const { data: originalList, error: listError } = await supabase
           .from("lists")
-          .select("boardId")
-          .eq("id", originalCard.listId)
+          .select("board_id")
+          .eq("id", originalCard.list_id)
           .single();
 
         if (listError || !originalList) {
+          console.error("[Mirror] Original list fetch error:", listError);
           throw new TRPCError({ code: "NOT_FOUND", message: "Lista original não encontrada" });
         }
 
-        // 3. Create new card in target list
+        // 3. Get original board name for the title
+        const { data: originalBoard } = await supabase
+          .from("boards")
+          .select("name")
+          .eq("id", originalList.board_id)
+          .single();
+
+        const originName = originalBoard?.name || "Desconhecido";
+
+        // 4. Create new card in target list
         const { data: mirrorCard, error: mirrorError } = await supabase
           .from("cards")
           .insert({
-            title: `[ESPELHO] ${originalCard.title}`,
+            title: `${originalCard.title} (Mirror: ${originName})`,
             description: originalCard.description,
-            listId: input.targetListId,
+            list_id: input.targetListId,
             position: 0,
-            createdBy: ctx.user.id
+            created_by: ctx.user.id
           })
           .select("id")
           .single();
@@ -1022,13 +1032,13 @@ export const appRouter = router({
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao criar espelho: ${mirrorError.message}` });
         }
 
-        // 4. Create link in mirrored_cards table
+        // 5. Create link in mirrored_cards table
         const { error: linkError } = await supabase
           .from("mirrored_cards")
           .insert({
             original_card_id: input.cardId,
             mirror_card_id: mirrorCard.id,
-            original_board_id: originalList.boardId,
+            original_board_id: originalList.board_id,
             mirror_board_id: input.targetBoardId,
             sync_status: 'synced'
           });

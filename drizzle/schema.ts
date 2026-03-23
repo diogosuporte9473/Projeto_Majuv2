@@ -18,9 +18,9 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name"),
   role: roleEnum("role").default("user").notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  lastSignedIn: timestamp("last_signed_in", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;
@@ -32,21 +32,21 @@ export const boards = pgTable("boards", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   color: varchar("color", { length: 7 }).default("#4b4897").notNull(),
-  ownerId: integer("ownerId").notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  ownerId: integer("owner_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Board = typeof boards.$inferSelect;
 export type InsertBoard = typeof boards.$inferInsert;
 
 // Board Members - Controle de acesso por quadro
-export const boardMembers = pgTable("boardMembers", {
+export const boardMembers = pgTable("board_members", {
   id: serial("id").primaryKey(),
-  boardId: integer("boardId").notNull(),
-  userId: integer("userId").notNull(),
+  boardId: integer("board_id").notNull(),
+  userId: integer("user_id").notNull(),
   role: memberRoleEnum("role").default("viewer").notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type BoardMember = typeof boardMembers.$inferSelect;
@@ -55,11 +55,11 @@ export type InsertBoardMember = typeof boardMembers.$inferInsert;
 // Lists table - Listas dentro de um quadro
 export const lists = pgTable("lists", {
   id: serial("id").primaryKey(),
-  boardId: integer("boardId").notNull(),
+  boardId: integer("board_id").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   position: integer("position").notNull().default(0),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type List = typeof lists.$inferSelect;
@@ -68,46 +68,46 @@ export type InsertList = typeof lists.$inferInsert;
 // Cards table - Cartões de tarefas
 export const cards = pgTable("cards", {
   id: serial("id").primaryKey(),
-  listId: integer("listId").notNull(),
+  listId: integer("list_id").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   position: integer("position").notNull().default(0),
-  dueDate: timestamp("dueDate", { withTimezone: true }),
-  assignedTo: integer("assignedTo"),
-  createdBy: integer("createdBy").notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  dueDate: timestamp("due_date", { withTimezone: true }),
+  assignedTo: integer("assigned_to"),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Card = typeof cards.$inferSelect;
 export type InsertCard = typeof cards.$inferInsert;
 
 // Mirrored Cards - Espelhamento de cartões entre quadros
-export const mirroredCards = pgTable("mirroredCards", {
+export const mirroredCards = pgTable("mirrored_cards", {
   id: serial("id").primaryKey(),
-  originalCardId: integer("originalCardId").notNull(),
-  mirrorCardId: integer("mirrorCardId").notNull(),
-  originalBoardId: integer("originalBoardId").notNull(),
-  mirrorBoardId: integer("mirrorBoardId").notNull(),
-  syncStatus: syncStatusEnum("syncStatus").default("synced").notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  originalCardId: integer("original_card_id").notNull(),
+  mirrorCardId: integer("mirror_card_id").notNull(),
+  originalBoardId: integer("original_board_id").notNull(),
+  mirrorBoardId: integer("mirror_board_id").notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type MirroredCard = typeof mirroredCards.$inferSelect;
 export type InsertMirroredCard = typeof mirroredCards.$inferInsert;
 
 // Card Attachments - Arquivos anexados aos cartões
-export const cardAttachments = pgTable("cardAttachments", {
+export const cardAttachments = pgTable("card_attachments", {
   id: serial("id").primaryKey(),
-  cardId: integer("cardId").notNull(),
+  cardId: integer("card_id").notNull(),
   filename: varchar("filename", { length: 255 }).notNull(),
-  fileUrl: text("fileUrl").notNull(),
-  fileKey: varchar("fileKey", { length: 255 }).notNull(),
-  mimeType: varchar("mimeType", { length: 100 }).notNull(),
-  fileSize: integer("fileSize").notNull(),
-  uploadedBy: integer("uploadedBy").notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileKey: varchar("file_key", { length: 255 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  fileSize: integer("file_size").notNull(),
+  uploadedBy: integer("uploaded_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type CardAttachment = typeof cardAttachments.$inferSelect;
@@ -116,69 +116,59 @@ export type InsertCardAttachment = typeof cardAttachments.$inferInsert;
 // Notifications - Sistema de notificações
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
+  userId: integer("user_id").notNull(),
   type: notificationTypeEnum("type").notNull(),
-  relatedCardId: integer("relatedCardId"),
-  relatedBoardId: integer("relatedBoardId"),
+  relatedCardId: integer("related_card_id"),
+  relatedBoardId: integer("related_board_id"),
   title: varchar("title", { length: 255 }).notNull(),
   message: text("message"),
   read: boolean("read").default(false).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
 
 // User Preferences - Preferências de notificação por email
-export const userPreferences = pgTable("userPreferences", {
+export const userPreferences = pgTable("user_preferences", {
   id: serial("id").primaryKey(),
-  userId: integer("userId").notNull().unique(),
-  emailOnCardAssigned: boolean("emailOnCardAssigned").default(true).notNull(),
-  emailOnCardUpdated: boolean("emailOnCardUpdated").default(true).notNull(),
-  emailOnMirroredCard: boolean("emailOnMirroredCard").default(true).notNull(),
-  emailOnDueDate: boolean("emailOnDueDate").default(true).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  userId: integer("user_id").notNull().unique(),
+  emailOnCardAssigned: boolean("email_on_card_assigned").default(true).notNull(),
+  emailOnCardUpdated: boolean("email_on_card_updated").default(true).notNull(),
+  emailOnMirroredCard: boolean("email_on_mirrored_card").default(true).notNull(),
+  emailOnDueDate: boolean("email_on_due_date").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type UserPreference = typeof userPreferences.$inferSelect;
 export type InsertUserPreference = typeof userPreferences.$inferInsert;
 
-// Card Labels - Etiquetas para cartões
-export const cardLabels = pgTable("cardLabels", {
-  id: serial("id").primaryKey(),
-  cardId: integer("cardId").notNull(),
-  label: varchar("label", { length: 50 }).notNull(),
-  color: varchar("color", { length: 7 }).default("#4b4897").notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export type CardLabel = typeof cardLabels.$inferSelect;
-export type InsertCardLabel = typeof cardLabels.$inferInsert;
-
 // Card Checklist - Checklist para cartões
-export const cardChecklists = pgTable("cardChecklists", {
+export const cardChecklists = pgTable("card_checklists", {
   id: serial("id").primaryKey(),
-  cardId: integer("cardId").notNull(),
+  cardId: integer("card_id").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   completed: boolean("completed").default(false).notNull(),
   position: integer("position").notNull().default(0),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  dueDate: timestamp("due_date", { withTimezone: true }),
+  assignedUserId: integer("assigned_user_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type CardChecklist = typeof cardChecklists.$inferSelect;
 export type InsertCardChecklist = typeof cardChecklists.$inferInsert;
 
 // Card Custom Fields - Campos personalizados para cartões
-export const cardCustomFields = pgTable("cardCustomFields", {
+export const cardCustomFields = pgTable("card_custom_fields", {
   id: serial("id").primaryKey(),
-  cardId: integer("cardId").notNull(),
-  fieldName: varchar("fieldName", { length: 255 }).notNull(),
-  fieldValue: text("fieldValue"),
-  fieldType: fieldTypeEnum("fieldType").default("text").notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  cardId: integer("card_id").notNull(),
+  fieldName: varchar("field_name", { length: 255 }).notNull(),
+  fieldValue: text("field_value"),
+  fieldType: fieldTypeEnum("field_type").default("text").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   cardFieldIdx: uniqueIndex("card_field_idx").on(table.cardId, table.fieldName),
 }));
@@ -186,14 +176,26 @@ export const cardCustomFields = pgTable("cardCustomFields", {
 export type CardCustomField = typeof cardCustomFields.$inferSelect;
 export type InsertCardCustomField = typeof cardCustomFields.$inferInsert;
 
-// Project Dates - Datas do projeto para cartões
-export const projectDates = pgTable("projectDates", {
+// Card Labels - Etiquetas para cartões
+export const cardLabels = pgTable("card_labels", {
   id: serial("id").primaryKey(),
-  cardId: integer("cardId").notNull().unique(),
-  projectStartDate: timestamp("projectStartDate", { withTimezone: true }),
-  projectEndDate: timestamp("projectEndDate", { withTimezone: true }),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  cardId: integer("card_id").notNull(),
+  label: varchar("label", { length: 50 }).notNull(),
+  color: varchar("color", { length: 7 }).default("#4b4897").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type CardLabel = typeof cardLabels.$inferSelect;
+export type InsertCardLabel = typeof cardLabels.$inferInsert;
+
+// Project Dates - Datas do projeto para cartões
+export const projectDates = pgTable("project_dates", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id").notNull().unique(),
+  projectStartDate: timestamp("project_start_date", { withTimezone: true }),
+  projectEndDate: timestamp("project_end_date", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ProjectDate = typeof projectDates.$inferSelect;
