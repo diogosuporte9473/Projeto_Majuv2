@@ -1,5 +1,6 @@
 import { useRoute } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useRealtimeSync } from "@/_core/hooks/useRealtimeSync";
 import { trpc } from "@/lib/trpc";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,9 @@ export default function BoardView() {
   const [, params] = useRoute("/board/:id");
   const boardId = params?.id ? parseInt(params.id) : null;
   const { user } = useAuth();
+  
+  // Ativa sincronização em tempo real para este quadro
+  useRealtimeSync(boardId || undefined);
 
   const { data: board, isLoading: boardLoading } = trpc.boards.get.useQuery(
     { id: boardId || 0 },

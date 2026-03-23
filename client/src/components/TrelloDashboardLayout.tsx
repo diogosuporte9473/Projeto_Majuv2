@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useRealtimeSync } from "@/_core/hooks/useRealtimeSync";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,6 +13,10 @@ interface TrelloDashboardLayoutProps {
 
 export default function TrelloDashboardLayout({ children }: TrelloDashboardLayoutProps) {
   const { user, logout } = useAuth();
+  
+  // Ativa sincronização global para a barra lateral (boards)
+  useRealtimeSync();
+
   const { data: boards, isLoading } = trpc.boards.list.useQuery();
   const [showNewBoard, setShowNewBoard] = useState(false);
   const [newBoardName, setNewBoardName] = useState("");
