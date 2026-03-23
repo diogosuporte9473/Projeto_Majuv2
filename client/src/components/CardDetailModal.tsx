@@ -57,6 +57,9 @@ export default function CardDetailModal({
   // Mutations
   const addLabelMutation = trpc.cardDetails.addLabel.useMutation();
   const deleteLabelMutation = trpc.cardDetails.deleteLabel.useMutation();
+  const addChecklistGroupMutation = trpc.cardDetails.addChecklistGroup.useMutation();
+  const updateChecklistGroupMutation = trpc.cardDetails.updateChecklistGroup.useMutation();
+  const deleteChecklistGroupMutation = trpc.cardDetails.deleteChecklistGroup.useMutation();
   const addChecklistMutation = trpc.cardDetails.addChecklist.useMutation();
   const updateChecklistMutation = trpc.cardDetails.updateChecklistItem.useMutation();
   const deleteChecklistMutation = trpc.cardDetails.deleteChecklist.useMutation();
@@ -78,7 +81,10 @@ export default function CardDetailModal({
   const [isMaximized, setIsMaximized] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#4b4897");
-  const [newChecklistTitle, setNewChecklistTitle] = useState("");
+  const [isCreatingChecklist, setIsCreatingChecklist] = useState(false);
+  const [newChecklistGroupTitle, setNewChecklistGroupTitle] = useState("");
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+  const [newChecklistItems, setNewChecklistItems] = useState<Record<number, string>>({});
   
   // Mirroring states
   const [isMirrorDialogOpen, setIsMirrorDialogOpen] = useState(false);
@@ -119,15 +125,49 @@ export default function CardDetailModal({
     }
   };
 
-  const handleAddChecklist = async () => {
-    if (!newChecklistTitle.trim()) return;
+  const handleAddChecklistGroup = async () => {
+    const title = newChecklistGroupTitle.trim() || "Checklist";
     try {
-      await addChecklistMutation.mutateAsync({ cardId, title: newChecklistTitle });
-      setNewChecklistTitle("");
+      await addChecklistGroupMutation.mutateAsync({ cardId, title });
+      setNewChecklistGroupTitle("");
+      setIsCreatingChecklist(false);
       await utils.cardDetails.getChecklists.invalidate({ cardId });
-      toast.success("Checklist adicionado");
+      toast.success("Checklist criado");
     } catch (error) {
-      toast.error("Erro ao adicionar checklist");
+      toast.error("Erro ao criar checklist");
+    }
+  };
+
+  const handleUpdateChecklistGroup = async (groupId: number, title: string) => {
+    try {
+      await updateChecklistGroupMutation.mutateAsync({ id: groupId, title });
+      setEditingGroupId(null);
+      await utils.cardDetails.getChecklists.invalidate({ cardId });
+    } catch (error) {
+      toast.error("Erro ao atualizar título do checklist");
+    }
+  };
+
+  const handleDeleteChecklistGroup = async (groupId: number) => {
+    if (!confirm("Tem certeza que deseja excluir este checklist inteiro?")) return;
+    try {
+      await deleteChecklistGroupMutation.mutateAsync({ id: groupId });
+      await utils.cardDetails.getChecklists.invalidate({ cardId });
+      toast.success("Checklist removido");
+    } catch (error) {
+      toast.error("Erro ao remover checklist");
+    }
+  };
+
+  const handleAddChecklistItem = async (groupId: number) => {
+    const title = newChecklistItems[groupId]?.trim();
+    if (!title) return;
+    try {
+      await addChecklistMutation.mutateAsync({ cardId, groupId, title });
+      setNewChecklistItems(prev => ({ ...prev, [groupId]: "" }));
+      await utils.cardDetails.getChecklists.invalidate({ cardId });
+    } catch (error) {
+      toast.error("Erro ao adicionar item");
     }
   };
 
@@ -398,26 +438,51 @@ export default function CardDetailModal({
                   </PopoverContent>
                 </Popover>
 
-                <Popover>
+                <Popover open={isCreatingChecklist} onOpenChange={setIsCreatingChecklist}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
                       <CheckSquare className="w-3.5 h-3.5 mr-2" /> Checklist
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-4">
+                  <PopoverContent className="w-72 bg-[#1a1a1a] border-[#333] p-4 shadow-2xl animate-in fade-in zoom-in duration-200">
                     <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-gray-200">Novo Checklist</h3>
-                      <input
-                        type="text"
-                        value={newChecklistTitle}
-                        onChange={(e) => setNewChecklistTitle(e.target.value)}
-                        placeholder="Título do item..."
-                        className="w-full bg-[#2a2a2a] border border-[#333] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-accent"
-                        onKeyDown={(e) => e.key === "Enter" && handleAddChecklist()}
-                      />
-                      <Button onClick={handleAddChecklist} size="sm" className="w-full bg-accent text-white h-8 text-[10px]">
-                        Adicionar Item
-                      </Button>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-gray-200">Adicionar Checklist</h3>
+                        <button onClick={() => setIsCreatingChecklist(false)} className="text-gray-500 hover:text-white transition-colors">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Título</label>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={newChecklistGroupTitle}
+                          onChange={(e) => setNewChecklistGroupTitle(e.target.value)}
+                          placeholder="Ex: Checklist de Pagamento"
+                          className="w-full bg-[#2a2a2a] border border-[#333] rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-accent transition-all"
+                          onKeyDown={(e) => e.key === "Enter" && handleAddChecklistGroup()}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          onClick={handleAddChecklistGroup} 
+                          size="sm" 
+                          className="bg-accent text-white h-9 px-4 text-xs font-bold rounded-lg shadow-lg shadow-accent/20"
+                          disabled={addChecklistGroupMutation.isPending}
+                        >
+                          {addChecklistGroupMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : null}
+                          Adicionar checklist
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setIsCreatingChecklist(false)} 
+                          className="h-9 text-xs text-gray-400 hover:text-white"
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
                     </div>
                   </PopoverContent>
                 </Popover>
@@ -558,190 +623,223 @@ export default function CardDetailModal({
             </div>
           </section>
 
-          {/* Section 4: Checklist */}
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CheckSquare className="w-5 h-5 text-gray-400" />
-                <h3 className="font-bold text-lg text-gray-200">Checklist</h3>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-sm font-bold text-gray-500 bg-[#222] px-2 py-1 rounded">
-                  {Math.round(checklistProgress)}%
-                </div>
-              </div>
+          {/* Section 4: Checklists (Multiple Groups) */}
+          {checklistsLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-accent" />
             </div>
-            <div className="pl-8 space-y-4">
-              <Progress value={checklistProgress} className="h-2 bg-[#222]" />
-              
-              <div className="space-y-1">
-                {checklistsLoading ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="w-6 h-6 animate-spin text-accent" />
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {checklists?.map((item: any) => {
-                      const isOverdue = item.due_date && new Date(item.due_date) < new Date() && !item.completed;
-                      const assignedUser = allUsers?.find((u: any) => u.id === item.assignedUserId);
-                      
-                      return (
-                        <div key={item.id} className="group flex items-start gap-4 p-2.5 rounded-xl hover:bg-white/5 transition-all">
+          ) : (
+            <div className="space-y-12">
+              {checklists?.map((group: any) => {
+                const groupItems = group.items || [];
+                const groupProgress = groupItems.length 
+                  ? (groupItems.filter((i: any) => i.completed).length / groupItems.length) * 100 
+                  : 0;
+
+                return (
+                  <section key={group.id} className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <CheckSquare className="w-5 h-5 text-gray-400" />
+                        {editingGroupId === group.id ? (
                           <input
-                            type="checkbox"
-                            checked={item.completed}
-                            onChange={() => handleUpdateChecklistItem(item.id, { completed: !item.completed })}
-                            className="w-5 h-5 mt-0.5 rounded border-[#444] bg-[#1a1a1a] text-accent focus:ring-0 cursor-pointer"
+                            autoFocus
+                            defaultValue={group.title}
+                            onBlur={(e) => handleUpdateChecklistGroup(group.id, e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleUpdateChecklistGroup(group.id, (e.target as HTMLInputElement).value)}
+                            className="bg-[#2a2a2a] border border-accent/40 rounded px-2 py-1 text-lg font-bold text-gray-200 outline-none w-full max-w-md focus:ring-1 focus:ring-accent/30"
                           />
-                          <div className="flex-1 min-w-0 space-y-2">
-                            <div className="flex items-center justify-between gap-2">
+                        ) : (
+                          <h3 
+                            onClick={() => setEditingGroupId(group.id)}
+                            className="font-bold text-lg text-gray-200 cursor-pointer hover:bg-white/5 px-2 py-1 rounded transition-all"
+                          >
+                            {group.title}
+                          </h3>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-sm font-bold text-gray-500 bg-[#222] px-2 py-1 rounded border border-[#333]">
+                          {Math.round(groupProgress)}%
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleDeleteChecklistGroup(group.id)}
+                          className="text-gray-500 hover:text-red-400 h-8 px-2"
+                        >
+                          Remover
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="pl-8 space-y-4">
+                      <Progress value={groupProgress} className="h-2 bg-[#222]" />
+                      
+                      <div className="space-y-1">
+                        {groupItems.map((item: any) => {
+                          const isOverdue = item.due_date && new Date(item.due_date) < new Date() && !item.completed;
+                          const assignedUser = allUsers?.find((u: any) => u.id === item.assignedUserId);
+                          
+                          return (
+                            <div key={item.id} className="group flex items-start gap-4 p-2.5 rounded-xl hover:bg-white/5 transition-all">
                               <input
-                                defaultValue={item.title}
-                                onBlur={(e) => handleUpdateChecklistItem(item.id, { title: e.target.value })}
-                                className={`text-sm flex-1 bg-transparent border-none p-0 focus:ring-0 focus:outline-none font-medium ${item.completed ? "line-through text-gray-500" : "text-gray-200"}`}
+                                type="checkbox"
+                                checked={item.completed}
+                                onChange={() => handleUpdateChecklistItem(item.id, { completed: !item.completed })}
+                                className="w-5 h-5 mt-0.5 rounded border-[#444] bg-[#1a1a1a] text-accent focus:ring-0 cursor-pointer"
                               />
-                              <div className="flex items-center gap-1">
-                                {/* Atribuir Usuário */}
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <button className="p-1 rounded-full hover:bg-white/10 text-gray-500 transition-all" title="Atribuir tarefa">
-                                      {assignedUser ? (
-                                        <Avatar className="w-5 h-5">
-                                          <AvatarFallback className="bg-accent text-[8px] text-white">
-                                            {assignedUser.name?.charAt(0).toUpperCase()}
-                                          </AvatarFallback>
-                                        </Avatar>
-                                      ) : (
-                                        <UserIcon className="w-4 h-4" />
-                                      )}
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-1 shadow-2xl">
-                                    <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                                      <div className="p-2 border-b border-[#333] mb-1">
-                                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Atribuir a...</p>
-                                      </div>
-                                      {allUsers?.map((u: any) => (
-                                        <button
-                                          key={u.id}
-                                          onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: u.id })}
-                                          className={`w-full flex items-center gap-2 p-2 rounded hover:bg-white/5 text-left transition-colors ${item.assignedUserId === u.id ? "bg-accent/10 text-accent" : "text-gray-300"}`}
-                                        >
-                                          <Avatar className="w-6 h-6">
-                                            <AvatarFallback className="bg-[#2a2a2a] text-[10px]">
-                                              {u.name?.charAt(0).toUpperCase()}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                          <div className="flex flex-col">
-                                            <span className="text-xs font-bold">{u.name}</span>
-                                            <span className="text-[10px] text-gray-500">@{u.username}</span>
+                              <div className="flex-1 min-w-0 space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <input
+                                    defaultValue={item.title}
+                                    onBlur={(e) => handleUpdateChecklistItem(item.id, { title: e.target.value })}
+                                    className={`text-sm flex-1 bg-transparent border-none p-0 focus:ring-0 focus:outline-none font-medium ${item.completed ? "line-through text-gray-500" : "text-gray-200"}`}
+                                  />
+                                  <div className="flex items-center gap-1">
+                                    {/* Atribuir Usuário */}
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <button className="p-1 rounded-full hover:bg-white/10 text-gray-500 transition-all" title="Atribuir tarefa">
+                                          {assignedUser ? (
+                                            <Avatar className="w-5 h-5">
+                                              <AvatarFallback className="bg-accent text-[8px] text-white">
+                                                {assignedUser.name?.charAt(0).toUpperCase()}
+                                              </AvatarFallback>
+                                            </Avatar>
+                                          ) : (
+                                            <UserIcon className="w-4 h-4" />
+                                          )}
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-1 shadow-2xl">
+                                        <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                          <div className="p-2 border-b border-[#333] mb-1">
+                                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Atribuir a...</p>
                                           </div>
-                                        </button>
-                                      ))}
-                                      {item.assignedUserId && (
-                                        <button
-                                          onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: null })}
-                                          className="w-full text-center p-2 text-[10px] text-red-400 hover:bg-red-400/10 mt-1 rounded transition-colors"
-                                        >
-                                          Remover Atribuição
-                                        </button>
-                                      )}
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
+                                          {allUsers?.map((u: any) => (
+                                            <button
+                                              key={u.id}
+                                              onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: u.id })}
+                                              className={`w-full flex items-center gap-2 p-2 rounded hover:bg-white/5 text-left transition-colors ${item.assignedUserId === u.id ? "bg-accent/10 text-accent" : "text-gray-300"}`}
+                                            >
+                                              <Avatar className="w-6 h-6">
+                                                <AvatarFallback className="bg-[#2a2a2a] text-[10px]">
+                                                  {u.name?.charAt(0).toUpperCase()}
+                                                </AvatarFallback>
+                                              </Avatar>
+                                              <div className="flex flex-col">
+                                                <span className="text-xs font-bold">{u.name}</span>
+                                                <span className="text-[10px] text-gray-500">@{u.username}</span>
+                                              </div>
+                                            </button>
+                                          ))}
+                                          {item.assignedUserId && (
+                                            <button
+                                              onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: null })}
+                                              className="w-full text-center p-2 text-[10px] text-red-400 hover:bg-red-400/10 mt-1 rounded transition-colors"
+                                            >
+                                              Remover Atribuição
+                                            </button>
+                                          )}
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
 
-                                {/* Definir Data */}
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <button className={`p-1 rounded-full hover:bg-white/10 transition-all ${item.due_date ? "text-accent" : "text-gray-500"}`} title="Definir data">
-                                      <CalendarDays className="w-4 h-4" />
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-[#333] shadow-2xl">
-                                    <div className="p-3 space-y-3">
-                                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Prazo do item</p>
-                                      <input
-                                        type="date"
-                                        className="bg-[#2a2a2a] border border-[#333] rounded px-3 py-1.5 text-xs text-white outline-none focus:ring-1 focus:ring-accent"
-                                        onChange={(e) => handleUpdateChecklistItem(item.id, { dueDate: e.target.value ? new Date(e.target.value) : null })}
-                                        defaultValue={item.due_date ? new Date(item.due_date).toISOString().split('T')[0] : ''}
-                                      />
-                                      {item.due_date && (
-                                        <button
-                                          onClick={() => handleUpdateChecklistItem(item.id, { dueDate: null })}
-                                          className="w-full text-center text-[10px] text-red-400 hover:text-red-500 py-1"
-                                        >
-                                          Remover Data
+                                    {/* Definir Data */}
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <button className={`p-1 rounded-full hover:bg-white/10 transition-all ${item.due_date ? "text-accent" : "text-gray-500"}`} title="Definir data">
+                                          <CalendarDays className="w-4 h-4" />
                                         </button>
-                                      )}
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-[#333] shadow-2xl">
+                                        <div className="p-3 space-y-3">
+                                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Prazo do item</p>
+                                          <input
+                                            type="date"
+                                            className="bg-[#2a2a2a] border border-[#333] rounded px-3 py-1.5 text-xs text-white outline-none focus:ring-1 focus:ring-accent"
+                                            onChange={(e) => handleUpdateChecklistItem(item.id, { dueDate: e.target.value ? new Date(e.target.value) : null })}
+                                            defaultValue={item.due_date ? new Date(item.due_date).toISOString().split('T')[0] : ''}
+                                          />
+                                          {item.due_date && (
+                                            <button
+                                              onClick={() => handleUpdateChecklistItem(item.id, { dueDate: null })}
+                                              className="w-full text-center text-[10px] text-red-400 hover:text-red-500 py-1"
+                                            >
+                                              Remover Data
+                                            </button>
+                                          )}
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
 
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <button className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-white/10 transition-all">
-                                      <MoreVertical className="w-4 h-4 text-gray-500" />
-                                    </button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent className="bg-[#1a1a1a] border-[#333] text-white shadow-2xl">
-                                    <DropdownMenuItem onClick={() => handleRemoveChecklist(item.id)} className="text-red-400 focus:text-red-400 focus:bg-red-400/10 cursor-pointer text-xs">
-                                      <Trash2 className="w-3.5 h-3.5 mr-2" /> Remover item
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <button className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-white/10 transition-all">
+                                          <MoreVertical className="w-4 h-4 text-gray-500" />
+                                        </button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent className="bg-[#1a1a1a] border-[#333] text-white shadow-2xl">
+                                        <DropdownMenuItem onClick={() => handleRemoveChecklist(item.id)} className="text-red-400 focus:text-red-400 focus:bg-red-400/10 cursor-pointer text-xs">
+                                          <Trash2 className="w-3.5 h-3.5 mr-2" /> Remover item
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-3">
+                                  {item.due_date && (
+                                    <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded ${isOverdue ? "bg-red-500/10 text-red-400" : "bg-accent/10 text-accent"}`}>
+                                      <Clock className="w-3 h-3" />
+                                      {format(new Date(item.due_date), "dd 'de' MMM", { locale: ptBR })}
+                                    </div>
+                                  )}
+                                  {assignedUser && (
+                                    <div className="flex items-center gap-1.5 bg-[#2a2a2a] px-2 py-0.5 rounded border border-[#333]">
+                                      <Avatar className="w-3.5 h-3.5">
+                                        <AvatarFallback className="bg-accent text-[7px] text-white">
+                                          {assignedUser.name?.charAt(0).toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="text-[10px] font-bold text-gray-400">{assignedUser.name}</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
-
-                            <div className="flex flex-wrap items-center gap-3">
-                              {item.due_date && (
-                                <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded ${isOverdue ? "bg-red-500/10 text-red-400" : "bg-accent/10 text-accent"}`}>
-                                  <Clock className="w-3 h-3" />
-                                  {format(new Date(item.due_date), "dd 'de' MMM", { locale: ptBR })}
-                                </div>
-                              )}
-                              {assignedUser && (
-                                <div className="flex items-center gap-1.5 bg-[#2a2a2a] px-2 py-0.5 rounded border border-[#333]">
-                                  <Avatar className="w-3.5 h-3.5">
-                                    <AvatarFallback className="bg-accent text-[7px] text-white">
-                                      {assignedUser.name?.charAt(0).toUpperCase()}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span className="text-[10px] font-bold text-gray-400">{assignedUser.name}</span>
-                                </div>
-                              )}
-                            </div>
+                          );
+                        })}
+                        
+                        <div className="mt-4">
+                          <div className="relative group">
+                            <input
+                              type="text"
+                              value={newChecklistItems[group.id] || ""}
+                              onChange={(e) => setNewChecklistItems(prev => ({ ...prev, [group.id]: e.target.value }))}
+                              placeholder="Adicionar um item..."
+                              className="w-full bg-[#222] hover:bg-[#2a2a2a] border border-transparent focus:border-accent/40 rounded-lg px-4 py-2 text-sm text-gray-300 outline-none transition-all"
+                              onKeyDown={(e) => e.key === "Enter" && handleAddChecklistItem(group.id)}
+                            />
+                            {newChecklistItems[group.id] && (
+                              <Button 
+                                onClick={() => handleAddChecklistItem(group.id)} 
+                                size="sm" 
+                                className="absolute right-1 top-1 bg-accent hover:bg-accent/90 h-7 text-[10px] px-3 rounded-md"
+                              >
+                                Adicionar
+                              </Button>
+                            )}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-                
-                <div className="mt-4">
-                  <div className="relative group">
-                    <input
-                      type="text"
-                      value={newChecklistTitle}
-                      onChange={(e) => setNewChecklistTitle(e.target.value)}
-                      placeholder="Adicionar um item..."
-                      className="w-full bg-[#222] hover:bg-[#2a2a2a] border border-transparent focus:border-accent/40 rounded-lg px-4 py-2 text-sm text-gray-300 outline-none transition-all"
-                      onKeyDown={(e) => e.key === "Enter" && handleAddChecklist()}
-                    />
-                    {newChecklistTitle && (
-                      <Button 
-                        onClick={handleAddChecklist} 
-                        size="sm" 
-                        className="absolute right-1 top-1 bg-accent hover:bg-accent/90 h-7 text-[10px] px-3 rounded-md"
-                      >
-                        Adicionar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
+                      </div>
+                    </div>
+                  </section>
+                );
+              })}
             </div>
-          </section>
+          )}
 
           {/* Section 5: Attachments */}
           {attachments && attachments.length > 0 && (
