@@ -212,7 +212,7 @@ export const appRouter = router({
         const { data, error } = await supabase
           .from("board_members")
           .select("userId, role, users(name, username)")
-          .eq("boardId", input.boardId);
+          .eq("board_id", input.boardId);
 
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
         
@@ -238,7 +238,7 @@ export const appRouter = router({
             name: input.name,
             description: input.description || "",
             color: input.color,
-            ownerId: ctx.user.id,
+            owner_id: ctx.user.id,
           })
           .select("id")
           .single();
@@ -263,27 +263,11 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
-        }
-
         const board = await getBoardById(input.id, ctx.user.id);
-        if (!board) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Board not found",
-          });
-        }
+        if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found" });
 
-        if (board.ownerId !== ctx.user.id) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Only board owner can update",
-          });
+        if (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only board owner or admin can update" });
         }
 
         const updateData: any = {};
@@ -291,37 +275,23 @@ export const appRouter = router({
         if (input.description !== undefined) updateData.description = input.description;
         if (input.color) updateData.color = input.color;
 
-        await db.update(boards).set(updateData).where(eq(boards.id, input.id));
+        const { error } = await supabase.from("boards").update(updateData).eq("id", input.id);
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
         return { success: true };
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
-        }
-
         const board = await getBoardById(input.id, ctx.user.id);
-        if (!board) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Board not found",
-          });
+        if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found" });
+
+        if (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only board owner or admin can delete" });
         }
 
-        if (board.ownerId !== ctx.user.id) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Only board owner can delete",
-          });
-        }
-
-        await db.delete(boards).where(eq(boards.id, input.id));
+        const { error } = await supabase.from("boards").delete().eq("id", input.id);
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
         return { success: true };
       }),
@@ -335,34 +305,20 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
-        }
-
         const board = await getBoardById(input.boardId, ctx.user.id);
-        if (!board) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Board not found",
-          });
+        if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found" });
+
+        if (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only board owner or admin can add members" });
         }
 
-        if (board.ownerId !== ctx.user.id) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Only board owner can add members",
-          });
-        }
-
-        await db.insert(boardMembers).values({
-          boardId: input.boardId,
-          userId: input.userId,
+        const { error } = await supabase.from("board_members").upsert({
+          board_id: input.boardId,
+          user_id: input.userId,
           role: input.role,
-        });
+        }, { onConflict: 'board_id,user_id' });
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
         return { success: true };
       }),
@@ -405,7 +361,7 @@ export const appRouter = router({
         const { data, error } = await supabase
           .from("lists")
           .insert({
-            boardId: input.boardId,
+            board_id: input.boardId,
             name: input.name,
             position,
           })
@@ -450,12 +406,12 @@ export const appRouter = router({
           const { data, error } = await supabase
             .from("cards")
             .insert({
-              listId: input.listId,
+              list_id: input.listId,
               title: input.title,
               description: input.description || "",
               position,
-              dueDate: input.dueDate ? input.dueDate.toISOString() : null,
-              createdBy: ctx.user?.id || null, // Permite nulo se não houver usuário na sessão
+              due_date: input.dueDate ? input.dueDate.toISOString() : null,
+              created_by: ctx.user?.id || null,
             })
             .select("id")
             .single();
@@ -510,8 +466,8 @@ export const appRouter = router({
         const updateData: any = {};
         if (input.title) updateData.title = input.title;
         if (input.description !== undefined) updateData.description = input.description;
-        if (input.dueDate) updateData.dueDate = input.dueDate.toISOString();
-        if (input.assignedTo !== undefined) updateData.assignedTo = input.assignedTo;
+        if (input.dueDate) updateData.due_date = input.dueDate.toISOString();
+        if (input.assignedTo !== undefined) updateData.assigned_to = input.assignedTo;
 
         const { error } = await supabase
           .from("cards")
@@ -556,7 +512,7 @@ export const appRouter = router({
         const { error } = await supabase
           .from("cards")
           .update({
-            listId: input.newListId,
+            list_id: input.newListId,
             position: input.newPosition,
           })
           .eq("id", input.cardId);
@@ -587,7 +543,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const { data, error } = await supabase
           .from("card_checklists")
-          .insert({ cardId: input.cardId, title: input.title, completed: false })
+          .insert({ card_id: input.cardId, title: input.title, completed: false })
           .select("id")
           .single();
         
@@ -606,11 +562,11 @@ export const appRouter = router({
         const { error } = await supabase
           .from("card_custom_fields")
           .upsert({ 
-            cardId: input.cardId, 
-            fieldName: input.fieldName, 
-            fieldValue: input.fieldValue,
-            fieldType: input.fieldType 
-          }, { onConflict: 'cardId,fieldName' });
+            card_id: input.cardId, 
+            field_name: input.fieldName, 
+            field_value: input.fieldValue,
+            field_type: input.fieldType 
+          }, { onConflict: 'card_id,field_name' });
         
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
         return { success: true };
@@ -662,44 +618,24 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
-        }
+        const updateData: any = {};
+        if (input.emailOnCardAssigned !== undefined)
+          updateData.email_on_card_assigned = input.emailOnCardAssigned;
+        if (input.emailOnCardUpdated !== undefined)
+          updateData.email_on_card_updated = input.emailOnCardUpdated;
+        if (input.emailOnMirroredCard !== undefined)
+          updateData.email_on_mirrored_card = input.emailOnMirroredCard;
+        if (input.emailOnDueDate !== undefined)
+          updateData.email_on_due_date = input.emailOnDueDate;
 
-        const existing = await db
-          .select()
-          .from(userPreferences)
-          .where(eq(userPreferences.userId, ctx.user.id))
-          .limit(1);
+        const { error } = await supabase
+          .from("user_preferences")
+          .upsert({
+            user_id: ctx.user.id,
+            ...updateData
+          }, { onConflict: 'user_id' });
 
-        if (existing.length === 0) {
-          await db.insert(userPreferences).values({
-            userId: ctx.user.id,
-            emailOnCardAssigned: input.emailOnCardAssigned ?? true,
-            emailOnCardUpdated: input.emailOnCardUpdated ?? true,
-            emailOnMirroredCard: input.emailOnMirroredCard ?? true,
-            emailOnDueDate: input.emailOnDueDate ?? true,
-          });
-        } else {
-          const updateData: any = {};
-          if (input.emailOnCardAssigned !== undefined)
-            updateData.emailOnCardAssigned = input.emailOnCardAssigned;
-          if (input.emailOnCardUpdated !== undefined)
-            updateData.emailOnCardUpdated = input.emailOnCardUpdated;
-          if (input.emailOnMirroredCard !== undefined)
-            updateData.emailOnMirroredCard = input.emailOnMirroredCard;
-          if (input.emailOnDueDate !== undefined)
-            updateData.emailOnDueDate = input.emailOnDueDate;
-
-          await db
-            .update(userPreferences)
-            .set(updateData)
-            .where(eq(userPreferences.userId, ctx.user.id));
-        }
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
         return { success: true };
       }),

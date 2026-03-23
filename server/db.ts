@@ -189,17 +189,17 @@ export async function getUserBoards(userId: number) {
 
     const { data: memberships } = await supabase
       .from("board_members")
-      .select("boardId")
-      .eq("userId", userId);
+      .select("board_id")
+      .eq("user_id", userId);
 
-    const boardIds = memberships?.map(m => m.boardId) || [];
+    const boardIds = memberships?.map(m => m.board_id) || [];
 
     let query = supabase.from("boards").select("*");
     
     if (boardIds.length > 0) {
-      query = query.or(`ownerId.eq.${userId},id.in.(${boardIds.join(",")})`);
+      query = query.or(`owner_id.eq.${userId},id.in.(${boardIds.join(",")})`);
     } else {
-      query = query.eq("ownerId", userId);
+      query = query.eq("owner_id", userId);
     }
 
     const { data, error } = await query;
@@ -240,13 +240,13 @@ export async function getBoardById(boardId: number, userId: number) {
     // Se for ADMIN, tem acesso total
     if (user?.role === "admin") return board as any;
 
-    const isOwner = board.ownerId === userId;
+    const isOwner = board.owner_id === userId;
     
     const { data: membership, error: memberError } = await supabase
       .from("board_members")
       .select("*")
-      .eq("boardId", boardId)
-      .eq("userId", userId)
+      .eq("board_id", boardId)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (!isOwner && !membership) return null;
@@ -263,7 +263,7 @@ export async function getBoardLists(boardId: number) {
     const { data, error } = await supabase
       .from("lists")
       .select("*")
-      .eq("boardId", boardId)
+      .eq("board_id", boardId)
       .order("position");
 
     if (error) {
@@ -285,8 +285,8 @@ export async function getListCards(listId: number) {
   try {
     const { data, error } = await supabase
       .from("cards")
-      .select("*, assignedToUser:users!assignedTo(name)")
-      .eq("listId", listId)
+      .select("*, assignedToUser:users!assigned_to(name)")
+      .eq("list_id", listId)
       .order("position");
 
     if (error) {
@@ -419,7 +419,7 @@ export async function getBoardMembers(boardId: number) {
     const { data, error } = await supabase
       .from("board_members")
       .select("*, user:users(*)")
-      .eq("boardId", boardId);
+      .eq("board_id", boardId);
 
     if (error) {
       console.error("[Database] Error fetching board members via REST:", error);
