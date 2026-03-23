@@ -302,7 +302,8 @@ export async function getListCards(listId: number) {
     const { data, error } = await supabase
       .from("cards")
       .select("*, assignedToUser:users!assigned_to(name)")
-      .eq("list_id", listId);
+      .eq("list_id", listId)
+      .eq("archived", false);
       // Removido .order("position") temporariamente para evitar erro 42703 se a coluna não existir
 
     if (error) throw error;
