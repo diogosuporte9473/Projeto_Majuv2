@@ -74,6 +74,9 @@ export default function CardDetailModal({
   const [description, setDescription] = useState(cardDescription || "");
   const [newComment, setNewComment] = useState("");
   const [isMaximized, setIsMaximized] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newLabelColor, setNewLabelColor] = useState("#4b4897");
+  const [newChecklistTitle, setNewChecklistTitle] = useState("");
   
   // Mirroring states
   const [isMirrorDialogOpen, setIsMirrorDialogOpen] = useState(false);
@@ -92,6 +95,50 @@ export default function CardDetailModal({
   }, [cardDescription]);
 
   // Handlers
+  const handleAddLabel = async () => {
+    if (!newLabel.trim()) return;
+    try {
+      await addLabelMutation.mutateAsync({ cardId, label: newLabel, color: newLabelColor });
+      setNewLabel("");
+      await utils.cardDetails.getLabels.invalidate({ cardId });
+      toast.success("Etiqueta adicionada");
+    } catch (error) {
+      toast.error("Erro ao adicionar etiqueta");
+    }
+  };
+
+  const handleRemoveLabel = async (id: number) => {
+    try {
+      await deleteLabelMutation.mutateAsync({ id });
+      await utils.cardDetails.getLabels.invalidate({ cardId });
+      toast.success("Etiqueta removida");
+    } catch (error) {
+      toast.error("Erro ao remover etiqueta");
+    }
+  };
+
+  const handleAddChecklist = async () => {
+    if (!newChecklistTitle.trim()) return;
+    try {
+      await addChecklistMutation.mutateAsync({ cardId, title: newChecklistTitle });
+      setNewChecklistTitle("");
+      await utils.cardDetails.getChecklists.invalidate({ cardId });
+      toast.success("Checklist adicionado");
+    } catch (error) {
+      toast.error("Erro ao adicionar checklist");
+    }
+  };
+
+  const handleUpdateDueDate = async (date: Date | null) => {
+    try {
+      await updateDueDateMutation.mutateAsync({ cardId, dueDate: date });
+      await utils.cards.getDetails.invalidate({ id: cardId });
+      toast.success("Data atualizada");
+    } catch (error) {
+      toast.error("Erro ao atualizar data");
+    }
+  };
+
   const handleUpdateDescription = async () => {
     if (description === cardDescription) return;
     try {
@@ -145,6 +192,20 @@ export default function CardDetailModal({
       await utils.cardDetails.getComments.invalidate({ cardId });
     } catch (error) {
       toast.error("Erro ao remover comentário");
+    }
+  };
+
+  const handleUpsertCustomField = async (fieldName: string, fieldValue: string) => {
+    try {
+      await upsertCustomFieldMutation.mutateAsync({
+        cardId,
+        fieldName,
+        fieldValue,
+      });
+      await utils.cardDetails.getCustomFields.invalidate({ cardId });
+      toast.success(`${fieldName} atualizado`);
+    } catch (error) {
+      toast.error("Erro ao atualizar campo");
     }
   };
 
@@ -264,15 +325,107 @@ export default function CardDetailModal({
             <div className="space-y-2">
               <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Adicionar ao cartão</h4>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
-                  <Tag className="w-3.5 h-3.5 mr-2" /> Etiquetas
-                </Button>
-                <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
-                  <CheckSquare className="w-3.5 h-3.5 mr-2" /> Checklist
-                </Button>
-                <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
-                  <Clock className="w-3.5 h-3.5 mr-2" /> Datas
-                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
+                      <Tag className="w-3.5 h-3.5 mr-2" /> Etiquetas
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-4">
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-gray-200">Etiquetas</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {labels?.map((label: any) => (
+                          <div
+                            key={label.id}
+                            className="flex items-center gap-2 px-2 py-1 rounded text-white text-[10px] font-bold group"
+                            style={{ backgroundColor: label.color }}
+                          >
+                            {label.label}
+                            <button onClick={() => handleRemoveLabel(label.id)} className="hover:bg-black/20 rounded p-0.5 transition-colors">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <Separator className="bg-[#333]" />
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          value={newLabel}
+                          onChange={(e) => setNewLabel(e.target.value)}
+                          placeholder="Nova etiqueta..."
+                          className="w-full bg-[#2a2a2a] border border-[#333] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-accent"
+                        />
+                        <div className="flex items-center justify-between gap-3">
+                          <input
+                            type="color"
+                            value={newLabelColor}
+                            onChange={(e) => setNewLabelColor(e.target.value)}
+                            className="w-8 h-8 rounded bg-transparent border-none cursor-pointer p-0"
+                          />
+                          <Button onClick={handleAddLabel} size="sm" className="bg-accent text-white h-8 text-[10px]">
+                            Adicionar
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
+                      <CheckSquare className="w-3.5 h-3.5 mr-2" /> Checklist
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-4">
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold text-gray-200">Novo Checklist</h3>
+                      <input
+                        type="text"
+                        value={newChecklistTitle}
+                        onChange={(e) => setNewChecklistTitle(e.target.value)}
+                        placeholder="Título do item..."
+                        className="w-full bg-[#2a2a2a] border border-[#333] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-accent"
+                        onKeyDown={(e) => e.key === "Enter" && handleAddChecklist()}
+                      />
+                      <Button onClick={handleAddChecklist} size="sm" className="w-full bg-accent text-white h-8 text-[10px]">
+                        Adicionar Item
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
+                      <Clock className="w-3.5 h-3.5 mr-2" /> Datas
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-[#333]">
+                    <div className="p-4 space-y-3">
+                      <h3 className="text-sm font-bold text-gray-200">Data de Entrega</h3>
+                      <input 
+                        type="date" 
+                        className="bg-[#2a2a2a] border border-[#333] rounded px-3 py-2 text-xs text-white w-full"
+                        onChange={(e) => handleUpdateDueDate(e.target.value ? new Date(e.target.value) : null)}
+                        defaultValue={card?.dueDate ? new Date(card.dueDate).toISOString().split('T')[0] : ''}
+                      />
+                      {card?.dueDate && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="w-full text-[10px] text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                          onClick={() => handleUpdateDueDate(null)}
+                        >
+                          Remover Data
+                        </Button>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
                 <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
                   <Paperclip className="w-3.5 h-3.5 mr-2" /> Anexar
                 </Button>
@@ -305,9 +458,15 @@ export default function CardDetailModal({
             </div>
             <div className="pl-8 grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Mapa de Calor</label>
-                <Select value={getCustomFieldValue("Mapa de Calor")}>
-                  <SelectTrigger className="bg-[#222] border-[#333] h-10 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Mapa de Calor</label>
+                </div>
+                <Select 
+                  value={getCustomFieldValue("Mapa de Calor")}
+                  onValueChange={(val) => handleUpsertCustomField("Mapa de Calor", val)}
+                >
+                  <SelectTrigger className="bg-[#222] border-[#333] h-10 rounded-lg text-xs font-medium">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
@@ -318,7 +477,48 @@ export default function CardDetailModal({
                   </SelectContent>
                 </Select>
               </div>
-              {/* Espaço para mais campos */}
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</label>
+                </div>
+                <Select 
+                  value={getCustomFieldValue("Status")}
+                  onValueChange={(val) => handleUpsertCustomField("Status", val)}
+                >
+                  <SelectTrigger className="bg-[#222] border-[#333] h-10 rounded-lg text-xs font-medium">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                    <SelectItem value="Pendente">Pendente</SelectItem>
+                    <SelectItem value="Em Andamento">Em Andamento</SelectItem>
+                    <SelectItem value="Concluído">Concluído</SelectItem>
+                    <SelectItem value="Bloqueado">Bloqueado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Classificação do Cliente</label>
+                </div>
+                <Select 
+                  value={getCustomFieldValue("Classificação")}
+                  onValueChange={(val) => handleUpsertCustomField("Classificação", val)}
+                >
+                  <SelectTrigger className="bg-[#222] border-[#333] h-10 rounded-lg text-xs font-medium">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                    <SelectItem value="Bronze">Bronze</SelectItem>
+                    <SelectItem value="Prata">Prata</SelectItem>
+                    <SelectItem value="Ouro">Ouro</SelectItem>
+                    <SelectItem value="Diamante">Diamante</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </section>
 
