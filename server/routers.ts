@@ -200,13 +200,27 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         const board = await getBoardById(input.id, ctx.user.id);
-        if (!board) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Board not found",
-          });
-        }
+        if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found or access denied" });
         return board;
+      }),
+    getMembers: protectedProcedure
+      .input(z.object({ boardId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const board = await getBoardById(input.boardId, ctx.user.id);
+        if (!board) throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+
+        const { data, error } = await supabase
+          .from("board_members")
+          .select("userId, role, users(name, username)")
+          .eq("boardId", input.boardId);
+
+        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        
+        return data.map((m: any) => ({
+          userId: m.userId,
+          role: m.role,
+          userName: m.users?.name || m.users?.username || `User ${m.userId}`
+        }));
       }),
     create: protectedProcedure
       .input(
@@ -311,18 +325,7 @@ export const appRouter = router({
 
         return { success: true };
       }),
-    getMembers: protectedProcedure
-      .input(z.object({ boardId: z.number() }))
-      .query(async ({ ctx, input }) => {
-        const board = await getBoardById(input.boardId, ctx.user.id);
-        if (!board) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Board not found",
-          });
-        }
-        return await getBoardMembers(input.boardId);
-      }),
+
     addMember: protectedProcedure
       .input(
         z.object({
@@ -991,98 +994,117 @@ export const appRouter = router({
   }),
 
   // Admin routers - User management
-  admin: router({
+  admin: router({ 
     users: router({
       list: protectedProcedure.query(async ({ ctx }) => {
         if (ctx.user.role !== 'admin') {
-          throw new TRPCError({ code: 'FORBIDDEN' });
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas administradores podem listar usuários' });
         }
-        const db = await getDb();
-        if (!db) return [];
-        const result = await db.select().from(users);
-        return result.map(({ password, ...u }) => u);
+        const { data, error } = await supabase.from("users").select("id, username, name, role, createdAt");
+        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        return data || [];
       }),
-      
       create: protectedProcedure
-        .input(z.object({ 
-          username: z.string(), 
-          password: z.string(), 
-          name: z.string()
+        .input(z.object({
+          username: z.string().min(3),
+          password: z.string().min(6),
+          name: z.string().optional(),
+          role: z.enum(['user', 'admin']).default('user'),
         }))
         .mutation(async ({ ctx, input }) => {
           if (ctx.user.role !== 'admin') {
-            throw new TRPCError({ code: 'FORBIDDEN' });
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas administradores podem criar usuários' });
           }
-          const db = await getDb();
-          if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
           
           const hashedPassword = await bcrypt.hash(input.password, 10);
-          await db.insert(users).values({
+          const email = input.username.includes('@') ? input.username : `${input.username}@projeto-maju.com`;
+
+          // Criar no Supabase Auth também para manter consistência se necessário
+          const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+            email,
+            password: input.password,
+            email_confirm: true,
+            user_metadata: { name: input.name, role: input.role }
+          });
+
+          if (authError) {
+            console.error("[Admin] Supabase Auth user creation failed:", authError.message);
+          }
+
+          const { data, error } = await supabase.from("users").insert({
             username: input.username,
             password: hashedPassword,
             name: input.name,
-            role: 'user',
-          });
+            role: input.role,
+          }).select("id").single();
+
+          if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+          return { id: data.id };
+        }),
+      update: protectedProcedure
+        .input(z.object({
+          id: z.number(),
+          name: z.string().optional(),
+          role: z.enum(['user', 'admin']).optional(),
+          password: z.string().min(6).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          if (ctx.user.role !== 'admin' && ctx.user.id !== input.id) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Você não tem permissão para atualizar este usuário' });
+          }
+
+          const updateData: any = {};
+          if (input.name) updateData.name = input.name;
+          if (input.role && ctx.user.role === 'admin') updateData.role = input.role;
+          if (input.password) updateData.password = await bcrypt.hash(input.password, 10);
+
+          const { error } = await supabase.from("users").update(updateData).eq("id", input.id);
+          if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
           return { success: true };
         }),
-      
-      updateRole: protectedProcedure
-        .input(z.object({ userId: z.number(), role: z.enum(['admin', 'user']) }))
+      delete: protectedProcedure
+        .input(z.object({ id: z.number() }))
         .mutation(async ({ ctx, input }) => {
           if (ctx.user.role !== 'admin') {
-            throw new TRPCError({ code: 'FORBIDDEN' });
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas administradores podem remover usuários' });
           }
-          const db = await getDb();
-          if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
-          
-          await db.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
+          if (ctx.user.id === input.id) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: 'Você não pode remover seu próprio usuário' });
+          }
+
+          const { error } = await supabase.from("users").delete().eq("id", input.id);
+          if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
           return { success: true };
         }),
     }),
-    
-    permissions: router({
-      getByBoard: protectedProcedure
-        .input(z.object({ boardId: z.number() }))
-        .query(async ({ ctx, input }) => {
-          if (ctx.user.role !== 'admin') {
-            throw new TRPCError({ code: 'FORBIDDEN' });
-          }
-          const db = await getDb();
-          if (!db) return [];
-          return await db.select().from(boardMembers).where(eq(boardMembers.boardId, input.boardId));
-        }),
-      
-      grant: protectedProcedure
-        .input(z.object({ boardId: z.number(), userId: z.number(), role: z.enum(['viewer', 'editor', 'admin']) }))
+    boards: router({
+      addMember: protectedProcedure
+        .input(z.object({ boardId: z.number(), userId: z.number(), role: z.enum(['viewer', 'editor', 'admin']).default('viewer') }))
         .mutation(async ({ ctx, input }) => {
-          if (ctx.user.role !== 'admin') {
-            throw new TRPCError({ code: 'FORBIDDEN' });
+          const board = await getBoardById(input.boardId, ctx.user.id);
+          if (!board || (board.ownerId !== ctx.user.id && ctx.user.role !== 'admin')) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas o dono ou admin pode adicionar membros' });
           }
-          const db = await getDb();
-          if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
-          
-          await db.insert(boardMembers).values({
+
+          const { error } = await supabase.from("board_members").upsert({
             boardId: input.boardId,
             userId: input.userId,
-            role: input.role,
-          }).onConflictDoUpdate({
-            target: [boardMembers.id],
-            set: { role: input.role },
-          });
+            role: input.role
+          }, { onConflict: 'boardId,userId' });
+
+          if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
           return { success: true };
         }),
-      
-      revoke: protectedProcedure
+      removeMember: protectedProcedure
         .input(z.object({ boardId: z.number(), userId: z.number() }))
         .mutation(async ({ ctx, input }) => {
-          if (ctx.user.role !== 'admin') {
-            throw new TRPCError({ code: 'FORBIDDEN' });
+          const board = await getBoardById(input.boardId, ctx.user.id);
+          if (!board || (board.ownerId !== ctx.user.id && ctx.user.role !== 'admin')) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas o dono ou admin pode remover membros' });
           }
-          const db = await getDb();
-          if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR' });
-          
-          await db.delete(boardMembers)
-            .where(and(eq(boardMembers.boardId, input.boardId), eq(boardMembers.userId, input.userId)));
+
+          const { error } = await supabase.from("board_members").delete().eq("boardId", input.boardId).eq("userId", input.userId);
+          if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
           return { success: true };
         }),
     }),

@@ -167,6 +167,32 @@ export async function getUserById(id: number) {
 // Board queries
 export async function getUserBoards(userId: number) {
   try {
+    // 1. Verificar se o usuário é ADMIN
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (userError) {
+      console.error("[Database] Error checking user role:", userError);
+      return [];
+    }
+
+    // Se for ADMIN, retorna TODOS os boards
+    if (user?.role === "admin") {
+      const { data, error } = await supabase
+        .from("boards")
+        .select("*");
+      
+      if (error) {
+        console.error("[Database] Error fetching all boards for admin:", error);
+        return [];
+      }
+      return (data as any[]) || [];
+    }
+
+    // Se for USER comum, aplica a lógica de ownerId ou board_members
     // 1. Buscar IDs dos boards onde o usuário é membro
     const { data: memberships } = await supabase
       .from("board_members")
@@ -200,6 +226,18 @@ export async function getUserBoards(userId: number) {
 
 export async function getBoardById(boardId: number, userId: number) {
   try {
+    // 1. Verificar se o usuário é ADMIN
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (userError) {
+      console.error("[Database] Error checking user role for board access:", userError);
+      return null;
+    }
+
     // MÉTODO SIMPLES: Usar API REST para evitar erro de conexão TCP
     const { data: board, error: boardError } = await supabase
       .from("boards")
@@ -208,6 +246,9 @@ export async function getBoardById(boardId: number, userId: number) {
       .maybeSingle();
 
     if (boardError || !board) return null;
+
+    // Se for ADMIN, tem acesso total
+    if (user?.role === "admin") return board as any;
 
     const isOwner = board.ownerId === userId;
     
