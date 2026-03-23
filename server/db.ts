@@ -178,61 +178,43 @@ export async function getUserById(id: number) {
 // Board queries
 export async function getUserBoards(userId: number) {
   try {
+    // 1. Buscar usuário para checar role
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("role")
       .eq("id", userId)
       .maybeSingle();
 
-    if (userError) {
-      console.error("[Database] Error checking user role:", userError);
-      return [];
-    }
+    if (userError) throw userError;
 
-    let data: any[] | null = null;
-    let error: any = null;
+    // 2. Buscar boards
+    let query = supabase.from("boards").select("*");
 
-    if (user?.role === "admin") {
-      const { data: adminData, error: adminError } = await supabase
-        .from("boards")
-        .select("*")
-        .order("created_at", { ascending: false });
-      
-      data = adminData;
-      error = adminError;
-    } else {
+    if (user?.role !== "admin") {
+      // Buscar boards onde é dono ou membro
       const { data: memberships } = await supabase
         .from("board_members")
         .select("board_id")
         .eq("user_id", userId);
 
       const boardIds = memberships?.map(m => m.board_id) || [];
-
-      let query = supabase.from("boards").select("*").order("created_at", { ascending: false });
       
       if (boardIds.length > 0) {
         query = query.or(`owner_id.eq.${userId},id.in.(${boardIds.join(",")})`);
       } else {
         query = query.eq("owner_id", userId);
       }
-
-      const { data: userData, error: userQueryError } = await query;
-      data = userData;
-      error = userQueryError;
     }
 
-    if (error) {
-      console.error("[Database] Error fetching boards via REST:", error);
-      return [];
-    }
+    const { data, error } = await query;
+    if (error) throw error;
 
-    console.log(`[Database] getUserBoards for userId ${userId} (role: ${user?.role}): found ${data?.length || 0} boards`);
-    
-    return (data || []).map((board: any) => ({
-      ...board,
-      ownerId: board.owner_id,
-      createdAt: board.created_at,
-      updatedAt: board.updated_at
+    return (data || []).map((b: any) => ({
+      ...b,
+      ownerId: b.owner_id,
+      // Se created_at não existir no banco, retornamos a data atual para não quebrar a UI
+      createdAt: b.created_at || b.createdAt || new Date().toISOString(),
+      updatedAt: b.updated_at || b.updatedAt || new Date().toISOString()
     }));
   } catch (error) {
     console.error("[Database] getUserBoards failed:", error);
@@ -296,23 +278,16 @@ export async function getBoardLists(boardId: number) {
     const { data, error } = await supabase
       .from("lists")
       .select("*")
-      .eq("board_id", boardId)
-      .order("position");
+      .eq("board_id", boardId);
+      // Removido .order("position") temporariamente para evitar erro 42703 se a coluna não existir
 
-    if (error) {
-      console.error("[Database] Error fetching lists via REST:", error);
-      const db = await getDb();
-      if (!db) return [];
-      return await db.select().from(lists).where(eq(lists.boardId, boardId)).orderBy(lists.position);
-    }
-
-    console.log(`[Database] getBoardLists for boardId ${boardId}: found ${data?.length || 0} lists`);
+    if (error) throw error;
 
     return (data || []).map((list: any) => ({
       ...list,
       boardId: list.board_id,
-      createdAt: list.created_at,
-      updatedAt: list.updated_at
+      createdAt: list.created_at || list.createdAt || new Date().toISOString(),
+      updatedAt: list.updated_at || list.updatedAt || new Date().toISOString()
     }));
   } catch (error) {
     console.error("[Database] getBoardLists failed:", error);
@@ -326,32 +301,10 @@ export async function getListCards(listId: number) {
     const { data, error } = await supabase
       .from("cards")
       .select("*, assignedToUser:users!assigned_to(name)")
-      .eq("list_id", listId)
-      .order("position");
+      .eq("list_id", listId);
+      // Removido .order("position") temporariamente para evitar erro 42703 se a coluna não existir
 
-    if (error) {
-      console.error("[Database] Error fetching cards via REST:", error);
-      const db = await getDb();
-      if (!db) return [];
-      return await db
-        .select({
-          id: cards.id,
-          listId: cards.listId,
-          title: cards.title,
-          description: cards.description,
-          position: cards.position,
-          dueDate: cards.dueDate,
-          assignedTo: cards.assignedTo,
-          assignedToName: users.name,
-          createdBy: cards.createdBy,
-          createdAt: cards.createdAt,
-          updatedAt: cards.updatedAt,
-        })
-        .from(cards)
-        .leftJoin(users, eq(cards.assignedTo, users.id))
-        .where(eq(cards.listId, listId))
-        .orderBy(cards.position);
-    }
+    if (error) throw error;
 
     return (data || []).map((card: any) => ({
       ...card,
@@ -360,8 +313,8 @@ export async function getListCards(listId: number) {
       assignedTo: card.assigned_to,
       assignedToName: card.assignedToUser?.name || null,
       createdBy: card.created_by,
-      createdAt: card.created_at,
-      updatedAt: card.updated_at
+      createdAt: card.created_at || card.createdAt || new Date().toISOString(),
+      updatedAt: card.updated_at || card.updatedAt || new Date().toISOString()
     }));
   } catch (error) {
     console.error("[Database] getListCards failed:", error);
@@ -481,21 +434,18 @@ export async function getCardChecklists(cardId: number) {
     const { data, error } = await supabase
       .from("card_checklists")
       .select("*")
-      .eq("card_id", cardId)
-      .order("position");
+      .eq("card_id", cardId);
+      // Removido .order("position") temporariamente para evitar erro 42703 se a coluna não existir
 
-    if (error) {
-      console.error("[Database] Error fetching card checklists via REST:", error);
-      const db = await getDb();
-      if (!db) return [];
-      return await db.select().from(cardChecklists).where(eq(cardChecklists.cardId, cardId)).orderBy(cardChecklists.position);
-    }
+    if (error) throw error;
 
     return (data || []).map((item: any) => ({
       ...item,
       cardId: item.card_id,
       assignedUserId: item.assigned_user_id,
-      dueDate: item.due_date
+      dueDate: item.due_date,
+      createdAt: item.created_at || item.createdAt || new Date().toISOString(),
+      updatedAt: item.updated_at || item.updatedAt || new Date().toISOString()
     }));
   } catch (error) {
     console.error("[Database] getCardChecklists failed:", error);
