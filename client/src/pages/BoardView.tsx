@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Loader2, MessageSquare, X } from "lucide-react";
+import { Plus, Loader2, MessageSquare, X, UserPlus, Users, Shield, Trash2 } from "lucide-react";
 import { useState } from "react";
 import {
   DndContext,
@@ -25,6 +25,12 @@ import { DraggableCard } from "@/components/DraggableCard";
 import { AIChatBox, Message } from "@/components/AIChatBox";
 import { toast } from "sonner";
 import type { List as DBList, Card as DBCard } from "../../../drizzle/schema";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function BoardView() {
   const [, params] = useRoute("/board/:id");
@@ -45,6 +51,7 @@ export default function BoardView() {
   const [showNewList, setShowNewList] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showAIChat, setShowAIChat] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { role: "system", content: "You are a helpful assistant for the Maju Task Manager. You can help users organize their tasks, suggest project steps, and answer questions about their boards." }
   ]);
@@ -146,13 +153,22 @@ export default function BoardView() {
     );
   }
 
+  const isOwnerOrAdmin = user?.id === board.ownerId || user?.role === 'admin';
+
   return (
     <TrelloDashboardLayout>
       <div className="p-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">{board.name}</h1>
-          {board.description && (
-            <p className="text-muted-foreground">{board.description}</p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">{board.name}</h1>
+            {board.description && (
+              <p className="text-muted-foreground">{board.description}</p>
+            )}
+          </div>
+          {isOwnerOrAdmin && (
+            <Button onClick={() => setShowShareModal(true)} variant="outline" className="flex items-center gap-2">
+              <UserPlus className="w-4 h-4" /> Compartilhar
+            </Button>
           )}
         </div>
 
@@ -223,6 +239,15 @@ export default function BoardView() {
           </DragOverlay>
         </DndContext>
 
+        {/* Share Modal */}
+        {boardId && (
+          <ShareBoardModal 
+            isOpen={showShareModal} 
+            onClose={() => setShowShareModal(false)} 
+            boardId={boardId} 
+          />
+        )}
+
         {/* AI Chat Button */}
         <div className="fixed bottom-8 right-8 z-50">
           {showAIChat ? (
@@ -260,6 +285,82 @@ export default function BoardView() {
         </div>
       </div>
     </TrelloDashboardLayout>
+  );
+}
+
+function ShareBoardModal({ isOpen, onClose, boardId }: { isOpen: boolean, onClose: () => void, boardId: number }) {
+  const utils = trpc.useUtils();
+  const { data: members } = trpc.boards.getMembers.useQuery({ boardId });
+  const { data: allUsers } = trpc.admin.users.list.useQuery();
+  const addMemberMutation = trpc.admin.boards.addMember.useMutation();
+  const removeMemberMutation = trpc.admin.boards.removeMember.useMutation();
+
+  const handleAddMember = async (userId: number) => {
+    try {
+      await addMemberMutation.mutateAsync({ boardId, userId, role: 'viewer' });
+      toast.success("Membro adicionado");
+      utils.boards.getMembers.invalidate({ boardId });
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao adicionar membro");
+    }
+  };
+
+  const handleRemoveMember = async (userId: number) => {
+    try {
+      await removeMemberMutation.mutateAsync({ boardId, userId });
+      toast.success("Membro removido");
+      utils.boards.getMembers.invalidate({ boardId });
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao remover membro");
+    }
+  };
+
+  const memberIds = members?.map((m: any) => m.userId) || [];
+  const nonMembers = allUsers?.filter((u: any) => !memberIds.includes(u.id)) || [];
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md bg-background border-border">
+        <DialogHeader>
+          <DialogTitle>Compartilhar Quadro</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-6 pt-4">
+          <div>
+            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4" /> Membros Atuais
+            </h4>
+            <div className="space-y-2">
+              {members?.length === 0 && <p className="text-xs text-muted-foreground">Apenas você tem acesso a este quadro.</p>}
+              {members?.map((m: any) => (
+                <div key={m.userId} className="flex items-center justify-between p-2 rounded bg-muted">
+                  <span className="text-sm font-medium">{m.userName || `Usuário ${m.userId}`}</span>
+                  <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(m.userId)} className="text-red-500 hover:bg-red-500/10">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold mb-3">Adicionar Novos Membros</h4>
+            <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
+              {nonMembers.map((u: any) => (
+                <div key={u.id} className="flex items-center justify-between p-2 rounded border border-border hover:bg-muted transition-colors">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{u.name || u.username}</span>
+                    <span className="text-xs text-muted-foreground">{u.username}</span>
+                  </div>
+                  <Button size="sm" onClick={() => handleAddMember(u.id)} className="bg-accent hover:bg-accent/90">
+                    Convidar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
