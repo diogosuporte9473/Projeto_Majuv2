@@ -97,6 +97,19 @@ export const mirroredCards = pgTable("mirrored_cards", {
 export type MirroredCard = typeof mirroredCards.$inferSelect;
 export type InsertMirroredCard = typeof mirroredCards.$inferInsert;
 
+// Card Comments - Comentários nos cartões
+export const cardComments = pgTable("card_comments", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id").notNull(),
+  userId: integer("user_id").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type CardComment = typeof cardComments.$inferSelect;
+export type InsertCardComment = typeof cardComments.$inferInsert;
+
 // Card Attachments - Arquivos anexados aos cartões
 export const cardAttachments = pgTable("card_attachments", {
   id: serial("id").primaryKey(),

@@ -756,6 +756,30 @@ export const appRouter = router({
         }
       }),
 
+    updateDueDate: protectedProcedure
+      .input(z.object({ cardId: z.number(), dueDate: z.date().nullish() }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("cards")
+          .update({ due_date: input.dueDate ? input.dueDate.toISOString() : null })
+          .eq("id", input.cardId);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
+
+    updateAssignedTo: protectedProcedure
+      .input(z.object({ cardId: z.number(), userId: z.number().nullish() }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("cards")
+          .update({ assigned_to: input.userId })
+          .eq("id", input.cardId);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
+
     archiveCard: protectedProcedure
       .input(z.object({ id: z.number(), archived: z.boolean() }))
       .mutation(async ({ input }) => {
@@ -815,6 +839,84 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    // Comments Procedures
+    getComments: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        return await getCardComments(input.cardId);
+      }),
+    addComment: protectedProcedure
+      .input(z.object({ cardId: z.number(), content: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const { data, error } = await supabase
+          .from("card_comments")
+          .insert({
+            card_id: input.cardId,
+            user_id: ctx.user.id,
+            content: input.content,
+          })
+          .select("id")
+          .single();
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { id: data.id };
+      }),
+    deleteComment: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        // Apenas o dono do comentário ou admin pode deletar
+        const { data: comment } = await supabase.from("card_comments").select("user_id").eq("id", input.id).single();
+        if (!comment) throw new TRPCError({ code: "NOT_FOUND" });
+        if (comment.user_id !== ctx.user.id && ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+
+        const { error } = await supabase.from("card_comments").delete().eq("id", input.id);
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
+
+    // Attachments Procedures
+    getAttachments: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        return await getCardAttachments(input.cardId);
+      }),
+    addAttachment: protectedProcedure
+      .input(z.object({ 
+        cardId: z.number(), 
+        filename: z.string(), 
+        fileUrl: z.string(), 
+        fileKey: z.string(),
+        mimeType: z.string(),
+        fileSize: z.number()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { data, error } = await supabase
+          .from("card_attachments")
+          .insert({
+            card_id: input.cardId,
+            filename: input.filename,
+            file_url: input.fileUrl,
+            file_key: input.fileKey,
+            mime_type: input.mimeType,
+            file_size: input.fileSize,
+            uploaded_by: ctx.user.id,
+          })
+          .select("id")
+          .single();
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { id: data.id };
+      }),
+    deleteAttachment: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase.from("card_attachments").delete().eq("id", input.id);
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
+
     getChecklists: protectedProcedure
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {
@@ -823,12 +925,20 @@ export const appRouter = router({
     addChecklist: protectedProcedure
       .input(z.object({ cardId: z.number(), title: z.string(), position: z.number().optional() }))
       .mutation(async ({ input }) => {
+        // Get current max position
+        const { data: currentItems } = await supabase
+          .from("card_checklists")
+          .select("position")
+          .eq("card_id", input.cardId);
+        
+        const nextPosition = (currentItems?.length || 0);
+
         const { data, error } = await supabase
           .from("card_checklists")
           .insert({
             card_id: input.cardId,
             title: input.title,
-            position: input.position || 0,
+            position: input.position ?? nextPosition,
             completed: false,
           })
           .select("id")
@@ -844,7 +954,7 @@ export const appRouter = router({
 
         return { id: data.id };
       }),
-    updateChecklist: protectedProcedure
+    updateChecklistItem: protectedProcedure
       .input(z.object({ 
         id: z.number(), 
         completed: z.boolean().optional(),
@@ -856,7 +966,7 @@ export const appRouter = router({
         const updateData: any = {};
         if (input.completed !== undefined) updateData.completed = input.completed;
         if (input.title !== undefined) updateData.title = input.title;
-        if (input.dueDate !== undefined) updateData.dueDate = input.dueDate ? input.dueDate.toISOString() : null;
+        if (input.dueDate !== undefined) updateData.due_date = input.dueDate ? input.dueDate.toISOString() : null;
         if (input.assignedUserId !== undefined) updateData.assigned_user_id = input.assignedUserId;
 
         const { error } = await supabase
@@ -872,6 +982,20 @@ export const appRouter = router({
           });
         }
 
+        return { success: true };
+      }),
+    reorderChecklist: protectedProcedure
+      .input(z.object({ 
+        items: z.array(z.object({ id: z.number(), position: z.number() }))
+      }))
+      .mutation(async ({ input }) => {
+        for (const item of input.items) {
+          const { error } = await supabase
+            .from("card_checklists")
+            .update({ position: item.position })
+            .eq("id", item.id);
+          if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        }
         return { success: true };
       }),
     deleteChecklist: protectedProcedure
@@ -943,6 +1067,21 @@ export const appRouter = router({
           });
         }
 
+        return { success: true };
+      }),
+
+    updateCustomField: protectedProcedure
+      .input(z.object({ 
+        id: z.number(), 
+        fieldValue: z.string()
+      }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("card_custom_fields")
+          .update({ field_value: input.fieldValue })
+          .eq("id", input.id);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
         return { success: true };
       }),
 
@@ -1157,15 +1296,15 @@ export const appRouter = router({
         .input(z.object({ boardId: z.number(), userId: z.number(), role: z.enum(['viewer', 'editor', 'admin']).default('viewer') }))
         .mutation(async ({ ctx, input }) => {
           const board = await getBoardById(input.boardId, ctx.user.id);
-          if (!board || (board.ownerId !== ctx.user.id && ctx.user.role !== 'admin')) {
+          if (!board || (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin')) {
             throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas o dono ou admin pode adicionar membros' });
           }
 
           const { error } = await supabase.from("board_members").upsert({
-            boardId: input.boardId,
-            userId: input.userId,
+            board_id: input.boardId,
+            user_id: input.userId,
             role: input.role
-          }, { onConflict: 'boardId,userId' });
+          }, { onConflict: 'board_id,user_id' });
 
           if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
           return { success: true };
@@ -1174,11 +1313,11 @@ export const appRouter = router({
         .input(z.object({ boardId: z.number(), userId: z.number() }))
         .mutation(async ({ ctx, input }) => {
           const board = await getBoardById(input.boardId, ctx.user.id);
-          if (!board || (board.ownerId !== ctx.user.id && ctx.user.role !== 'admin')) {
+          if (!board || (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin')) {
             throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas o dono ou admin pode remover membros' });
           }
 
-          const { error } = await supabase.from("board_members").delete().eq("boardId", input.boardId).eq("userId", input.userId);
+          const { error } = await supabase.from("board_members").delete().eq("board_id", input.boardId).eq("user_id", input.userId);
           if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
           return { success: true };
         }),

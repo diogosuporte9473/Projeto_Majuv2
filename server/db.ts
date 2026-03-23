@@ -130,7 +130,14 @@ export async function getUserByUsername(username: string) {
       return results[0] || undefined;
     }
 
-    return (data as any) || undefined;
+    if (!data) return undefined;
+
+    return {
+      ...data,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      lastSignedIn: data.last_signed_in
+    } as any;
   } catch (error) {
     console.error("[Database] getUserByUsername failed:", error);
     return undefined;
@@ -154,7 +161,14 @@ export async function getUserById(id: number) {
       return results[0] || undefined;
     }
 
-    return (data as any) || undefined;
+    if (!data) return undefined;
+
+    return {
+      ...data,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      lastSignedIn: data.last_signed_in
+    } as any;
   } catch (error) {
     console.error("[Database] getUserById failed:", error);
     return undefined;
@@ -175,41 +189,47 @@ export async function getUserBoards(userId: number) {
       return [];
     }
 
+    let data: any[] | null = null;
+    let error: any = null;
+
     if (user?.role === "admin") {
-      const { data, error } = await supabase
+      const { data: adminData, error: adminError } = await supabase
         .from("boards")
-        .select("*");
+        .select("*")
+        .order("created_at", { ascending: false });
       
-      if (error) {
-        console.error("[Database] Error fetching all boards for admin:", error);
-        return [];
-      }
-      return (data as any[]) || [];
-    }
-
-    const { data: memberships } = await supabase
-      .from("board_members")
-      .select("board_id")
-      .eq("user_id", userId);
-
-    const boardIds = memberships?.map(m => m.board_id) || [];
-
-    let query = supabase.from("boards").select("*");
-    
-    if (boardIds.length > 0) {
-      query = query.or(`owner_id.eq.${userId},id.in.(${boardIds.join(",")})`);
+      data = adminData;
+      error = adminError;
     } else {
-      query = query.eq("owner_id", userId);
-    }
+      const { data: memberships } = await supabase
+        .from("board_members")
+        .select("board_id")
+        .eq("user_id", userId);
 
-    const { data, error } = await query;
+      const boardIds = memberships?.map(m => m.board_id) || [];
+
+      let query = supabase.from("boards").select("*").order("created_at", { ascending: false });
+      
+      if (boardIds.length > 0) {
+        query = query.or(`owner_id.eq.${userId},id.in.(${boardIds.join(",")})`);
+      } else {
+        query = query.eq("owner_id", userId);
+      }
+
+      const { data: userData, error: userQueryError } = await query;
+      data = userData;
+      error = userQueryError;
+    }
 
     if (error) {
       console.error("[Database] Error fetching boards via REST:", error);
       return [];
     }
 
-    return (data as any[]) || [];
+    return (data as any[]).map(board => ({
+      ...board,
+      ownerId: board.owner_id
+    })) || [];
   } catch (error) {
     console.error("[Database] getUserBoards failed:", error);
     return [];
@@ -238,7 +258,12 @@ export async function getBoardById(boardId: number, userId: number) {
     if (boardError || !board) return null;
 
     // Se for ADMIN, tem acesso total
-    if (user?.role === "admin") return board as any;
+    if (user?.role === "admin") {
+      return {
+        ...board,
+        ownerId: board.owner_id
+      } as any;
+    }
 
     const isOwner = board.owner_id === userId;
     
@@ -250,7 +275,11 @@ export async function getBoardById(boardId: number, userId: number) {
       .maybeSingle();
 
     if (!isOwner && !membership) return null;
-    return board as any;
+    
+    return {
+      ...board,
+      ownerId: board.owner_id
+    } as any;
   } catch (error) {
     console.error("[Database] getBoardById failed:", error);
     return null;
@@ -273,7 +302,10 @@ export async function getBoardLists(boardId: number) {
       return await db.select().from(lists).where(eq(lists.boardId, boardId)).orderBy(lists.position);
     }
 
-    return (data as any[]) || [];
+    return (data as any[]).map(list => ({
+      ...list,
+      boardId: list.board_id
+    })) || [];
   } catch (error) {
     console.error("[Database] getBoardLists failed:", error);
     return [];
@@ -316,6 +348,9 @@ export async function getListCards(listId: number) {
 
     return (data as any[]).map(card => ({
       ...card,
+      listId: card.list_id,
+      dueDate: card.due_date,
+      assignedTo: card.assigned_to,
       assignedToName: card.assignedToUser?.name || null
     })) || [];
   } catch (error) {
@@ -340,7 +375,17 @@ export async function getCardById(cardId: number) {
       return results[0] || null;
     }
 
-    return (data as any) || null;
+    if (!data) return null;
+
+    return {
+      ...data,
+      listId: data.list_id,
+      dueDate: data.due_date,
+      assignedTo: data.assigned_to,
+      createdBy: data.created_by,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   } catch (error) {
     console.error("[Database] getCardById failed:", error);
     return null;
@@ -362,7 +407,11 @@ export async function getCardLabels(cardId: number) {
       return await db.select().from(cardLabels).where(eq(cardLabels.cardId, cardId));
     }
 
-    return (data as any[]) || [];
+    return (data as any[]).map(label => ({
+      ...label,
+      cardId: label.card_id,
+      createdAt: label.created_at
+    })) || [];
   } catch (error) {
     console.error("[Database] getCardLabels failed:", error);
     return [];
@@ -370,6 +419,53 @@ export async function getCardLabels(cardId: number) {
 }
 
 // Card Checklist queries
+export async function getCardComments(cardId: number) {
+  try {
+    const { data, error } = await supabase
+      .from("card_comments")
+      .select("*, user:users(id, name, username)")
+      .eq("card_id", cardId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return (data as any[]).map(comment => ({
+      ...comment,
+      cardId: comment.card_id,
+      userId: comment.user_id,
+      createdAt: comment.created_at,
+      updatedAt: comment.updated_at
+    })) || [];
+  } catch (error) {
+    console.error("[Database] getCardComments failed:", error);
+    return [];
+  }
+}
+
+export async function getCardAttachments(cardId: number) {
+  try {
+    const { data, error } = await supabase
+      .from("card_attachments")
+      .select("*")
+      .eq("card_id", cardId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return (data as any[]).map(att => ({
+      ...att,
+      cardId: att.card_id,
+      fileUrl: att.file_url,
+      fileKey: att.file_key,
+      mimeType: att.mime_type,
+      fileSize: att.file_size,
+      uploadedBy: att.uploaded_by,
+      createdAt: att.created_at
+    })) || [];
+  } catch (error) {
+    console.error("[Database] getCardAttachments failed:", error);
+    return [];
+  }
+}
+
 export async function getCardChecklists(cardId: number) {
   try {
     const { data, error } = await supabase
@@ -385,7 +481,12 @@ export async function getCardChecklists(cardId: number) {
       return await db.select().from(cardChecklists).where(eq(cardChecklists.cardId, cardId)).orderBy(cardChecklists.position);
     }
 
-    return (data as any[]) || [];
+    return (data as any[]).map(item => ({
+      ...item,
+      cardId: item.card_id,
+      assignedUserId: item.assigned_user_id,
+      dueDate: item.due_date
+    })) || [];
   } catch (error) {
     console.error("[Database] getCardChecklists failed:", error);
     return [];
@@ -407,7 +508,13 @@ export async function getCardCustomFields(cardId: number) {
       return await db.select().from(cardCustomFields).where(eq(cardCustomFields.cardId, cardId));
     }
 
-    return (data as any[]) || [];
+    return (data as any[]).map(field => ({
+      ...field,
+      cardId: field.card_id,
+      fieldName: field.field_name,
+      fieldValue: field.field_value,
+      fieldType: field.field_type
+    })) || [];
   } catch (error) {
     console.error("[Database] getCardCustomFields failed:", error);
     return [];
@@ -441,6 +548,8 @@ export async function getBoardMembers(boardId: number) {
 
     return (data as any[]).map(m => ({
       ...m,
+      boardId: m.board_id,
+      userId: m.user_id,
       user: m.user
     })) || [];
   } catch (error) {
@@ -463,7 +572,14 @@ export async function getMirroredCards(boardId: number) {
       return await db.select().from(mirroredCards).where(or(eq(mirroredCards.originalBoardId, boardId), eq(mirroredCards.mirrorBoardId, boardId)));
     }
 
-    return (data as any[]) || [];
+    return (data as any[]).map(mc => ({
+      ...mc,
+      originalCardId: mc.original_card_id,
+      mirrorCardId: mc.mirror_card_id,
+      originalBoardId: mc.original_board_id,
+      mirrorBoardId: mc.mirror_board_id,
+      syncStatus: mc.sync_status
+    })) || [];
   } catch (error) {
     console.error("[Database] getMirroredCards failed:", error);
     return [];
@@ -472,34 +588,88 @@ export async function getMirroredCards(boardId: number) {
 
 // Project Dates queries
 export async function getProjectDate(cardId: number) {
-  const db = await getDb();
-  if (!db) return null;
-  const result = await db.select().from(projectDates).where(eq(projectDates.cardId, cardId)).limit(1);
-  return result.length > 0 ? result[0] : null;
-}
+  try {
+    const { data, error } = await supabase
+      .from("project_dates")
+      .select("*")
+      .eq("card_id", cardId)
+      .maybeSingle();
 
-export async function upsertProjectDate(cardId: number, projectStartDate?: Date, projectEndDate?: Date) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  
-  const existing = await getProjectDate(cardId);
-  if (existing) {
-    return await db.update(projectDates).set({ projectStartDate, projectEndDate }).where(eq(projectDates.cardId, cardId));
-  } else {
-    return await db.insert(projectDates).values({ cardId, projectStartDate, projectEndDate });
+    if (error) {
+      console.error("[Database] Error fetching project date via REST:", error);
+      const db = await getDb();
+      if (!db) return null;
+      const result = await db.select().from(projectDates).where(eq(projectDates.cardId, cardId)).limit(1);
+      return result.length > 0 ? result[0] : null;
+    }
+
+    if (!data) return null;
+
+    return {
+      ...data,
+      cardId: data.card_id,
+      projectStartDate: data.project_start_date,
+      projectEndDate: data.project_end_date
+    };
+  } catch (error) {
+    console.error("[Database] getProjectDate failed:", error);
+    return null;
   }
 }
 
+export async function upsertProjectDate(cardId: number, projectStartDate?: Date, projectEndDate?: Date) {
+  const { error } = await supabase
+    .from("project_dates")
+    .upsert({
+      card_id: cardId,
+      project_start_date: projectStartDate ? projectStartDate.toISOString() : null,
+      project_end_date: projectEndDate ? projectEndDate.toISOString() : null,
+    }, { onConflict: 'card_id' });
+
+  if (error) throw error;
+  return { success: true };
+}
+
 export async function updateCard(cardId: number, data: Partial<InsertCard>) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.update(cards).set(data).where(eq(cards.id, cardId));
+  const updateData: any = {};
+  if (data.title) updateData.title = data.title;
+  if (data.description !== undefined) updateData.description = data.description;
+  if (data.listId) updateData.list_id = data.listId;
+  if (data.position !== undefined) updateData.position = data.position;
+  if (data.dueDate !== undefined) updateData.due_date = data.dueDate;
+  if (data.assignedTo !== undefined) updateData.assigned_to = data.assignedTo;
+  if (data.archived !== undefined) updateData.archived = data.archived;
+
+  const { error } = await supabase
+    .from("cards")
+    .update(updateData)
+    .eq("id", cardId);
+
+  if (error) throw error;
+  return { success: true };
 }
 
 export async function getAllUsers() {
-  const db = await getDb();
-  if (!db) return [];
-  return await db.select().from(users);
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*");
+
+    if (error) {
+      const db = await getDb();
+      if (!db) return [];
+      return await db.select().from(users);
+    }
+
+    return (data as any[]).map(user => ({
+      ...user,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      lastSignedIn: user.last_signed_in
+    })) || [];
+  } catch (error) {
+    return [];
+  }
 }
 
 export async function updateUserRole(userId: number, role: "admin" | "user") {
