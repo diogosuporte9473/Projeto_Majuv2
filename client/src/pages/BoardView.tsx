@@ -16,6 +16,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -122,23 +123,28 @@ export default function BoardView() {
     const activeParts = activeId.split("-");
     const overParts = overId.split("-");
 
-    if (activeParts[0] === "card" && overParts[0] === "card") {
+    if (activeParts[0] === "card") {
       const cardId = parseInt(activeParts[1]);
-      const newListId = parseInt(overParts[2]);
+      let newListId: number | null = null;
 
-      if (isNaN(cardId) || isNaN(newListId)) {
-        console.error("Invalid card or list ID", { cardId, newListId });
-        return;
+      if (overParts[0] === "card") {
+        newListId = parseInt(overParts[2]);
+      } else if (overParts[0] === "list") {
+        newListId = parseInt(overParts[1]);
       }
 
-      try {
-        await reorderCardMutation.mutateAsync({
-          cardId,
-          newListId,
-          newPosition: 0,
-        });
-      } catch (error) {
-        console.error("Error reordering card:", error);
+      if (cardId && newListId) {
+        try {
+          await reorderCardMutation.mutateAsync({
+            cardId,
+            newListId,
+            newPosition: 0,
+          });
+          toast.success("Cartão movido");
+          utils.cards.getByList.invalidate();
+        } catch (error) {
+          toast.error("Erro ao mover cartão");
+        }
       }
     }
   };
@@ -167,8 +173,8 @@ export default function BoardView() {
 
   return (
     <TrelloDashboardLayout>
-      <div className="p-8">
-        <div className="mb-8 flex justify-between items-start">
+      <div className="h-full flex flex-col">
+        <div className="p-6 flex justify-between items-start flex-shrink-0">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">{board.name}</h1>
             {board.description && (
@@ -182,72 +188,73 @@ export default function BoardView() {
           )}
         </div>
 
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragEnd={handleDragEnd}
-          onDragStart={(event) => {
-            setActiveId(event.active.id as string);
-          }}
-        >
-          <div className="flex gap-6 overflow-x-auto pb-4">
-            {lists && (lists as DBList[]).map((list: DBList) => (
-              <div key={list.id} className="flex-shrink-0 w-80">
-                <ListColumn listId={list.id} listName={list.name} />
-              </div>
-            ))}
+        <div className="flex-1 overflow-x-auto overflow-y-hidden px-6 pb-6">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragEnd={handleDragEnd}
+            onDragStart={(event) => {
+              setActiveId(event.active.id as string);
+            }}
+          >
+            <div className="flex gap-4 h-full items-start">
+              {lists && (lists as DBList[]).map((list: DBList) => (
+                <ListColumn key={list.id} listId={list.id} listName={list.name} />
+              ))}
 
-            {showNewList ? (
-              <div className="flex-shrink-0 w-80 bg-card rounded-lg p-4 border border-border">
-                <input
-                  type="text"
-                  placeholder="List name"
-                  value={newListName}
-                  onChange={(e) => setNewListName(e.target.value)}
-                  className="w-full px-3 py-2 rounded bg-background border border-border text-foreground placeholder-muted-foreground text-sm mb-3"
-                  autoFocus
-                />
-                <div className="flex gap-2">
+              {showNewList ? (
+                <div className="flex-shrink-0 w-72 bg-card rounded-lg p-3 border border-border shadow-sm">
+                  <input
+                    type="text"
+                    placeholder="Nome da lista..."
+                    value={newListName}
+                    onChange={(e) => setNewListName(e.target.value)}
+                    className="w-full px-3 py-2 rounded bg-background border border-border text-foreground placeholder-muted-foreground text-sm mb-2 focus:ring-1 focus:ring-accent outline-none"
+                    autoFocus
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateList()}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleCreateList}
+                      disabled={createListMutation.isPending}
+                      size="sm"
+                      className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
+                    >
+                      Criar Lista
+                    </Button>
+                    <Button
+                      onClick={() => setShowNewList(false)}
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-shrink-0 w-72">
                   <Button
-                    onClick={handleCreateList}
-                    disabled={createListMutation.isPending}
-                    size="sm"
-                    className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
-                  >
-                    Create
-                  </Button>
-                  <Button
-                    onClick={() => setShowNewList(false)}
+                    onClick={() => setShowNewList(true)}
                     variant="outline"
-                    size="sm"
-                    className="flex-1"
+                    className="w-full justify-start bg-background/50 border-dashed border-2 hover:bg-background hover:border-accent text-muted-foreground hover:text-foreground h-12 transition-all"
                   >
-                    Cancel
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar outra lista
                   </Button>
                 </div>
-              </div>
-            ) : (
-              <div className="flex-shrink-0 w-80">
-                <Button
-                  onClick={() => setShowNewList(true)}
-                  variant="outline"
-                  className="w-full justify-start text-muted-foreground hover:text-foreground"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add List
-                </Button>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <DragOverlay>
-            {activeId && activeId.startsWith("card-") ? (
-              <div className="bg-card rounded p-3 border border-border shadow-lg">
-                <p className="font-medium text-sm text-foreground">Dragging...</p>
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+            <DragOverlay>
+              {activeId && activeId.startsWith("card-") ? (
+                <div className="bg-card rounded p-3 border border-border shadow-2xl rotate-3 cursor-grabbing w-64">
+                  <p className="font-medium text-sm text-foreground">Movendo cartão...</p>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        </div>
 
         {/* Share Modal */}
         {boardId && (
@@ -386,6 +393,7 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
   const [newCardTitle, setNewCardTitle] = useState("");
   const [showNewCard, setShowNewCard] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { setNodeRef } = useDroppable({ id: `list-${listId}` });
 
   useEffect(() => {
     if (isEditingName && inputRef.current) {
@@ -428,6 +436,7 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
       });
       setNewCardTitle("");
       setShowNewCard(false);
+      utils.cards.getByList.invalidate({ listId });
     } catch (error) {
       console.error("Error creating card:", error);
     }
@@ -436,8 +445,11 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
   const cardIds = (cards as DBCard[])?.map((card: DBCard) => `card-${card.id}-${listId}`) || [];
 
   return (
-    <div className="bg-[#1a1a1a] rounded-lg flex flex-col max-h-full border border-[#333]">
-      <div className="p-3 flex items-center justify-between group/list">
+    <div 
+      ref={setNodeRef}
+      className="flex-shrink-0 w-72 bg-[#1a1a1a] rounded-lg flex flex-col max-h-full border border-[#333] shadow-lg"
+    >
+      <div className="p-3 flex items-center justify-between group/list bg-[#222] rounded-t-lg border-b border-[#333]">
         {isEditingName ? (
           <input
             ref={inputRef}
@@ -450,7 +462,7 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
         ) : (
           <h2 
             onClick={() => setIsEditingName(true)}
-            className="text-sm font-semibold text-white px-2 py-1 cursor-pointer hover:bg-[#2a2a2a] rounded flex-1 truncate"
+            className="text-sm font-semibold text-white px-2 py-1 cursor-pointer hover:bg-[#2a2a2a] rounded flex-1 truncate uppercase tracking-tight"
           >
             {listName}
           </h2>
@@ -458,12 +470,12 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="text-gray-400 hover:text-white">
+            <Button variant="ghost" size="icon" className="w-8 h-8 text-gray-400 hover:text-white hover:bg-white/10">
               <MoreHorizontal className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="bg-[#1a1a1a] border-[#333] text-white">
-            <DropdownMenuItem onClick={() => setIsEditingName(true)} className="flex items-center gap-2 cursor-pointer">
+            <DropdownMenuItem onClick={() => setIsEditingName(true)} className="flex items-center gap-2 cursor-pointer hover:bg-[#2a2a2a]">
               <Edit2 className="w-4 h-4" /> Renomear
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleDeleteList} className="flex items-center gap-2 text-red-400 cursor-pointer focus:text-red-400 focus:bg-red-400/10">
@@ -473,71 +485,62 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
         </DropdownMenu>
       </div>
 
-      <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-        <div className="flex-1 space-y-3 overflow-y-auto mb-4">
+      <div className="flex-1 overflow-y-auto p-2 min-h-[100px] space-y-2 scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
+        <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
           {isLoading ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-20 bg-card rounded animate-pulse" />
+                <div key={i} className="h-20 bg-card/50 rounded animate-pulse" />
               ))}
             </div>
-          ) : cards && cards.length > 0 ? (
-            (cards as DBCard[]).map((card: DBCard) => (
-              <DraggableCard
-                key={card.id}
-                id={card.id}
-                listId={listId}
-                title={card.title}
-                description={card.description || undefined}
-                dueDate={card.dueDate ? new Date(card.dueDate) : undefined}
-                listName={listName}
-              />
-            ))
-          ) : (
-            <p className="text-xs text-muted-foreground">No cards yet</p>
-          )}
-        </div>
-      </SortableContext>
+          ) : cards && (cards as DBCard[]).map((card: DBCard) => (
+            <DraggableCard
+              key={card.id}
+              id={card.id}
+              listId={listId}
+              title={card.title}
+              description={card.description || undefined}
+              dueDate={card.dueDate ? new Date(card.dueDate) : undefined}
+              listName={listName}
+              assignedToName={card.assignedToName}
+            />
+          ))}
+        </SortableContext>
+      </div>
 
-      {showNewCard ? (
-        <div className="bg-card rounded p-3 border border-border">
-          <textarea
-            placeholder="Card title"
-            value={newCardTitle}
-            onChange={(e) => setNewCardTitle(e.target.value)}
-            className="w-full px-2 py-2 rounded bg-background border border-border text-foreground placeholder-muted-foreground text-sm mb-2 resize-none"
-            rows={2}
-          />
-          <div className="flex gap-2">
-            <Button
-              onClick={handleCreateCard}
-              disabled={createCardMutation.isPending}
-              size="sm"
-              className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 text-xs"
-            >
-              Add Card
-            </Button>
-            <Button
-              onClick={() => setShowNewCard(false)}
-              variant="outline"
-              size="sm"
-              className="flex-1 text-xs"
-            >
-              Cancel
-            </Button>
+      <div className="p-2 border-t border-[#333] bg-[#222]/30 rounded-b-lg">
+        {showNewCard ? (
+          <div className="p-2 bg-[#2a2a2a] rounded border border-[#444] shadow-sm">
+            <textarea
+              placeholder="Digite o título do cartão..."
+              value={newCardTitle}
+              onChange={(e) => setNewCardTitle(e.target.value)}
+              className="w-full bg-[#1a1a1a] border border-[#444] rounded p-2 text-sm text-white placeholder-gray-500 resize-none focus:ring-1 focus:ring-accent outline-none mb-2"
+              rows={3}
+              autoFocus
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleCreateCard())}
+            />
+            <div className="flex gap-2">
+              <Button onClick={handleCreateCard} size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
+                Adicionar
+              </Button>
+              <Button onClick={() => setShowNewCard(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                Cancelar
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <Button
-          onClick={() => setShowNewCard(true)}
-          variant="outline"
-          className="w-full justify-start text-muted-foreground hover:text-foreground text-sm"
-          size="sm"
-        >
-          <Plus className="w-3 h-3 mr-2" />
-          Add Card
-        </Button>
-      )}
+        ) : (
+          <Button
+            onClick={() => setShowNewCard(true)}
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-gray-400 hover:text-white hover:bg-white/5 h-10"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Adicionar um cartão
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

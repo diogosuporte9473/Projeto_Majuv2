@@ -132,6 +132,16 @@ export default function CardDetailModal({
   const datesRef = useRef<HTMLDivElement>(null);
   const commentsRef = useRef<HTMLDivElement>(null);
 
+  const handleUpdateDueDate = async (date: Date | null) => {
+    try {
+      await updateDueDateMutation.mutateAsync({ cardId, dueDate: date });
+      toast.success("Data atualizada");
+      utils.cards.get.invalidate({ id: cardId });
+    } catch (error) {
+      toast.error("Erro ao atualizar data");
+    }
+  };
+
   const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -451,6 +461,41 @@ export default function CardDetailModal({
                 </div>
               </section>
             )}
+
+            {/* Seção de Datas do Card */}
+             {showDates && (
+               <section ref={datesRef} className="animate-in fade-in slide-in-from-top-4 duration-300">
+                 <div className="flex items-center gap-2 mb-4">
+                   <Calendar className="w-5 h-5 text-accent" />
+                   <h3 className="font-semibold text-lg">Datas</h3>
+                 </div>
+                 <div className="ml-7 flex items-center gap-3">
+                   <div className="bg-[#2a2a2a] p-2 rounded border border-[#333] flex items-center gap-3 relative hover:bg-[#333] transition-colors group cursor-pointer">
+                     <Calendar className="w-4 h-4 text-gray-400 group-hover:text-accent" />
+                     <span className="text-sm font-medium">
+                       {card?.dueDate ? new Date(card.dueDate).toLocaleDateString('pt-BR') : "Clique para definir"}
+                     </span>
+                     <input 
+                       type="date" 
+                       className="bg-transparent border-none outline-none text-xs w-full cursor-pointer opacity-0 absolute inset-0"
+                       onChange={(e) => handleUpdateDueDate(e.target.value ? new Date(e.target.value) : null)}
+                       defaultValue={card?.dueDate ? new Date(card.dueDate).toISOString().split('T')[0] : ''}
+                     />
+                   </div>
+                   {card?.dueDate && (
+                     <Button 
+                       variant="ghost" 
+                       size="sm" 
+                       className="text-xs text-red-400 hover:text-red-500 hover:bg-red-500/10 h-8"
+                       onClick={() => handleUpdateDueDate(null)}
+                     >
+                       <Trash2 className="w-3 h-3 mr-2" />
+                       Remover
+                     </Button>
+                   )}
+                 </div>
+               </section>
+             )}
 
             {/* Description */}
             <section ref={descriptionRef}>
