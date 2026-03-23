@@ -7,7 +7,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { 
   X, 
   Plus, 
@@ -25,7 +24,11 @@ import {
   User as UserIcon,
   CalendarDays,
   Archive,
-  Trash
+  Trash,
+  MessageSquare,
+  Paperclip,
+  Send,
+  MoreVertical
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -39,8 +42,16 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 interface CardDetailModalProps {
   isOpen: boolean;
@@ -59,33 +70,42 @@ export default function CardDetailModal({
   cardDescription,
   listName,
 }: CardDetailModalProps) {
+  const { user: currentUser } = useAuth();
   const utils = trpc.useUtils();
 
   // Queries
-  const { data: labels, isLoading: labelsLoading } = trpc.cardDetails.getLabels.useQuery({ cardId });
+  const { data: labels } = trpc.cardDetails.getLabels.useQuery({ cardId });
   const { data: checklists, isLoading: checklistsLoading } = trpc.cardDetails.getChecklists.useQuery({ cardId });
-  const { data: projectDates, isLoading: datesLoading } = trpc.cardDetails.getProjectDates.useQuery({ cardId });
-  const { data: customFields, isLoading: customFieldsLoading } = trpc.cardDetails.getCustomFields.useQuery({ cardId });
+  const { data: comments } = trpc.cardDetails.getComments.useQuery({ cardId });
+  const { data: attachments } = trpc.cardDetails.getAttachments.useQuery({ cardId });
+  const { data: customFields } = trpc.cardDetails.getCustomFields.useQuery({ cardId });
+  const { data: projectDates } = trpc.cardDetails.getProjectDates.useQuery({ cardId });
 
   // Mutations
   const addLabelMutation = trpc.cardDetails.addLabel.useMutation();
   const deleteLabelMutation = trpc.cardDetails.deleteLabel.useMutation();
   const addChecklistMutation = trpc.cardDetails.addChecklist.useMutation();
-  const updateChecklistMutation = trpc.cardDetails.updateChecklist.useMutation();
+  const updateChecklistMutation = trpc.cardDetails.updateChecklistItem.useMutation();
   const deleteChecklistMutation = trpc.cardDetails.deleteChecklist.useMutation();
-  const upsertDatesMutation = trpc.cardDetails.upsertProjectDates.useMutation();
+  const upsertProjectDatesMutation = trpc.cardDetails.upsertProjectDates.useMutation();
   const updateDescriptionMutation = trpc.cardDetails.updateDescription.useMutation();
+  const updateDueDateMutation = trpc.cardDetails.updateDueDate.useMutation();
+  const updateAssignedToMutation = trpc.cardDetails.updateAssignedTo.useMutation();
   const upsertCustomFieldMutation = trpc.cards.upsertCustomField.useMutation();
+  const updateCustomFieldMutation = trpc.cardDetails.updateCustomField.useMutation();
   const deleteCustomFieldMutation = trpc.cardDetails.deleteCustomField.useMutation();
   const createMirrorMutation = trpc.cardDetails.createMirror.useMutation();
   const archiveCardMutation = trpc.cardDetails.archiveCard.useMutation();
   const deleteCardMutation = trpc.cards.delete.useMutation();
+  const addCommentMutation = trpc.cardDetails.addComment.useMutation();
+  const deleteCommentMutation = trpc.cardDetails.deleteComment.useMutation();
 
   const [newLabel, setNewLabel] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#4b4897");
   const [newChecklistTitle, setNewChecklistTitle] = useState("");
   const [description, setDescription] = useState(cardDescription || "");
   const [isEditingCustomFields, setIsEditingCustomFields] = useState(false);
+  const [newComment, setNewComment] = useState("");
   
   // Mirroring states
   const [isMirrorDialogOpen, setIsMirrorDialogOpen] = useState(false);
@@ -110,6 +130,7 @@ export default function CardDetailModal({
   const checklistRef = useRef<HTMLDivElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
   const datesRef = useRef<HTMLDivElement>(null);
+  const commentsRef = useRef<HTMLDivElement>(null);
 
   const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -239,7 +260,7 @@ export default function CardDetailModal({
       const startDate = start ? new Date(start) : null;
       const endDate = end ? new Date(end) : null;
       
-      await upsertDatesMutation.mutateAsync({
+      await upsertProjectDatesMutation.mutateAsync({
         cardId,
         startDate,
         endDate,
@@ -252,13 +273,20 @@ export default function CardDetailModal({
   };
 
   const handleUpdateDescription = async () => {
+    if (description === cardDescription) return;
     try {
-      await updateDescriptionMutation.mutateAsync({ cardId, description });
-      await utils.cards.getByList.invalidate();
+      await updateDescriptionMutation.mutateAsync({
+        cardId,
+        description,
+      });
       toast.success("Descrição atualizada");
     } catch (error) {
       toast.error("Erro ao atualizar descrição");
     }
+  };
+
+  const getCustomFieldValue = (fieldName: string) => {
+    return customFields?.find((f: any) => f.fieldName === fieldName)?.fieldValue || "";
   };
 
   const handleUpsertCustomField = async (fieldName: string, fieldValue: string) => {
@@ -267,11 +295,10 @@ export default function CardDetailModal({
         cardId,
         fieldName,
         fieldValue,
-        fieldType: "text"
       });
       await utils.cardDetails.getCustomFields.invalidate({ cardId });
     } catch (error) {
-      toast.error("Erro ao atualizar campo personalizado");
+      toast.error("Erro ao atualizar campo");
     }
   };
 
@@ -279,91 +306,153 @@ export default function CardDetailModal({
     try {
       await deleteCustomFieldMutation.mutateAsync({ id });
       await utils.cardDetails.getCustomFields.invalidate({ cardId });
-      toast.success("Campo removido");
     } catch (error) {
       toast.error("Erro ao remover campo");
     }
   };
 
-  const getCustomFieldValue = (fieldName: string) => {
-    return customFields?.find(f => f.fieldName === fieldName)?.fieldValue || "";
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
+    try {
+      await addCommentMutation.mutateAsync({ cardId, content: newComment });
+      setNewComment("");
+      await utils.cardDetails.getComments.invalidate({ cardId });
+    } catch (error) {
+      toast.error("Erro ao adicionar comentário");
+    }
   };
+
+  const handleDeleteComment = async (id: number) => {
+    try {
+      await deleteCommentMutation.mutateAsync({ id });
+      await utils.cardDetails.getComments.invalidate({ cardId });
+    } catch (error) {
+      toast.error("Erro ao remover comentário");
+    }
+  };
+
+  const checklistProgress = checklists?.length 
+    ? (checklists.filter((i: any) => i.completed).length / checklists.length) * 100 
+    : 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto bg-[#1a1a1a] text-white border-[#333] p-0">
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-2 text-sm text-gray-400">
-            <span className="flex items-center gap-1 bg-[#2a2a2a] px-2 py-0.5 rounded cursor-pointer hover:bg-[#333]">
-              {listName || "Caixa de Entrada"} <ChevronDown className="w-3 h-3" />
-            </span>
-          </div>
-
-          <div className="flex items-start justify-between mb-6">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-[#1a1a1a] text-white border-[#333] p-0 gap-0">
+        <DialogHeader className="p-6 pb-2">
+          <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 border-2 border-gray-500 rounded-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-gray-500 rounded-full" />
+              <div className="w-8 h-8 rounded bg-accent flex items-center justify-center">
+                <LayoutGrid className="w-5 h-5 text-white" />
               </div>
-              <DialogTitle className="text-3xl font-bold">{cardTitle}</DialogTitle>
+              <div>
+                <DialogTitle className="text-2xl font-bold">{cardTitle}</DialogTitle>
+                <p className="text-sm text-gray-400">na lista <span className="underline">{listName}</span></p>
+              </div>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
               <X className="w-6 h-6" />
             </button>
           </div>
+        </DialogHeader>
 
-          <div className="flex flex-wrap gap-2 mb-8">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className={`bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2 ${showLabels ? "ring-1 ring-gray-400" : ""}`}
-              onClick={() => setShowLabels(!showLabels)}
-            >
-              <Tag className="w-4 h-4" /> Etiquetas
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className={`bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2 ${showDates ? "ring-1 ring-gray-400" : ""}`}
-              onClick={() => setShowDates(!showDates)}
-            >
-              <Clock className="w-4 h-4" /> Datas
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className={`bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2 ${showChecklist ? "ring-1 ring-gray-400" : ""}`}
-              onClick={() => setShowChecklist(!showChecklist)}
-            >
-              <CheckSquare className="w-4 h-4" /> Checklist
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2"
-              onClick={() => setIsMirrorDialogOpen(true)}
-            >
-              <Copy className="w-4 h-4" /> Espelhar
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="bg-[#2a2a2a] border-none hover:bg-amber-600/20 text-white flex items-center gap-2"
-              onClick={handleArchiveCard}
-            >
-              <Archive className="w-4 h-4" /> Arquivar
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="bg-[#2a2a2a] border-none hover:bg-red-600/20 text-white flex items-center gap-2"
-              onClick={handleDeleteCard}
-            >
-              <Trash className="w-4 h-4" /> Excluir
-            </Button>
-          </div>
+        <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="md:col-span-3 space-y-10">
+            {/* Top Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={`bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2 ${showLabels ? "ring-1 ring-gray-400" : ""}`}
+                onClick={() => setShowLabels(!showLabels)}
+              >
+                <Tag className="w-4 h-4" /> Etiquetas
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={`bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2 ${showDates ? "ring-1 ring-gray-400" : ""}`}
+                onClick={() => setShowDates(!showDates)}
+              >
+                <Clock className="w-4 h-4" /> Datas
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={`bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2 ${showChecklist ? "ring-1 ring-gray-400" : ""}`}
+                onClick={() => setShowChecklist(!showChecklist)}
+              >
+                <CheckSquare className="w-4 h-4" /> Checklist
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2"
+                onClick={() => setIsMirrorDialogOpen(true)}
+              >
+                <Copy className="w-4 h-4" /> Espelhar
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="bg-[#2a2a2a] border-none hover:bg-amber-600/20 text-white flex items-center gap-2"
+                onClick={handleArchiveCard}
+              >
+                <Archive className="w-4 h-4" /> Arquivar
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="bg-[#2a2a2a] border-none hover:bg-red-600/20 text-white flex items-center gap-2"
+                onClick={handleDeleteCard}
+              >
+                <Trash className="w-4 h-4" /> Excluir
+              </Button>
+            </div>
 
-          <div className="space-y-8">
-            {/* Descrição */}
+            {/* Labels Section */}
+            {showLabels && (
+              <section ref={labelsRef}>
+                <div className="flex items-center gap-2 mb-4">
+                  <Tag className="w-5 h-5 text-gray-400" />
+                  <h3 className="font-semibold text-lg">Etiquetas</h3>
+                </div>
+                <div className="ml-7 flex flex-wrap gap-2">
+                  <div className="flex items-center gap-2 w-full mb-4">
+                    <input
+                      type="text"
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      placeholder="Nova etiqueta..."
+                      className="bg-[#2a2a2a] border-none rounded px-3 py-2 text-sm flex-1"
+                      onKeyDown={(e) => e.key === "Enter" && handleAddLabel()}
+                    />
+                    <input
+                      type="color"
+                      value={newLabelColor}
+                      onChange={(e) => setNewLabelColor(e.target.value)}
+                      className="w-8 h-8 rounded bg-transparent border-none cursor-pointer p-0"
+                    />
+                    <Button onClick={handleAddLabel} size="sm" className="bg-[#2a2a2a] hover:bg-[#333] text-white">
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  {labels?.map((label: any) => (
+                    <div
+                      key={label.id}
+                      className="flex items-center gap-2 px-3 py-1 rounded text-white text-xs font-medium"
+                      style={{ backgroundColor: label.color }}
+                    >
+                      {label.label}
+                      <button onClick={() => handleRemoveLabel(label.id)} className="hover:opacity-80">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Description */}
             <section ref={descriptionRef}>
               <div className="flex items-center gap-2 mb-3">
                 <AlignLeft className="w-5 h-5 text-gray-400" />
@@ -380,7 +469,7 @@ export default function CardDetailModal({
               </div>
             </section>
 
-            {/* Campos Personalizados */}
+            {/* Custom Fields */}
             <section ref={customFieldsRef}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
@@ -458,107 +547,75 @@ export default function CardDetailModal({
                   </Select>
                 </div>
               </div>
-
-              {isEditingCustomFields && (
-                <div className="mt-6 ml-7 p-4 border border-dashed border-[#444] rounded-lg">
-                  <h4 className="text-sm font-medium mb-4">Gerenciar outros campos</h4>
-                  <div className="space-y-3">
-                    {customFields?.filter(f => !["Mapa de Calor", "Status", "Classificação do Cliente"].includes(f.fieldName)).map(field => (
-                      <div key={field.id} className="flex items-center justify-between bg-[#2a2a2a] p-2 rounded">
-                        <span>{field.fieldName}: {field.fieldValue}</span>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteCustomField(field.id)}>
-                          <Trash2 className="w-4 h-4 text-red-400" />
-                        </Button>
-                      </div>
-                    ))}
-                    <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        placeholder="Nome do campo" 
-                        className="flex-1 bg-[#2a2a2a] border-none rounded px-3 py-1 text-sm"
-                        id="new-field-name"
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Valor" 
-                        className="flex-1 bg-[#2a2a2a] border-none rounded px-3 py-1 text-sm"
-                        id="new-field-value"
-                      />
-                      <Button size="sm" onClick={() => {
-                        const nameEl = document.getElementById("new-field-name") as HTMLInputElement;
-                        const valEl = document.getElementById("new-field-value") as HTMLInputElement;
-                        if (nameEl.value && valEl.value) {
-                          handleUpsertCustomField(nameEl.value, valEl.value);
-                          nameEl.value = "";
-                          valEl.value = "";
-                        }
-                      }}>
-                        Add
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </section>
 
             {/* Checklist */}
             {showChecklist && (
               <section ref={checklistRef}>
-                <div className="flex items-center gap-2 mb-4">
-                  <CheckSquare className="w-5 h-5 text-gray-400" />
-                  <h3 className="font-semibold text-lg">Checklist</h3>
-                </div>
-                <div className="ml-7 space-y-4">
-                  <div className="flex gap-2 mb-2">
-                    <input
-                      type="text"
-                      value={newChecklistTitle}
-                      onChange={(e) => setNewChecklistTitle(e.target.value)}
-                      placeholder="Adicionar item..."
-                      className="flex-1 bg-[#2a2a2a] border-none rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-gray-400"
-                      onKeyDown={(e) => e.key === "Enter" && handleAddChecklist()}
-                    />
-                    <Button onClick={handleAddChecklist} size="sm" className="bg-[#2a2a2a] hover:bg-[#333] text-white">
-                      Adicionar
-                    </Button>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <CheckSquare className="w-5 h-5 text-gray-400" />
+                    <h3 className="font-semibold text-lg">Checklist</h3>
                   </div>
-                  
+                  <div className="text-xs text-gray-400 font-medium">
+                    {Math.round(checklistProgress)}% concluído
+                  </div>
+                </div>
+                
+                <div className="ml-7 mb-6">
+                  <Progress value={checklistProgress} className="h-2 bg-[#2a2a2a]" indicatorClassName="bg-accent" />
+                </div>
+
+                <div className="ml-7 space-y-4">
                   {checklistsLoading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto" />
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {checklists?.map((item: any) => {
-                        const assignedUser = allUsers?.find((u: any) => u.id === item.assignedUserId);
+                        const assignedUser = allUsers?.find((u: any) => u.id === item.assigned_user_id);
+                        const isOverdue = item.due_date && new Date(item.due_date) < new Date() && !item.completed;
                         
                         return (
-                          <div key={item.id} className="group bg-[#222] hover:bg-[#2a2a2a] p-3 rounded-lg transition-colors">
+                          <div key={item.id} className="group bg-[#222] hover:bg-[#2a2a2a] p-3 rounded-lg transition-all border border-transparent hover:border-[#444]">
                             <div className="flex items-start gap-3">
                               <input
                                 type="checkbox"
                                 checked={item.completed}
                                 onChange={() => handleUpdateChecklistItem(item.id, { completed: !item.completed })}
-                                className="w-5 h-5 mt-0.5 rounded border-gray-600 bg-[#2a2a2a] text-accent focus:ring-offset-0"
+                                className="w-5 h-5 mt-0.5 rounded border-gray-600 bg-[#2a2a2a] text-accent focus:ring-offset-0 cursor-pointer"
                               />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className={`text-sm flex-1 ${item.completed ? "line-through text-gray-500" : "text-white"}`}>
-                                    {item.title}
-                                  </span>
-                                  <button
-                                    onClick={() => handleRemoveChecklist(item.id)}
-                                    className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-opacity"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                  <input
+                                    defaultValue={item.title}
+                                    onBlur={(e) => handleUpdateChecklistItem(item.id, { title: e.target.value })}
+                                    className={`text-sm flex-1 bg-transparent border-none focus:outline-none focus:ring-0 ${item.completed ? "line-through text-gray-500" : "text-white"}`}
+                                  />
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#333] transition-opacity">
+                                        <MoreVertical className="w-4 h-4 text-gray-400" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="bg-[#1a1a1a] border-[#333] text-white">
+                                      <DropdownMenuItem onClick={() => handleRemoveChecklist(item.id)} className="text-red-400 focus:text-red-400 focus:bg-red-400/10 cursor-pointer">
+                                        <Trash2 className="w-4 h-4 mr-2" /> Remover item
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
 
                                 <div className="flex items-center gap-3 mt-2">
-                                  {/* Seletor de Data */}
+                                  {/* Date Badge */}
                                   <Popover>
                                     <PopoverTrigger asChild>
-                                      <button className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded hover:bg-[#333] transition-colors ${item.dueDate ? "text-accent bg-accent/10" : "text-gray-500 bg-[#2a2a2a]"}`}>
-                                        <CalendarDays className="w-3.5 h-3.5" />
-                                        {item.dueDate ? format(new Date(item.dueDate), "dd 'de' MMM", { locale: ptBR }) : "Data"}
+                                      <button className={`flex items-center gap-1.5 text-[10px] uppercase font-bold px-2 py-0.5 rounded transition-colors ${
+                                        item.completed ? "bg-green-500/10 text-green-500" : 
+                                        isOverdue ? "bg-red-500/10 text-red-500" : 
+                                        item.due_date ? "bg-amber-500/10 text-amber-500" : "bg-[#2a2a2a] text-gray-500 hover:bg-[#333]"
+                                      }`}>
+                                        <CalendarDays className="w-3 h-3" />
+                                        {item.due_date ? format(new Date(item.due_date), "dd 'de' MMM", { locale: ptBR }) : "Data"}
                                       </button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-[#333]">
@@ -570,36 +627,32 @@ export default function CardDetailModal({
                                     </PopoverContent>
                                   </Popover>
 
-                                  {/* Seletor de Usuário */}
+                                  {/* User Avatar */}
                                   <Popover>
                                     <PopoverTrigger asChild>
-                                      <button className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded hover:bg-[#333] transition-colors ${assignedUser ? "text-green-400 bg-green-400/10" : "text-gray-500 bg-[#2a2a2a]"}`}>
+                                      <button className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
                                         {assignedUser ? (
-                                          <>
-                                            <Avatar className="w-4 h-4 border border-green-400/20">
-                                              <AvatarFallback className="text-[8px] bg-green-400 text-black">
-                                                {assignedUser.name?.charAt(0).toUpperCase()}
-                                              </AvatarFallback>
-                                            </Avatar>
-                                            <span className="truncate max-w-[80px]">{assignedUser.name}</span>
-                                          </>
+                                          <Avatar className="w-5 h-5 border border-white/10 shadow-sm">
+                                            <AvatarFallback className="text-[8px] bg-accent text-white font-bold">
+                                              {assignedUser.name?.charAt(0).toUpperCase()}
+                                            </AvatarFallback>
+                                          </Avatar>
                                         ) : (
-                                          <>
-                                            <UserIcon className="w-3.5 h-3.5" />
-                                            Atribuir
-                                          </>
+                                          <div className="w-5 h-5 rounded-full bg-[#2a2a2a] flex items-center justify-center hover:bg-[#333] border border-dashed border-gray-600">
+                                            <UserIcon className="w-3 h-3 text-gray-500" />
+                                          </div>
                                         )}
                                       </button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-64 p-2 bg-[#1a1a1a] border-[#333]">
                                       <div className="space-y-1">
-                                        <p className="text-xs font-semibold text-gray-400 px-2 py-1 uppercase">Atribuir a um usuário</p>
+                                        <p className="text-[10px] font-bold text-gray-500 px-2 py-1 uppercase tracking-wider">Atribuir item</p>
                                         <div className="max-h-48 overflow-y-auto">
                                           <button 
                                             onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: null })}
                                             className="w-full text-left px-2 py-1.5 rounded hover:bg-[#2a2a2a] text-sm text-gray-400"
                                           >
-                                            Remover atribuição
+                                            Ninguém
                                           </button>
                                           {allUsers?.map((u: any) => (
                                             <button 
@@ -612,7 +665,7 @@ export default function CardDetailModal({
                                                   {u.name?.charAt(0).toUpperCase()}
                                                 </AvatarFallback>
                                               </Avatar>
-                                              <span className="truncate">{u.name}</span>
+                                              <span className="truncate">{u.name || u.username}</span>
                                             </button>
                                           ))}
                                         </div>
@@ -627,87 +680,128 @@ export default function CardDetailModal({
                       })}
                     </div>
                   )}
+
+                  <div className="pt-2">
+                    <input
+                      type="text"
+                      value={newChecklistTitle}
+                      onChange={(e) => setNewChecklistTitle(e.target.value)}
+                      placeholder="Adicionar um item..."
+                      className="w-full bg-[#2a2a2a] border-none rounded-lg px-4 py-2.5 text-sm focus:ring-1 focus:ring-accent transition-all placeholder:text-gray-500"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddChecklist();
+                        if (e.key === "Escape") setNewChecklistTitle("");
+                      }}
+                    />
+                  </div>
                 </div>
               </section>
             )}
 
-            {/* Etiquetas */}
-            {showLabels && (
-              <section ref={labelsRef}>
-                <div className="flex items-center gap-2 mb-4">
-                  <Tag className="w-5 h-5 text-gray-400" />
-                  <h3 className="font-semibold text-lg">Etiquetas</h3>
-                </div>
-                <div className="ml-7 flex flex-wrap gap-2">
-                  <div className="flex items-center gap-2 w-full mb-4">
-                    <input
-                      type="text"
-                      value={newLabel}
-                      onChange={(e) => setNewLabel(e.target.value)}
-                      placeholder="Nova etiqueta..."
-                      className="bg-[#2a2a2a] border-none rounded px-3 py-2 text-sm flex-1"
-                      onKeyDown={(e) => e.key === "Enter" && handleAddLabel()}
+            {/* Comments Section */}
+            <section ref={commentsRef} className="pt-4">
+              <div className="flex items-center gap-2 mb-6">
+                <MessageSquare className="w-5 h-5 text-gray-400" />
+                <h3 className="font-semibold text-lg">Comentários</h3>
+              </div>
+              <div className="ml-7 space-y-6">
+                <div className="flex gap-3">
+                  <Avatar className="w-8 h-8 flex-shrink-0 border border-white/10">
+                    <AvatarFallback className="bg-accent text-white text-xs font-bold">
+                      {currentUser?.name?.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-2">
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Escreva um comentário..."
+                      className="w-full bg-[#2a2a2a] border border-[#333] rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-accent min-h-[80px] resize-none transition-all shadow-inner"
                     />
-                    <input
-                      type="color"
-                      value={newLabelColor}
-                      onChange={(e) => setNewLabelColor(e.target.value)}
-                      className="w-8 h-8 rounded bg-transparent border-none cursor-pointer p-0"
-                    />
-                    <Button onClick={handleAddLabel} size="sm" className="bg-[#2a2a2a] hover:bg-[#333] text-white">
-                      <Plus className="w-4 h-4" />
-                    </Button>
+                    <div className="flex justify-end">
+                      <Button 
+                        onClick={handleAddComment} 
+                        size="sm" 
+                        disabled={!newComment.trim() || addCommentMutation.isPending}
+                        className="bg-accent hover:bg-accent/90 text-white gap-2 font-bold px-4"
+                      >
+                        {addCommentMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-3.5 h-3.5" /> Enviar</>}
+                      </Button>
+                    </div>
                   </div>
-                  {labels?.map((label) => (
-                    <div
-                      key={label.id}
-                      className="flex items-center gap-2 px-3 py-1 rounded text-white text-xs font-medium"
-                      style={{ backgroundColor: label.color }}
-                    >
-                      {label.label}
-                      <button onClick={() => handleRemoveLabel(label.id)} className="hover:opacity-80">
-                        <X className="w-3 h-3" />
-                      </button>
+                </div>
+
+                <div className="space-y-4">
+                  {comments?.map((comment: any) => (
+                    <div key={comment.id} className="flex gap-3 group">
+                      <Avatar className="w-8 h-8 flex-shrink-0 border border-white/5">
+                        <AvatarFallback className="bg-[#333] text-gray-400 text-xs">
+                          {comment.user?.name?.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-bold text-white">{comment.user?.name || comment.user?.username}</span>
+                          <span className="text-[10px] text-gray-500">
+                            {format(new Date(comment.created_at), "dd 'de' MMM 'às' HH:mm", { locale: ptBR })}
+                          </span>
+                        </div>
+                        <div className="bg-[#2a2a2a] p-3 rounded-lg rounded-tl-none text-sm text-gray-200 border border-[#333] shadow-sm">
+                          {comment.content}
+                        </div>
+                        {(comment.user_id === currentUser?.id || currentUser?.role === 'admin') && (
+                          <button 
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="text-[10px] text-gray-500 hover:text-red-400 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            Excluir
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
-              </section>
-            )}
+              </div>
+            </section>
+          </div>
 
-            {/* Datas */}
-            {showDates && (
-              <section ref={datesRef}>
-                <div className="flex items-center gap-2 mb-4">
-                  <Calendar className="w-5 h-5 text-gray-400" />
-                  <h3 className="font-semibold text-lg">Datas do Projeto</h3>
+          {/* Sidebar */}
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Ações do Card</h4>
+              <div className="grid grid-cols-1 gap-2">
+                <Button variant="outline" size="sm" className="justify-start bg-[#2a2a2a] border-none hover:bg-[#333] text-white gap-2 h-9 text-xs">
+                  <Paperclip className="w-3.5 h-3.5" /> Anexar arquivo
+                </Button>
+                <Button variant="outline" size="sm" className="justify-start bg-[#2a2a2a] border-none hover:bg-[#333] text-white gap-2 h-9 text-xs">
+                  <Settings2 className="w-3.5 h-3.5" /> Configurações
+                </Button>
+              </div>
+            </div>
+
+            {attachments && attachments.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Anexos</h4>
+                <div className="space-y-2">
+                  {attachments.map((file: any) => (
+                    <a 
+                      key={file.id} 
+                      href={file.file_url} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="flex items-center gap-3 p-2 rounded bg-[#2a2a2a] hover:bg-[#333] transition-colors border border-[#333]"
+                    >
+                      <div className="w-8 h-8 rounded bg-[#1a1a1a] flex items-center justify-center">
+                        <Paperclip className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-bold text-white truncate">{file.filename}</p>
+                        <p className="text-[9px] text-gray-500 uppercase">{(file.file_size / 1024).toFixed(1)} KB</p>
+                      </div>
+                    </a>
+                  ))}
                 </div>
-                <div className="ml-7 grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-2">Início</label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        defaultValue={projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : ""}
-                        onChange={(e) => handleUpdateDates(e.target.value, projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : undefined)}
-                        className="w-full bg-[#2a2a2a] border-none rounded-lg px-4 py-3 text-sm text-white appearance-none"
-                      />
-                      <Calendar className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-2">Término</label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        defaultValue={projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : ""}
-                        onChange={(e) => handleUpdateDates(projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : undefined, e.target.value)}
-                        className="w-full bg-[#2a2a2a] border-none rounded-lg px-4 py-3 text-sm text-white appearance-none"
-                      />
-                      <Calendar className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
-                  </div>
-                </div>
-              </section>
+              </div>
             )}
           </div>
         </div>

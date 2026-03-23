@@ -65,6 +65,23 @@ export function useRealtimeSync(boardId?: number) {
         { event: "*", schema: "public", table: "project_dates" },
         () => utils.cardDetails.getProjectDates.invalidate()
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "card_comments" },
+        () => utils.cardDetails.getComments.invalidate()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "card_attachments" },
+        () => utils.cardDetails.getAttachments.invalidate()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "mirrored_cards" },
+        () => {
+          if (boardId) utils.cardDetails.getMirroredCards.invalidate({ boardId });
+        }
+      )
       .subscribe();
 
     return () => {
