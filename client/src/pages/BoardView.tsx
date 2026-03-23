@@ -40,6 +40,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+interface CardWithUser extends DBCard {
+  assignedToName?: string | null;
+}
+
 export default function BoardView() {
   const [, params] = useRoute("/board/:id");
   const boardId = params?.id ? parseInt(params.id) : null;
@@ -587,7 +591,7 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
                 <div key={i} className="h-20 bg-card/50 rounded animate-pulse" />
               ))}
             </div>
-          ) : cards && (cards as DBCard[]).map((card: DBCard) => (
+          ) : cards && (cards as CardWithUser[]).map((card: CardWithUser) => (
             <DraggableCard
               key={card.id}
               id={card.id}

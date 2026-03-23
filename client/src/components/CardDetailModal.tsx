@@ -296,11 +296,12 @@ export default function CardDetailModal({
   };
 
   const handleCreateMirror = async () => {
-    if (!selectedListId) return;
+    if (!selectedListId || !selectedBoardId) return;
     try {
       await createMirrorMutation.mutateAsync({
         cardId,
         targetListId: parseInt(selectedListId),
+        targetBoardId: parseInt(selectedBoardId),
       });
       setIsMirrorDialogOpen(false);
       toast.success("Cartão espelhado com sucesso");
