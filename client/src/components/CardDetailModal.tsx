@@ -14,7 +14,8 @@ import {
   LayoutGrid, 
   ChevronDown,
   Clock,
-  Settings2
+  Settings2,
+  Copy
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -26,6 +27,13 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface CardDetailModalProps {
   isOpen: boolean;
@@ -62,6 +70,7 @@ export default function CardDetailModal({
   const updateDescriptionMutation = trpc.cardDetails.updateDescription.useMutation();
   const upsertCustomFieldMutation = trpc.cards.upsertCustomField.useMutation();
   const deleteCustomFieldMutation = trpc.cardDetails.deleteCustomField.useMutation();
+  const createMirrorMutation = trpc.cardDetails.createMirror.useMutation();
 
   const [newLabel, setNewLabel] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#4b4897");
@@ -69,6 +78,17 @@ export default function CardDetailModal({
   const [description, setDescription] = useState(cardDescription || "");
   const [isEditingCustomFields, setIsEditingCustomFields] = useState(false);
   
+  // Mirroring states
+  const [isMirrorDialogOpen, setIsMirrorDialogOpen] = useState(false);
+  const [selectedBoardId, setSelectedBoardId] = useState<string>("");
+  const [selectedListId, setSelectedListId] = useState<string>("");
+
+  const { data: userBoards } = trpc.boards.list.useQuery();
+  const { data: targetLists } = trpc.lists.getByBoard.useQuery(
+    { boardId: parseInt(selectedBoardId) },
+    { enabled: !!selectedBoardId }
+  );
+
   // Visibility states for optional sections
   const [showLabels, setShowLabels] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
@@ -101,6 +121,25 @@ export default function CardDetailModal({
   useEffect(() => {
     if (showDates) scrollToSection(datesRef);
   }, [showDates]);
+
+  const handleCreateMirror = async () => {
+    if (!selectedBoardId || !selectedListId) {
+      toast.error("Selecione um quadro e uma lista");
+      return;
+    }
+
+    try {
+      await createMirrorMutation.mutateAsync({
+        cardId,
+        targetBoardId: parseInt(selectedBoardId),
+        targetListId: parseInt(selectedListId)
+      });
+      toast.success("Cartão espelhado com sucesso!");
+      setIsMirrorDialogOpen(false);
+    } catch (error: any) {
+      toast.error("Erro ao espelhar cartão: " + error.message);
+    }
+  };
 
   const handleAddLabel = async () => {
     if (!newLabel.trim()) {
@@ -268,6 +307,14 @@ export default function CardDetailModal({
               onClick={() => setShowChecklist(!showChecklist)}
             >
               <CheckSquare className="w-4 h-4" /> Checklist
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2"
+              onClick={() => setIsMirrorDialogOpen(true)}
+            >
+              <Copy className="w-4 h-4" /> Espelhar
             </Button>
           </div>
 
@@ -536,6 +583,57 @@ export default function CardDetailModal({
             )}
           </div>
         </div>
+
+        {/* Mirror Selection Modal */}
+        <Dialog open={isMirrorDialogOpen} onOpenChange={setIsMirrorDialogOpen}>
+          <DialogContent className="bg-[#1a1a1a] text-white border-[#333]">
+            <DialogHeader>
+              <DialogTitle>Espelhar Cartão</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-400">Quadro de Destino</label>
+                <Select value={selectedBoardId} onValueChange={(val) => {
+                  setSelectedBoardId(val);
+                  setSelectedListId("");
+                }}>
+                  <SelectTrigger className="bg-[#2a2a2a] border-none text-white">
+                    <SelectValue placeholder="Selecione um quadro..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                    {userBoards?.map(board => (
+                      <SelectItem key={board.id} value={board.id.toString()}>{board.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-400">Lista de Destino</label>
+                <Select value={selectedListId} onValueChange={setSelectedListId} disabled={!selectedBoardId}>
+                  <SelectTrigger className="bg-[#2a2a2a] border-none text-white">
+                    <SelectValue placeholder="Selecione uma lista..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                    {targetLists?.map(list => (
+                      <SelectItem key={list.id} value={list.id.toString()}>{list.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setIsMirrorDialogOpen(false)}>Cancelar</Button>
+              <Button 
+                onClick={handleCreateMirror} 
+                className="bg-accent hover:bg-accent/90"
+                disabled={createMirrorMutation.isPending || !selectedListId}
+              >
+                {createMirrorMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Criar Espelho"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );
