@@ -349,6 +349,7 @@ export default function CardDetailModal({
     ? (checklists.filter((i: any) => i.completed).length / checklists.length) * 100 
     : 0;
 
+  return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
         showCloseButton={false}
