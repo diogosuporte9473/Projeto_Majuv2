@@ -563,7 +563,7 @@ export default function CardDetailModal({
                 </div>
                 
                 <div className="ml-7 mb-6">
-                  <Progress value={checklistProgress} className="h-2 bg-[#2a2a2a]" indicatorClassName="bg-accent" />
+                  <Progress value={checklistProgress} className="h-2 bg-[#2a2a2a]" />
                 </div>
 
                 <div className="ml-7 space-y-4">
