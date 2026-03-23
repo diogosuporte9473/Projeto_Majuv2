@@ -845,7 +845,15 @@ export const appRouter = router({
     getComments: protectedProcedure
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {
-        return await getCardComments(input.cardId);
+        try {
+          return await getCardComments(input.cardId);
+        } catch (error: any) {
+          if (error.code === 'PGRST204' || error.code === '42P01') {
+            console.warn("[tRPC] Table card_comments not found, returning empty array");
+            return [];
+          }
+          throw error;
+        }
       }),
     addComment: protectedProcedure
       .input(z.object({ cardId: z.number(), content: z.string() }))
@@ -867,7 +875,8 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         // Apenas o dono do comentário ou admin pode deletar
-        const { data: comment } = await supabase.from("card_comments").select("user_id").eq("id", input.id).single();
+        const { data: comment, error: fetchError } = await supabase.from("card_comments").select("user_id").eq("id", input.id).maybeSingle();
+        if (fetchError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: fetchError.message });
         if (!comment) throw new TRPCError({ code: "NOT_FOUND" });
         if (comment.user_id !== ctx.user.id && ctx.user.role !== 'admin') {
           throw new TRPCError({ code: "FORBIDDEN" });
@@ -882,7 +891,15 @@ export const appRouter = router({
     getAttachments: protectedProcedure
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {
-        return await getCardAttachments(input.cardId);
+        try {
+          return await getCardAttachments(input.cardId);
+        } catch (error: any) {
+          if (error.code === 'PGRST204' || error.code === '42P01') {
+            console.warn("[tRPC] Table card_attachments not found, returning empty array");
+            return [];
+          }
+          throw error;
+        }
       }),
     addAttachment: protectedProcedure
       .input(z.object({ 

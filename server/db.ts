@@ -9,6 +9,7 @@ import {
   lists,
   cards,
   mirroredCards,
+  cardComments,
   cardAttachments,
   notifications,
   userPreferences,
@@ -387,16 +388,15 @@ export async function getCardComments(cardId: number) {
     const { data, error } = await supabase
       .from("card_comments")
       .select("*, user:users(id, name, username)")
-      .eq("card_id", cardId)
-      .order("created_at", { ascending: false });
+      .eq("card_id", cardId);
 
     if (error) throw error;
     return (data || []).map((comment: any) => ({
       ...comment,
       cardId: comment.card_id,
       userId: comment.user_id,
-      createdAt: comment.created_at,
-      updatedAt: comment.updated_at
+      createdAt: comment.created_at || new Date().toISOString(),
+      updatedAt: comment.updated_at || new Date().toISOString()
     }));
   } catch (error) {
     console.error("[Database] getCardComments failed:", error);
@@ -409,8 +409,7 @@ export async function getCardAttachments(cardId: number) {
     const { data, error } = await supabase
       .from("card_attachments")
       .select("*")
-      .eq("card_id", cardId)
-      .order("created_at", { ascending: false });
+      .eq("card_id", cardId);
 
     if (error) throw error;
     return (data || []).map((att: any) => ({
@@ -421,7 +420,7 @@ export async function getCardAttachments(cardId: number) {
       mimeType: att.mime_type,
       fileSize: att.file_size,
       uploadedBy: att.uploaded_by,
-      createdAt: att.created_at
+      createdAt: att.created_at || new Date().toISOString()
     }));
   } catch (error) {
     console.error("[Database] getCardAttachments failed:", error);
