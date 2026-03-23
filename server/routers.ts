@@ -379,6 +379,23 @@ export const appRouter = router({
 
         return { id: data.id };
       }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase.from("lists").delete().eq("id", input.id);
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), name: z.string().min(1).max(255) }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("lists")
+          .update({ name: input.name })
+          .eq("id", input.id);
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
   }),
 
   // Cards routers
@@ -942,8 +959,8 @@ export const appRouter = router({
     upsertProjectDates: protectedProcedure
       .input(z.object({
         cardId: z.number(),
-        startDate: z.date().optional(),
-        endDate: z.date().optional(),
+        startDate: z.date().nullish(),
+        endDate: z.date().nullish(),
       }))
       .mutation(async ({ input }) => {
         const { error } = await supabase
