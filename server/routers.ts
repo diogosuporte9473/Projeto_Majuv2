@@ -755,22 +755,45 @@ export const appRouter = router({
         return await db.select().from(cardLabels).where(eq(cardLabels.cardId, input.cardId));
       }),
     addLabel: protectedProcedure
-      .input(z.object({ cardId: z.number(), label: z.string(), color: z.string().optional() }))
+      .input(z.object({ cardId: z.number(), label: z.string(), color: z.string() }))
       .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        return await db.insert(cardLabels).values({
-          cardId: input.cardId,
-          label: input.label,
-          color: input.color || "#4b4897",
-        });
+        const { data, error } = await supabase
+          .from("card_labels")
+          .insert({
+            cardId: input.cardId,
+            label: input.label,
+            color: input.color,
+          })
+          .select("id")
+          .single();
+
+        if (error) {
+          console.error("[Database] Label creation failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao adicionar etiqueta: ${error.message}`,
+          });
+        }
+
+        return { id: data.id };
       }),
     deleteLabel: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        return await db.delete(cardLabels).where(eq(cardLabels.id, input.id));
+        const { error } = await supabase
+          .from("card_labels")
+          .delete()
+          .eq("id", input.id);
+
+        if (error) {
+          console.error("[Database] Label deletion failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao remover etiqueta: ${error.message}`,
+          });
+        }
+
+        return { success: true };
       }),
 
     getChecklists: protectedProcedure
@@ -787,14 +810,26 @@ export const appRouter = router({
     addChecklist: protectedProcedure
       .input(z.object({ cardId: z.number(), title: z.string(), position: z.number().optional() }))
       .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        return await db.insert(cardChecklists).values({
-          cardId: input.cardId,
-          title: input.title,
-          position: input.position || 0,
-          completed: false,
-        });
+        const { data, error } = await supabase
+          .from("card_checklists")
+          .insert({
+            cardId: input.cardId,
+            title: input.title,
+            position: input.position || 0,
+            completed: false,
+          })
+          .select("id")
+          .single();
+
+        if (error) {
+          console.error("[Database] Checklist creation failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao criar checklist: ${error.message}`,
+          });
+        }
+
+        return { id: data.id };
       }),
 
     getMirroredCards: protectedProcedure
@@ -805,19 +840,38 @@ export const appRouter = router({
     updateChecklist: protectedProcedure
       .input(z.object({ id: z.number(), completed: z.boolean() }))
       .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        return await db
-          .update(cardChecklists)
-          .set({ completed: input.completed })
-          .where(eq(cardChecklists.id, input.id));
+        const { error } = await supabase
+          .from("card_checklists")
+          .update({ completed: input.completed })
+          .eq("id", input.id);
+
+        if (error) {
+          console.error("[Database] Checklist update failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao atualizar checklist: ${error.message}`,
+          });
+        }
+
+        return { success: true };
       }),
     deleteChecklist: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        return await db.delete(cardChecklists).where(eq(cardChecklists.id, input.id));
+        const { error } = await supabase
+          .from("card_checklists")
+          .delete()
+          .eq("id", input.id);
+
+        if (error) {
+          console.error("[Database] Checklist deletion failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao remover checklist: ${error.message}`,
+          });
+        }
+
+        return { success: true };
       }),
 
     getCustomFields: protectedProcedure
@@ -835,21 +889,44 @@ export const appRouter = router({
         fieldType: z.enum(["text", "select", "date", "number"]).optional(),
       }))
       .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        return await db.insert(cardCustomFields).values({
-          cardId: input.cardId,
-          fieldName: input.fieldName,
-          fieldValue: input.fieldValue,
-          fieldType: input.fieldType || "text",
-        });
+        const { data, error } = await supabase
+          .from("card_custom_fields")
+          .insert({
+            cardId: input.cardId,
+            fieldName: input.fieldName,
+            fieldValue: input.fieldValue,
+            fieldType: input.fieldType || "text",
+          })
+          .select("id")
+          .single();
+
+        if (error) {
+          console.error("[Database] Custom field creation failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao criar campo personalizado: ${error.message}`,
+          });
+        }
+
+        return { id: data.id };
       }),
     deleteCustomField: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        return await db.delete(cardCustomFields).where(eq(cardCustomFields.id, input.id));
+        const { error } = await supabase
+          .from("card_custom_fields")
+          .delete()
+          .eq("id", input.id);
+
+        if (error) {
+          console.error("[Database] Custom field deletion failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao remover campo personalizado: ${error.message}`,
+          });
+        }
+
+        return { success: true };
       }),
 
     getProjectDates: protectedProcedure
@@ -867,29 +944,49 @@ export const appRouter = router({
         endDate: z.date().optional(),
       }))
       .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        
-        const existing = await db.select().from(projectDates).where(eq(projectDates.cardId, input.cardId)).limit(1);
-        if (existing.length > 0) {
-          return await db.update(projectDates)
-            .set({ projectStartDate: input.startDate, projectEndDate: input.endDate })
-            .where(eq(projectDates.cardId, input.cardId));
-        } else {
-          return await db.insert(projectDates).values({
+        const { error } = await supabase
+          .from("project_dates")
+          .upsert({
             cardId: input.cardId,
-            projectStartDate: input.startDate,
-            projectEndDate: input.endDate,
+            projectStartDate: input.startDate ? input.startDate.toISOString() : null,
+            projectEndDate: input.endDate ? input.endDate.toISOString() : null,
+          }, { onConflict: 'cardId' });
+
+        if (error) {
+          console.error("[Database] Project dates upsert failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao atualizar datas: ${error.message}`,
           });
         }
+
+        return { success: true };
       }),
     updateDescription: protectedProcedure
       .input(z.object({ cardId: z.number(), description: z.string() }))
       .mutation(async ({ input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        await db.update(cards).set({ description: input.description }).where(eq(cards.id, input.cardId));
-        return { success: true };
+        try {
+          const { error } = await supabase
+            .from("cards")
+            .update({ description: input.description })
+            .eq("id", input.cardId);
+
+          if (error) {
+            console.error("[Database] Description update failed via Supabase:", error);
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Erro ao atualizar descrição: ${error.message}`,
+            });
+          }
+
+          return { success: true };
+        } catch (err: any) {
+          console.error("[Database] Unexpected error during description update:", err);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: err.message || "Erro inesperado ao atualizar descrição",
+          });
+        }
       }),
   }),
 
