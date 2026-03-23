@@ -407,6 +407,18 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         return await getListCards(input.listId);
       }),
+    getArchivedByBoard: protectedProcedure
+      .input(z.object({ boardId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { data, error } = await supabase
+          .from("cards")
+          .select("*, lists!inner(board_id)")
+          .eq("lists.board_id", input.boardId)
+          .eq("archived", true);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return data;
+      }),
     create: protectedProcedure
       .input(
         z.object({
