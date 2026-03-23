@@ -68,6 +68,11 @@ export default function CardDetailModal({
   const [newChecklistTitle, setNewChecklistTitle] = useState("");
   const [description, setDescription] = useState(cardDescription || "");
   const [isEditingCustomFields, setIsEditingCustomFields] = useState(false);
+  
+  // Visibility states for optional sections
+  const [showLabels, setShowLabels] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(false);
+  const [showDates, setShowDates] = useState(false);
 
   // Scroll references
   const descriptionRef = useRef<HTMLDivElement>(null);
@@ -83,6 +88,19 @@ export default function CardDetailModal({
   useEffect(() => {
     setDescription(cardDescription || "");
   }, [cardDescription]);
+
+  // Auto-scroll to sections when they are toggled on
+  useEffect(() => {
+    if (showLabels) scrollToSection(labelsRef);
+  }, [showLabels]);
+
+  useEffect(() => {
+    if (showChecklist) scrollToSection(checklistRef);
+  }, [showChecklist]);
+
+  useEffect(() => {
+    if (showDates) scrollToSection(datesRef);
+  }, [showDates]);
 
   const handleAddLabel = async () => {
     if (!newLabel.trim()) {
@@ -230,24 +248,24 @@ export default function CardDetailModal({
             <Button 
               variant="outline" 
               size="sm" 
-              className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2"
-              onClick={() => scrollToSection(labelsRef)}
+              className={`bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2 ${showLabels ? "ring-1 ring-gray-400" : ""}`}
+              onClick={() => setShowLabels(!showLabels)}
             >
               <Tag className="w-4 h-4" /> Etiquetas
             </Button>
             <Button 
               variant="outline" 
               size="sm" 
-              className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2"
-              onClick={() => scrollToSection(datesRef)}
+              className={`bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2 ${showDates ? "ring-1 ring-gray-400" : ""}`}
+              onClick={() => setShowDates(!showDates)}
             >
               <Clock className="w-4 h-4" /> Datas
             </Button>
             <Button 
               variant="outline" 
               size="sm" 
-              className="bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2"
-              onClick={() => scrollToSection(checklistRef)}
+              className={`bg-[#2a2a2a] border-none hover:bg-[#333] text-white flex items-center gap-2 ${showChecklist ? "ring-1 ring-gray-400" : ""}`}
+              onClick={() => setShowChecklist(!showChecklist)}
             >
               <CheckSquare className="w-4 h-4" /> Checklist
             </Button>
@@ -393,123 +411,129 @@ export default function CardDetailModal({
             </section>
 
             {/* Checklist */}
-            <section ref={checklistRef}>
-              <div className="flex items-center gap-2 mb-4">
-                <CheckSquare className="w-5 h-5 text-gray-400" />
-                <h3 className="font-semibold text-lg">Checklist</h3>
-              </div>
-              <div className="ml-7 space-y-3">
-                <div className="flex gap-2 mb-4">
-                  <input
-                    type="text"
-                    value={newChecklistTitle}
-                    onChange={(e) => setNewChecklistTitle(e.target.value)}
-                    placeholder="Adicionar item..."
-                    className="flex-1 bg-[#2a2a2a] border-none rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-gray-400"
-                    onKeyDown={(e) => e.key === "Enter" && handleAddChecklist()}
-                  />
-                  <Button onClick={handleAddChecklist} size="sm" className="bg-[#2a2a2a] hover:bg-[#333] text-white">
-                    Adicionar
-                  </Button>
+            {showChecklist && (
+              <section ref={checklistRef}>
+                <div className="flex items-center gap-2 mb-4">
+                  <CheckSquare className="w-5 h-5 text-gray-400" />
+                  <h3 className="font-semibold text-lg">Checklist</h3>
                 </div>
-                {checklistsLoading ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : checklists?.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3 group">
+                <div className="ml-7 space-y-3">
+                  <div className="flex gap-2 mb-4">
                     <input
-                      type="checkbox"
-                      checked={item.completed}
-                      onChange={() => handleToggleChecklist(item.id, item.completed)}
-                      className="w-5 h-5 rounded border-gray-600 bg-[#2a2a2a] text-accent focus:ring-offset-0"
+                      type="text"
+                      value={newChecklistTitle}
+                      onChange={(e) => setNewChecklistTitle(e.target.value)}
+                      placeholder="Adicionar item..."
+                      className="flex-1 bg-[#2a2a2a] border-none rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-gray-400"
+                      onKeyDown={(e) => e.key === "Enter" && handleAddChecklist()}
                     />
-                    <span className={`flex-1 ${item.completed ? "line-through text-gray-500" : "text-white"}`}>
-                      {item.title}
-                    </span>
-                    <button
-                      onClick={() => handleRemoveChecklist(item.id)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-opacity"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <Button onClick={handleAddChecklist} size="sm" className="bg-[#2a2a2a] hover:bg-[#333] text-white">
+                      Adicionar
+                    </Button>
                   </div>
-                ))}
-              </div>
-            </section>
+                  {checklistsLoading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : checklists?.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3 group">
+                      <input
+                        type="checkbox"
+                        checked={item.completed}
+                        onChange={() => handleToggleChecklist(item.id, item.completed)}
+                        className="w-5 h-5 rounded border-gray-600 bg-[#2a2a2a] text-accent focus:ring-offset-0"
+                      />
+                      <span className={`flex-1 ${item.completed ? "line-through text-gray-500" : "text-white"}`}>
+                        {item.title}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveChecklist(item.id)}
+                        className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-opacity"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Etiquetas */}
-            <section ref={labelsRef}>
-              <div className="flex items-center gap-2 mb-4">
-                <Tag className="w-5 h-5 text-gray-400" />
-                <h3 className="font-semibold text-lg">Etiquetas</h3>
-              </div>
-              <div className="ml-7 flex flex-wrap gap-2">
-                <div className="flex items-center gap-2 w-full mb-4">
-                  <input
-                    type="text"
-                    value={newLabel}
-                    onChange={(e) => setNewLabel(e.target.value)}
-                    placeholder="Nova etiqueta..."
-                    className="bg-[#2a2a2a] border-none rounded px-3 py-2 text-sm flex-1"
-                    onKeyDown={(e) => e.key === "Enter" && handleAddLabel()}
-                  />
-                  <input
-                    type="color"
-                    value={newLabelColor}
-                    onChange={(e) => setNewLabelColor(e.target.value)}
-                    className="w-8 h-8 rounded bg-transparent border-none cursor-pointer p-0"
-                  />
-                  <Button onClick={handleAddLabel} size="sm" className="bg-[#2a2a2a] hover:bg-[#333] text-white">
-                    <Plus className="w-4 h-4" />
-                  </Button>
+            {showLabels && (
+              <section ref={labelsRef}>
+                <div className="flex items-center gap-2 mb-4">
+                  <Tag className="w-5 h-5 text-gray-400" />
+                  <h3 className="font-semibold text-lg">Etiquetas</h3>
                 </div>
-                {labels?.map((label) => (
-                  <div
-                    key={label.id}
-                    className="flex items-center gap-2 px-3 py-1 rounded text-white text-xs font-medium"
-                    style={{ backgroundColor: label.color }}
-                  >
-                    {label.label}
-                    <button onClick={() => handleRemoveLabel(label.id)} className="hover:opacity-80">
-                      <X className="w-3 h-3" />
-                    </button>
+                <div className="ml-7 flex flex-wrap gap-2">
+                  <div className="flex items-center gap-2 w-full mb-4">
+                    <input
+                      type="text"
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      placeholder="Nova etiqueta..."
+                      className="bg-[#2a2a2a] border-none rounded px-3 py-2 text-sm flex-1"
+                      onKeyDown={(e) => e.key === "Enter" && handleAddLabel()}
+                    />
+                    <input
+                      type="color"
+                      value={newLabelColor}
+                      onChange={(e) => setNewLabelColor(e.target.value)}
+                      className="w-8 h-8 rounded bg-transparent border-none cursor-pointer p-0"
+                    />
+                    <Button onClick={handleAddLabel} size="sm" className="bg-[#2a2a2a] hover:bg-[#333] text-white">
+                      <Plus className="w-4 h-4" />
+                    </Button>
                   </div>
-                ))}
-              </div>
-            </section>
+                  {labels?.map((label) => (
+                    <div
+                      key={label.id}
+                      className="flex items-center gap-2 px-3 py-1 rounded text-white text-xs font-medium"
+                      style={{ backgroundColor: label.color }}
+                    >
+                      {label.label}
+                      <button onClick={() => handleRemoveLabel(label.id)} className="hover:opacity-80">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Datas */}
-            <section ref={datesRef}>
-              <div className="flex items-center gap-2 mb-4">
-                <Calendar className="w-5 h-5 text-gray-400" />
-                <h3 className="font-semibold text-lg">Datas do Projeto</h3>
-              </div>
-              <div className="ml-7 grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-400 mb-2">Início</label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      defaultValue={projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : ""}
-                      onChange={(e) => handleUpdateDates(e.target.value, projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : undefined)}
-                      className="w-full bg-[#2a2a2a] border-none rounded-lg px-4 py-3 text-sm text-white appearance-none"
-                    />
-                    <Calendar className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            {showDates && (
+              <section ref={datesRef}>
+                <div className="flex items-center gap-2 mb-4">
+                  <Calendar className="w-5 h-5 text-gray-400" />
+                  <h3 className="font-semibold text-lg">Datas do Projeto</h3>
+                </div>
+                <div className="ml-7 grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-2">Início</label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        defaultValue={projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : ""}
+                        onChange={(e) => handleUpdateDates(e.target.value, projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : undefined)}
+                        className="w-full bg-[#2a2a2a] border-none rounded-lg px-4 py-3 text-sm text-white appearance-none"
+                      />
+                      <Calendar className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-2">Término</label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        defaultValue={projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : ""}
+                        onChange={(e) => handleUpdateDates(projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : undefined, e.target.value)}
+                        className="w-full bg-[#2a2a2a] border-none rounded-lg px-4 py-3 text-sm text-white appearance-none"
+                      />
+                      <Calendar className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-2">Término</label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      defaultValue={projectDates?.projectEndDate ? new Date(projectDates.projectEndDate).toISOString().split('T')[0] : ""}
-                      onChange={(e) => handleUpdateDates(projectDates?.projectStartDate ? new Date(projectDates.projectStartDate).toISOString().split('T')[0] : undefined, e.target.value)}
-                      className="w-full bg-[#2a2a2a] border-none rounded-lg px-4 py-3 text-sm text-white appearance-none"
-                    />
-                    <Calendar className="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
-                </div>
-              </div>
-            </section>
+              </section>
+            )}
           </div>
         </div>
       </DialogContent>
