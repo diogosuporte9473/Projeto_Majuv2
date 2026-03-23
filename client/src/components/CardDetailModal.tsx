@@ -28,7 +28,9 @@ import {
   MessageSquare,
   Paperclip,
   Send,
-  MoreVertical
+  MoreVertical,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -123,6 +125,7 @@ export default function CardDetailModal({
   const [showLabels, setShowLabels] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
   const [showDates, setShowDates] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   // Scroll references
   const descriptionRef = useRef<HTMLDivElement>(null);
@@ -347,7 +350,7 @@ export default function CardDetailModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-[#1a1a1a] text-white border-[#333] p-0 gap-0">
+      <DialogContent className={`${isMaximized ? "max-w-[98vw] h-[98vh]" : "max-w-3xl max-h-[90vh]"} overflow-y-auto bg-[#1a1a1a] text-white border-[#333] p-0 gap-0 transition-all duration-300`}>
         <DialogHeader className="p-6 pb-2">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
@@ -359,9 +362,25 @@ export default function CardDetailModal({
                 <p className="text-sm text-gray-400">na lista <span className="underline">{listName}</span></p>
               </div>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
-              <X className="w-6 h-6" />
-            </button>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon-sm" 
+                onClick={() => setIsMaximized(!isMaximized)}
+                className="text-gray-400 hover:text-white hover:bg-white/10"
+                title={isMaximized ? "Minimizar" : "Maximizar"}
+              >
+                {isMaximized ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon-sm" 
+                onClick={onClose}
+                className="text-gray-400 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-6 h-6" />
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
@@ -650,11 +669,11 @@ export default function CardDetailModal({
                                   </DropdownMenu>
                                 </div>
 
-                                <div className="flex items-center gap-3 mt-2">
+                                <div className="flex flex-col md:flex-row md:items-center gap-3 mt-2">
                                   {/* Date Badge */}
                                   <Popover>
                                     <PopoverTrigger asChild>
-                                      <button className={`flex items-center gap-1.5 text-[10px] uppercase font-bold px-2 py-0.5 rounded transition-colors ${
+                                      <button className={`flex items-center gap-1.5 text-[10px] uppercase font-bold px-2 py-0.5 rounded transition-colors w-fit ${
                                         item.completed ? "bg-green-500/10 text-green-500" : 
                                         isOverdue ? "bg-red-500/10 text-red-500" : 
                                         item.due_date ? "bg-amber-500/10 text-amber-500" : "bg-[#2a2a2a] text-gray-500 hover:bg-[#333]"
@@ -675,16 +694,22 @@ export default function CardDetailModal({
                                   {/* User Avatar */}
                                   <Popover>
                                     <PopoverTrigger asChild>
-                                      <button className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                                      <button className="flex items-center gap-1.5 hover:opacity-80 transition-opacity w-fit">
                                         {assignedUser ? (
-                                          <Avatar className="w-5 h-5 border border-white/10 shadow-sm">
-                                            <AvatarFallback className="text-[8px] bg-accent text-white font-bold">
-                                              {assignedUser.name?.charAt(0).toUpperCase()}
-                                            </AvatarFallback>
-                                          </Avatar>
+                                          <div className="flex items-center gap-2">
+                                            <Avatar className="w-5 h-5 border border-white/10 shadow-sm">
+                                              <AvatarFallback className="text-[8px] bg-accent text-white font-bold">
+                                                {assignedUser.name?.charAt(0).toUpperCase()}
+                                              </AvatarFallback>
+                                            </Avatar>
+                                            <span className="text-[10px] text-gray-400 md:hidden">{assignedUser.name}</span>
+                                          </div>
                                         ) : (
-                                          <div className="w-5 h-5 rounded-full bg-[#2a2a2a] flex items-center justify-center hover:bg-[#333] border border-dashed border-gray-600">
-                                            <UserIcon className="w-3 h-3 text-gray-500" />
+                                          <div className="flex items-center gap-2">
+                                            <div className="w-5 h-5 rounded-full bg-[#2a2a2a] flex items-center justify-center hover:bg-[#333] border border-dashed border-gray-600">
+                                              <UserIcon className="w-3 h-3 text-gray-500" />
+                                            </div>
+                                            <span className="text-[10px] text-gray-500 md:hidden">Atribuir</span>
                                           </div>
                                         )}
                                       </button>
