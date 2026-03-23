@@ -78,7 +78,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
         updateSet.password = value;
       } else {
         const normalized = value ?? null;
-        values[field] = normalized;
+        (values as any)[field] = normalized;
         updateSet[field] = normalized;
       }
     };
@@ -115,8 +115,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
 export async function getUserByUsername(username: string) {
   try {
-    // MÉTODO SIMPLES: Usar a API REST do Supabase em vez de conexão direta Postgres
-    // Isso evita o erro "Tenant or user not found" definitivamente
     const { data, error } = await supabase
       .from("users")
       .select("*")
@@ -141,7 +139,6 @@ export async function getUserByUsername(username: string) {
 
 export async function getUserById(id: number) {
   try {
-    // MÉTODO SIMPLES: Usar a API REST do Supabase para evitar erro de conexão TCP
     const { data, error } = await supabase
       .from("users")
       .select("*")
@@ -167,7 +164,6 @@ export async function getUserById(id: number) {
 // Board queries
 export async function getUserBoards(userId: number) {
   try {
-    // 1. Verificar se o usuário é ADMIN
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("role")
@@ -179,7 +175,6 @@ export async function getUserBoards(userId: number) {
       return [];
     }
 
-    // Se for ADMIN, retorna TODOS os boards
     if (user?.role === "admin") {
       const { data, error } = await supabase
         .from("boards")
@@ -192,8 +187,6 @@ export async function getUserBoards(userId: number) {
       return (data as any[]) || [];
     }
 
-    // Se for USER comum, aplica a lógica de ownerId ou board_members
-    // 1. Buscar IDs dos boards onde o usuário é membro
     const { data: memberships } = await supabase
       .from("board_members")
       .select("boardId")
@@ -201,7 +194,6 @@ export async function getUserBoards(userId: number) {
 
     const boardIds = memberships?.map(m => m.boardId) || [];
 
-    // 2. Buscar boards onde o usuário é dono OU é membro
     let query = supabase.from("boards").select("*");
     
     if (boardIds.length > 0) {
@@ -226,7 +218,6 @@ export async function getUserBoards(userId: number) {
 
 export async function getBoardById(boardId: number, userId: number) {
   try {
-    // 1. Verificar se o usuário é ADMIN
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("role")
@@ -238,7 +229,6 @@ export async function getBoardById(boardId: number, userId: number) {
       return null;
     }
 
-    // MÉTODO SIMPLES: Usar API REST para evitar erro de conexão TCP
     const { data: board, error: boardError } = await supabase
       .from("boards")
       .select("*")
@@ -323,7 +313,6 @@ export async function getListCards(listId: number) {
         .orderBy(cards.position);
     }
 
-    // Adaptar formato para o que o frontend espera (assignedToName)
     return (data as any[]).map(card => ({
       ...card,
       assignedToName: card.assignedToUser?.name || null
@@ -343,13 +332,14 @@ export async function getCardById(cardId: number) {
       .maybeSingle();
 
     if (error) {
-      console.error("[Database] Error fetching card via REST:", error);
+      console.error("[Database] Error fetching card by ID via REST:", error);
       const db = await getDb();
       if (!db) return null;
-      const result = await db.select().from(cards).where(eq(cards.id, cardId)).limit(1);
-      return result.length > 0 ? result[0] : null;
+      const results = await db.select().from(cards).where(eq(cards.id, cardId)).limit(1);
+      return results[0] || null;
     }
-    return data || null;
+
+    return (data as any) || null;
   } catch (error) {
     console.error("[Database] getCardById failed:", error);
     return null;
@@ -362,16 +352,18 @@ export async function getCardLabels(cardId: number) {
     const { data, error } = await supabase
       .from("card_labels")
       .select("*")
-      .eq("cardId", cardId);
+      .eq("card_id", cardId);
 
     if (error) {
-      console.error("[Database] Error fetching labels via REST:", error);
+      console.error("[Database] Error fetching card labels via REST:", error);
       const db = await getDb();
       if (!db) return [];
       return await db.select().from(cardLabels).where(eq(cardLabels.cardId, cardId));
     }
-    return data || [];
+
+    return (data as any[]) || [];
   } catch (error) {
+    console.error("[Database] getCardLabels failed:", error);
     return [];
   }
 }
@@ -382,17 +374,19 @@ export async function getCardChecklists(cardId: number) {
     const { data, error } = await supabase
       .from("card_checklists")
       .select("*")
-      .eq("cardId", cardId)
+      .eq("card_id", cardId)
       .order("position");
 
     if (error) {
-      console.error("[Database] Error fetching checklists via REST:", error);
+      console.error("[Database] Error fetching card checklists via REST:", error);
       const db = await getDb();
       if (!db) return [];
       return await db.select().from(cardChecklists).where(eq(cardChecklists.cardId, cardId)).orderBy(cardChecklists.position);
     }
-    return data || [];
+
+    return (data as any[]) || [];
   } catch (error) {
+    console.error("[Database] getCardChecklists failed:", error);
     return [];
   }
 }
@@ -403,16 +397,18 @@ export async function getCardCustomFields(cardId: number) {
     const { data, error } = await supabase
       .from("card_custom_fields")
       .select("*")
-      .eq("cardId", cardId);
+      .eq("card_id", cardId);
 
     if (error) {
-      console.error("[Database] Error fetching custom fields via REST:", error);
+      console.error("[Database] Error fetching card custom fields via REST:", error);
       const db = await getDb();
       if (!db) return [];
       return await db.select().from(cardCustomFields).where(eq(cardCustomFields.cardId, cardId));
     }
-    return data || [];
+
+    return (data as any[]) || [];
   } catch (error) {
+    console.error("[Database] getCardCustomFields failed:", error);
     return [];
   }
 }
@@ -452,23 +448,23 @@ export async function getBoardMembers(boardId: number) {
 }
 
 // Mirrored cards queries
-export async function getMirroredCards(cardId: number) {
+export async function getMirroredCards(boardId: number) {
   try {
     const { data, error } = await supabase
       .from("mirrored_cards")
       .select("*")
-      .or(`originalCardId.eq.${cardId},mirrorCardId.eq.${cardId}`);
+      .or(`original_board_id.eq.${boardId},mirror_board_id.eq.${boardId}`);
 
     if (error) {
+      console.error("[Database] Error fetching mirrored cards via REST:", error);
       const db = await getDb();
       if (!db) return [];
-      return await db
-        .select()
-        .from(mirroredCards)
-        .where(or(eq(mirroredCards.originalCardId, cardId), eq(mirroredCards.mirrorCardId, cardId)));
+      return await db.select().from(mirroredCards).where(or(eq(mirroredCards.originalBoardId, boardId), eq(mirroredCards.mirrorBoardId, boardId)));
     }
-    return data || [];
+
+    return (data as any[]) || [];
   } catch (error) {
+    console.error("[Database] getMirroredCards failed:", error);
     return [];
   }
 }

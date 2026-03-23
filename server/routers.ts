@@ -746,6 +746,32 @@ export const appRouter = router({
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         return await db.insert(notes).values({ title: input.title });
       }),
+    updateDescription: protectedProcedure
+      .input(z.object({ cardId: z.number(), description: z.string() }))
+      .mutation(async ({ input }) => {
+        try {
+          const { error } = await supabase
+            .from("cards")
+            .update({ description: input.description })
+            .eq("id", input.cardId);
+
+          if (error) {
+            console.error("[Database] Description update failed via Supabase:", error);
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Erro ao atualizar descrição: ${error.message}`,
+            });
+          }
+
+          return { success: true };
+        } catch (err: any) {
+          console.error("[Database] Unexpected error during description update:", err);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: err.message || "Erro inesperado ao atualizar descrição",
+          });
+        }
+      }),
   }),
 
   // Labels, Checklists, Custom Fields and Project Dates
@@ -753,9 +779,7 @@ export const appRouter = router({
     getLabels: protectedProcedure
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return [];
-        return await db.select().from(cardLabels).where(eq(cardLabels.cardId, input.cardId));
+        return await getCardLabels(input.cardId);
       }),
     addLabel: protectedProcedure
       .input(z.object({ cardId: z.number(), label: z.string(), color: z.string() }))
@@ -763,7 +787,7 @@ export const appRouter = router({
         const { data, error } = await supabase
           .from("card_labels")
           .insert({
-            cardId: input.cardId,
+            card_id: input.cardId,
             label: input.label,
             color: input.color,
           })
@@ -802,13 +826,7 @@ export const appRouter = router({
     getChecklists: protectedProcedure
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return [];
-        return await db
-          .select()
-          .from(cardChecklists)
-          .where(eq(cardChecklists.cardId, input.cardId))
-          .orderBy(cardChecklists.position);
+        return await getCardChecklists(input.cardId);
       }),
     addChecklist: protectedProcedure
       .input(z.object({ cardId: z.number(), title: z.string(), position: z.number().optional() }))
@@ -816,7 +834,7 @@ export const appRouter = router({
         const { data, error } = await supabase
           .from("card_checklists")
           .insert({
-            cardId: input.cardId,
+            card_id: input.cardId,
             title: input.title,
             position: input.position || 0,
             completed: false,
@@ -834,14 +852,151 @@ export const appRouter = router({
 
         return { id: data.id };
       }),
+    updateChecklist: protectedProcedure
+      .input(z.object({ 
+        id: z.number(), 
+        completed: z.boolean().optional(),
+        title: z.string().optional(),
+        dueDate: z.date().nullish(),
+        assignedUserId: z.number().nullish()
+      }))
+      .mutation(async ({ input }) => {
+        const updateData: any = {};
+        if (input.completed !== undefined) updateData.completed = input.completed;
+        if (input.title !== undefined) updateData.title = input.title;
+        if (input.dueDate !== undefined) updateData.dueDate = input.dueDate ? input.dueDate.toISOString() : null;
+        if (input.assignedUserId !== undefined) updateData.assigned_user_id = input.assignedUserId;
+
+        const { error } = await supabase
+          .from("card_checklists")
+          .update(updateData)
+          .eq("id", input.id);
+
+        if (error) {
+          console.error("[Database] Checklist update failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao atualizar checklist: ${error.message}`,
+          });
+        }
+
+        return { success: true };
+      }),
+    deleteChecklist: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("card_checklists")
+          .delete()
+          .eq("id", input.id);
+
+        if (error) {
+          console.error("[Database] Checklist deletion failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao remover checklist: ${error.message}`,
+          });
+        }
+
+        return { success: true };
+      }),
+
+    getCustomFields: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        return await getCardCustomFields(input.cardId);
+      }),
+    addCustomField: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        fieldName: z.string(),
+        fieldValue: z.string(),
+        fieldType: z.enum(["text", "select", "date", "number"]).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { data, error } = await supabase
+          .from("card_custom_fields")
+          .insert({
+            card_id: input.cardId,
+            field_name: input.fieldName,
+            field_value: input.fieldValue,
+            field_type: input.fieldType || "text",
+          })
+          .select("id")
+          .single();
+
+        if (error) {
+          console.error("[Database] Custom field creation failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao criar campo personalizado: ${error.message}`,
+          });
+        }
+
+        return { id: data.id };
+      }),
+    deleteCustomField: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("card_custom_fields")
+          .delete()
+          .eq("id", input.id);
+
+        if (error) {
+          console.error("[Database] Custom field deletion failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao remover campo personalizado: ${error.message}`,
+          });
+        }
+
+        return { success: true };
+      }),
+
+    getProjectDates: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        const { data, error } = await supabase
+          .from("project_dates")
+          .select("*")
+          .eq("card_id", input.cardId)
+          .maybeSingle();
+        return data || null;
+      }),
+    upsertProjectDates: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("project_dates")
+          .upsert({
+            card_id: input.cardId,
+            project_start_date: input.startDate ? input.startDate.toISOString() : null,
+            project_end_date: input.endDate ? input.endDate.toISOString() : null,
+          }, { onConflict: 'card_id' });
+
+        if (error) {
+          console.error("[Database] Project dates upsert failed via Supabase:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao atualizar datas: ${error.message}`,
+          });
+        }
+
+        return { success: true };
+      }),
 
     getMirroredCards: protectedProcedure
       .input(z.object({ boardId: z.number() }))
       .query(async ({ input }) => {
         const { data, error } = await supabase
-          .from("mirroredCards")
+          .from("mirrored_cards")
           .select("*")
-          .or(`originalBoardId.eq.${input.boardId},mirrorBoardId.eq.${input.boardId}`);
+          .or(`original_board_id.eq.${input.boardId},mirror_board_id.eq.${input.boardId}`);
         
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
         return data || [];
@@ -892,15 +1047,15 @@ export const appRouter = router({
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao criar espelho: ${mirrorError.message}` });
         }
 
-        // 4. Create link in mirroredCards table
+        // 4. Create link in mirrored_cards table
         const { error: linkError } = await supabase
-          .from("mirroredCards")
+          .from("mirrored_cards")
           .insert({
-            originalCardId: input.cardId,
-            mirrorCardId: mirrorCard.id,
-            originalBoardId: originalList.boardId,
-            mirrorBoardId: input.targetBoardId,
-            syncStatus: 'synced'
+            original_card_id: input.cardId,
+            mirror_card_id: mirrorCard.id,
+            original_board_id: originalList.boardId,
+            mirror_board_id: input.targetBoardId,
+            sync_status: 'synced'
           });
 
         if (linkError) {
@@ -908,157 +1063,6 @@ export const appRouter = router({
         }
 
         return { success: true, mirrorId: mirrorCard.id };
-      }),
-    updateChecklist: protectedProcedure
-      .input(z.object({ id: z.number(), completed: z.boolean() }))
-      .mutation(async ({ input }) => {
-        const { error } = await supabase
-          .from("card_checklists")
-          .update({ completed: input.completed })
-          .eq("id", input.id);
-
-        if (error) {
-          console.error("[Database] Checklist update failed via Supabase:", error);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `Erro ao atualizar checklist: ${error.message}`,
-          });
-        }
-
-        return { success: true };
-      }),
-    deleteChecklist: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        const { error } = await supabase
-          .from("card_checklists")
-          .delete()
-          .eq("id", input.id);
-
-        if (error) {
-          console.error("[Database] Checklist deletion failed via Supabase:", error);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `Erro ao remover checklist: ${error.message}`,
-          });
-        }
-
-        return { success: true };
-      }),
-
-    getCustomFields: protectedProcedure
-      .input(z.object({ cardId: z.number() }))
-      .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return [];
-        return await db.select().from(cardCustomFields).where(eq(cardCustomFields.cardId, input.cardId));
-      }),
-    addCustomField: protectedProcedure
-      .input(z.object({
-        cardId: z.number(),
-        fieldName: z.string(),
-        fieldValue: z.string(),
-        fieldType: z.enum(["text", "select", "date", "number"]).optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const { data, error } = await supabase
-          .from("card_custom_fields")
-          .insert({
-            cardId: input.cardId,
-            fieldName: input.fieldName,
-            fieldValue: input.fieldValue,
-            fieldType: input.fieldType || "text",
-          })
-          .select("id")
-          .single();
-
-        if (error) {
-          console.error("[Database] Custom field creation failed via Supabase:", error);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `Erro ao criar campo personalizado: ${error.message}`,
-          });
-        }
-
-        return { id: data.id };
-      }),
-    deleteCustomField: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        const { error } = await supabase
-          .from("card_custom_fields")
-          .delete()
-          .eq("id", input.id);
-
-        if (error) {
-          console.error("[Database] Custom field deletion failed via Supabase:", error);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `Erro ao remover campo personalizado: ${error.message}`,
-          });
-        }
-
-        return { success: true };
-      }),
-
-    getProjectDates: protectedProcedure
-      .input(z.object({ cardId: z.number() }))
-      .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return null;
-        const result = await db.select().from(projectDates).where(eq(projectDates.cardId, input.cardId)).limit(1);
-        return result.length > 0 ? result[0] : null;
-      }),
-    upsertProjectDates: protectedProcedure
-      .input(z.object({
-        cardId: z.number(),
-        startDate: z.date().optional(),
-        endDate: z.date().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const { error } = await supabase
-          .from("project_dates")
-          .upsert({
-            cardId: input.cardId,
-            projectStartDate: input.startDate ? input.startDate.toISOString() : null,
-            projectEndDate: input.endDate ? input.endDate.toISOString() : null,
-          }, { onConflict: 'cardId' });
-
-        if (error) {
-          console.error("[Database] Project dates upsert failed via Supabase:", error);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `Erro ao atualizar datas: ${error.message}`,
-          });
-        }
-
-        return { success: true };
-      }),
-    updateDescription: protectedProcedure
-      .input(z.object({ cardId: z.number(), description: z.string() }))
-      .mutation(async ({ input }) => {
-        try {
-          const { error } = await supabase
-            .from("cards")
-            .update({ description: input.description })
-            .eq("id", input.cardId);
-
-          if (error) {
-            console.error("[Database] Description update failed via Supabase:", error);
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: `Erro ao atualizar descrição: ${error.message}`,
-            });
-          }
-
-          return { success: true };
-        } catch (err: any) {
-          console.error("[Database] Unexpected error during description update:", err);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: err.message || "Erro inesperado ao atualizar descrição",
-          });
-        }
       }),
   }),
 
