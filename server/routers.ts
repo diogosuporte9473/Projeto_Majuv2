@@ -838,7 +838,76 @@ export const appRouter = router({
     getMirroredCards: protectedProcedure
       .input(z.object({ boardId: z.number() }))
       .query(async ({ input }) => {
-        return await getMirroredCards(input.boardId);
+        const { data, error } = await supabase
+          .from("mirroredCards")
+          .select("*")
+          .or(`originalBoardId.eq.${input.boardId},mirrorBoardId.eq.${input.boardId}`);
+        
+        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        return data || [];
+      }),
+    createMirror: protectedProcedure
+      .input(z.object({ 
+        cardId: z.number(), 
+        targetListId: z.number(),
+        targetBoardId: z.number()
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // 1. Get original card data
+        const { data: originalCard, error: cardError } = await supabase
+          .from("cards")
+          .select("*")
+          .eq("id", input.cardId)
+          .single();
+
+        if (cardError || !originalCard) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Cartão original não encontrado" });
+        }
+
+        // 2. Get original list to find its boardId
+        const { data: originalList, error: listError } = await supabase
+          .from("lists")
+          .select("boardId")
+          .eq("id", originalCard.listId)
+          .single();
+
+        if (listError || !originalList) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Lista original não encontrada" });
+        }
+
+        // 3. Create new card in target list
+        const { data: mirrorCard, error: mirrorError } = await supabase
+          .from("cards")
+          .insert({
+            title: `[ESPELHO] ${originalCard.title}`,
+            description: originalCard.description,
+            listId: input.targetListId,
+            position: 0,
+            createdBy: ctx.user.id
+          })
+          .select("id")
+          .single();
+
+        if (mirrorError) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao criar espelho: ${mirrorError.message}` });
+        }
+
+        // 4. Create link in mirroredCards table
+        const { error: linkError } = await supabase
+          .from("mirroredCards")
+          .insert({
+            originalCardId: input.cardId,
+            mirrorCardId: mirrorCard.id,
+            originalBoardId: originalList.boardId,
+            mirrorBoardId: input.targetBoardId,
+            syncStatus: 'synced'
+          });
+
+        if (linkError) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao vincular espelhos: ${linkError.message}` });
+        }
+
+        return { success: true, mirrorId: mirrorCard.id };
       }),
     updateChecklist: protectedProcedure
       .input(z.object({ id: z.number(), completed: z.boolean() }))
