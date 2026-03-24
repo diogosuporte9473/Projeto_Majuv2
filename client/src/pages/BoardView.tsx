@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Loader2, MessageSquare, X, UserPlus, Users, Shield, Trash2, MoreHorizontal, Edit2, Archive } from "lucide-react";
+import { Plus, Loader2, MessageSquare, X, UserPlus, Users, Shield, Trash2, MoreHorizontal, Edit2, Archive, Settings2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import {
   DndContext,
@@ -32,7 +32,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,6 +70,7 @@ export default function BoardView() {
   const [showAIChat, setShowAIChat] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showArchivedModal, setShowArchivedModal] = useState(false);
+  const [showMirrorSettings, setShowMirrorSettings] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { role: "system", content: "You are a helpful assistant for the Maju Task Manager. You can help users organize their tasks, suggest project steps, and answer questions about their boards." }
   ]);
@@ -257,6 +260,17 @@ export default function BoardView() {
             </Button>
             {user?.role === 'admin' && (
               <Button 
+                onClick={() => setShowMirrorSettings(true)} 
+                variant="ghost" 
+                size="icon" 
+                className="text-muted-foreground hover:text-accent" 
+                title="Configurações de Espelhamento"
+              >
+                <Settings2 className="w-4 h-4" />
+              </Button>
+            )}
+            {user?.role === 'admin' && (
+              <Button 
                 onClick={handleDeleteBoard} 
                 variant="ghost" 
                 size="icon" 
@@ -351,6 +365,15 @@ export default function BoardView() {
           />
         )}
 
+        {/* Mirror Settings Modal */}
+        {boardId && (
+          <MirrorSettingsModal
+            isOpen={showMirrorSettings}
+            onClose={() => setShowMirrorSettings(false)}
+            boardId={boardId}
+          />
+        )}
+
         {/* Archived Cards Modal */}
         {boardId && (
           <ArchivedCardsModal
@@ -400,7 +423,87 @@ export default function BoardView() {
   );
 }
 
-function ShareBoardModal({ isOpen, onClose, boardId }: { isOpen: boolean, onClose: () => void, boardId: number }) {
+function MirrorSettingsModal({ isOpen, onClose, boardId }: { isOpen: boolean; onClose: () => void; boardId: number }) {
+  const utils = trpc.useUtils();
+  const { data: settings, isLoading } = trpc.boards.getMirrorSettings.useQuery({ boardId });
+  const updateSettingsMutation = trpc.boards.updateMirrorSettings.useMutation();
+
+  const handleToggle = async (key: string, value: boolean) => {
+    if (!settings) return;
+    
+    const newSettings = {
+      mirror_labels: settings.mirror_labels,
+      mirror_checklists: settings.mirror_checklists,
+      mirror_comments: settings.mirror_comments,
+      mirror_attachments: settings.mirror_attachments,
+      mirror_custom_fields: settings.mirror_custom_fields,
+      mirror_dates: settings.mirror_dates,
+      mirror_description: settings.mirror_description,
+      [key]: value
+    };
+
+    try {
+      await updateSettingsMutation.mutateAsync({
+        boardId,
+        settings: newSettings
+      });
+      utils.boards.getMirrorSettings.invalidate({ boardId });
+      toast.success("Configuração atualizada");
+    } catch (error) {
+      toast.error("Erro ao atualizar configuração");
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="bg-[#1a1a1a] text-white border-[#333] max-w-md" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            <Settings2 className="w-5 h-5 text-accent" />
+            Configurações de Espelhamento
+          </DialogTitle>
+          <DialogDescription className="text-gray-400 text-sm">
+            Defina quais atributos serão sincronizados quando um cartão deste quadro for espelhado.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-accent" />
+          </div>
+        ) : (
+          <div className="space-y-6 py-4">
+            <div className="space-y-4">
+              {[
+                { key: 'mirror_description', label: 'Descrição', icon: AlignLeft },
+                { key: 'mirror_labels', label: 'Etiquetas', icon: Tag },
+                { key: 'mirror_checklists', label: 'Checklists', icon: CheckSquare },
+                { key: 'mirror_dates', label: 'Datas (Início/Entrega)', icon: Clock },
+                { key: 'mirror_custom_fields', label: 'Campos Personalizados', icon: LayoutGrid },
+                { key: 'mirror_comments', label: 'Comentários', icon: MessageSquare },
+                { key: 'mirror_attachments', label: 'Anexos', icon: Paperclip },
+              ].map((item) => (
+                <div key={item.key} className="flex items-center justify-between p-3 rounded-lg bg-[#222] border border-[#333] hover:border-accent/30 transition-all">
+                  <div className="flex items-center gap-3">
+                    <item.icon className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm font-medium text-gray-200">{item.label}</span>
+                  </div>
+                  <Switch 
+                    checked={(settings as any)?.[item.key]} 
+                    onCheckedChange={(val) => handleToggle(item.key, val)}
+                    className="data-[state=checked]:bg-accent"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ShareModal({ isOpen, onClose, boardId }: { isOpen: boolean; onClose: () => void; boardId: number }) {
   const utils = trpc.useUtils();
   const { data: members } = trpc.boards.getMembers.useQuery({ boardId });
   const { data: allUsers } = trpc.admin.users.list.useQuery();
