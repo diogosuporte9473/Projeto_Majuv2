@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Loader2, MessageSquare, X, UserPlus, Users, Shield, Trash2, MoreHorizontal, Edit2, Archive, Settings2 } from "lucide-react";
+import { Plus, Loader2, MessageSquare, X, UserPlus, Users, Shield, Trash2, MoreHorizontal, Edit2, Archive, Settings2, AlignLeft, Tag, CheckSquare, Clock, LayoutGrid, Paperclip } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import {
   DndContext,
@@ -358,7 +358,7 @@ export default function BoardView() {
 
         {/* Share Modal */}
         {boardId && (
-          <ShareBoardModal 
+          <ShareModal 
             isOpen={showShareModal} 
             onClose={() => setShowShareModal(false)} 
             boardId={boardId} 
