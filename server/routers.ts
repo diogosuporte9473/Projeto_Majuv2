@@ -234,7 +234,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         // MÉTODO DIRETO REST: Evita o erro de conexão do Drizzle/Postgres
-        const { data, error } = await supabase
+        const { data: board, error: boardError } = await supabase
           .from("boards")
           .insert({
             name: input.name,
@@ -245,15 +245,30 @@ export const appRouter = router({
           .select("id")
           .single();
 
-        if (error) {
-          console.error("[Database] Board creation failed via REST:", error);
+        if (boardError) {
+          console.error("[Database] Board creation failed via REST:", boardError);
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: `Erro ao criar quadro: ${error.message}`,
+            message: `Erro ao criar quadro: ${boardError.message}`,
           });
         }
 
-        return { id: data.id };
+        // Criar lista "Caixa de Entrada" automaticamente
+        const { error: listError } = await supabase
+          .from("lists")
+          .insert({
+            board_id: board.id,
+            name: "Caixa de Entrada",
+            position: 0,
+          });
+
+        if (listError) {
+          console.error("[Database] Inbox list creation failed:", listError);
+          // Não lançamos erro aqui para não invalidar a criação do board, 
+          // mas logamos para depuração.
+        }
+
+        return { id: board.id };
       }),
     update: protectedProcedure
       .input(
@@ -268,9 +283,8 @@ export const appRouter = router({
         const board = await getBoardById(input.id, ctx.user.id);
         if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found" });
 
-        if (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin') {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only board owner or admin can update" });
-        }
+        // Permitir que qualquer usuário altere o nome (removido check de owner)
+        // No entanto, ainda verificamos se o usuário tem acesso ao board através do getBoardById
 
         const updateData: any = {};
         if (input.name) updateData.name = input.name;
@@ -288,8 +302,9 @@ export const appRouter = router({
         const board = await getBoardById(input.id, ctx.user.id);
         if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found" });
 
-        if (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin') {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Only board owner or admin can delete" });
+        // Apenas ADM pode excluir boards
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem excluir quadros" });
         }
 
         const { error } = await supabase.from("boards").delete().eq("id", input.id);
