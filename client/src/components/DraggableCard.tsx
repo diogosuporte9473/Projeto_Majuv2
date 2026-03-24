@@ -2,6 +2,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
+import { Clock } from "lucide-react";
 import CardDetailModal from "./CardDetailModal";
 
 interface DraggableCardProps {
