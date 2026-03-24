@@ -72,6 +72,7 @@ export const cards = pgTable("cards", {
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   position: integer("position").notNull().default(0),
+  startDate: timestamp("start_date", { withTimezone: true }),
   dueDate: timestamp("due_date", { withTimezone: true }),
   assignedTo: integer("assigned_to"),
   createdBy: integer("created_by").notNull(),

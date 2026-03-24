@@ -711,6 +711,18 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    updateStartDate: protectedProcedure
+      .input(z.object({ cardId: z.number(), startDate: z.date().nullish() }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("cards")
+          .update({ start_date: input.startDate ? input.startDate.toISOString() : null })
+          .eq("id", input.cardId);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
+
     updateAssignedTo: protectedProcedure
       .input(z.object({ cardId: z.number(), userId: z.number().nullish() }))
       .mutation(async ({ input }) => {
