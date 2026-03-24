@@ -68,7 +68,7 @@ export default function CardDetailModal({
   const updateDueDateMutation = trpc.cardDetails.updateDueDate.useMutation();
   const updateStartDateMutation = trpc.cardDetails.updateStartDate.useMutation();
   const updateAssignedToMutation = trpc.cardDetails.updateAssignedTo.useMutation();
-  const upsertCustomFieldMutation = trpc.cards.upsertCustomField.useMutation();
+  const upsertCustomFieldMutation = trpc.cardDetails.upsertCustomField.useMutation();
   const createMirrorMutation = trpc.cardDetails.createMirror.useMutation();
   const archiveCardMutation = trpc.cardDetails.archiveCard.useMutation();
   const deleteCardMutation = trpc.cards.delete.useMutation();
