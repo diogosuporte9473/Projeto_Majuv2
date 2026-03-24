@@ -1294,6 +1294,87 @@ export const appRouter = router({
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao vincular espelhos: ${linkError.message}` });
         }
 
+        // --- NOVO: Sincronização Inicial de Atributos ---
+        const { data: settings } = await supabase
+          .from("board_mirror_settings")
+          .select("*")
+          .eq("board_id", input.targetBoardId)
+          .maybeSingle();
+
+        const mirrorSettings = settings || {
+          mirror_labels: true,
+          mirror_checklists: true,
+          mirror_custom_fields: true,
+          mirror_dates: true,
+          mirror_description: true,
+        };
+
+        // 1. Sincronizar Etiquetas
+        if (mirrorSettings.mirror_labels) {
+          const { data: labels } = await supabase.from("card_labels").select("*").eq("card_id", input.cardId);
+          if (labels && labels.length > 0) {
+            await supabase.from("card_labels").insert(
+              labels.map(l => ({ card_id: mirrorCard.id, label: l.label, color: l.color }))
+            );
+          }
+        }
+
+        // 2. Sincronizar Checklists
+        if (mirrorSettings.mirror_checklists) {
+          const { data: groups } = await supabase.from("card_checklist_groups").select("*").eq("card_id", input.cardId);
+          if (groups) {
+            for (const group of groups) {
+              const { data: newGroup } = await supabase
+                .from("card_checklist_groups")
+                .insert({ card_id: mirrorCard.id, title: group.title, position: group.position })
+                .select("id")
+                .single();
+
+              if (newGroup) {
+                const { data: items } = await supabase.from("card_checklists").select("*").eq("group_id", group.id);
+                if (items && items.length > 0) {
+                  await supabase.from("card_checklists").insert(
+                    items.map(i => ({
+                      card_id: mirrorCard.id,
+                      group_id: newGroup.id,
+                      title: i.title,
+                      completed: i.completed,
+                      position: i.position
+                    }))
+                  );
+                }
+              }
+            }
+          }
+        }
+
+        // 3. Sincronizar Datas do Projeto
+        if (mirrorSettings.mirror_dates) {
+          const { data: dates } = await supabase.from("project_dates").select("*").eq("card_id", input.cardId).maybeSingle();
+          if (dates) {
+            await supabase.from("project_dates").upsert({
+              card_id: mirrorCard.id,
+              start_date: dates.start_date,
+              end_date: dates.end_date
+            });
+          }
+        }
+
+        // 4. Sincronizar Campos Personalizados
+        if (mirrorSettings.mirror_custom_fields) {
+          const { data: fields } = await supabase.from("card_custom_fields").select("*").eq("card_id", input.cardId);
+          if (fields && fields.length > 0) {
+            await supabase.from("card_custom_fields").insert(
+              fields.map(f => ({
+                card_id: mirrorCard.id,
+                field_name: f.field_name,
+                field_value: f.field_value,
+                field_type: f.field_type
+              }))
+            );
+          }
+        }
+
         return { success: true, mirrorId: mirrorCard.id };
       }),
 
@@ -1301,6 +1382,26 @@ export const appRouter = router({
       .input(z.object({ boardId: z.number() }))
       .query(async ({ input }) => {
         return await getMirroredCards(input.boardId);
+      }),
+
+    getCardMirrors: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        // Busca onde este card é o ORIGINAL
+        const { data, error } = await supabase
+          .from("mirrored_cards")
+          .select(`
+            mirror_board_id,
+            boards:mirror_board_id (name)
+          `)
+          .eq("original_card_id", input.cardId);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        
+        return (data || []).map((m: any) => ({
+          boardId: m.mirror_board_id,
+          boardName: m.boards?.name || "Quadro Desconhecido"
+        }));
       }),
   }),
 
@@ -1466,9 +1567,15 @@ export const appRouter = router({
           "como configurar o espelhamento": "Administradores podem clicar no ícone de engrenagem no topo do quadro para definir quais atributos (etiquetas, checklists, etc.) devem ser sincronizados.",
           "como adicionar membros": "Clique no botão 'Compartilhar' no topo do quadro para adicionar novos usuários e definir seus níveis de permissão.",
           "o que é o modo ia": "O modo Maju IA é o seu assistente virtual D., projetado para ajudar na organização e tirar dúvidas sobre a plataforma.",
+          "como gerenciar prazos": "Você pode definir 'Data de Início' e 'Data de Entrega' nos detalhes de cada cartão. O sistema alertará quando um prazo estiver próximo ou vencido.",
+          "como usar etiquetas": "As etiquetas ajudam a categorizar cartões por cores e nomes. Você pode adicionar várias etiquetas a um único cartão para facilitar a filtragem visual.",
+          "como funciona o checklist": "Você pode criar grupos de checklist dentro de um cartão para quebrar tarefas grandes em subtarefas menores e acompanhar o progresso através da barra de porcentagem.",
+          "privacidade e seguranca": "O Maju Tasks utiliza Supabase para garantir que seus dados estejam seguros. Você pode controlar quem vê seus quadros através do botão 'Compartilhar'.",
+          "como anexar arquivos": "Dentro de um cartão, utilize a seção 'Anexos' para fazer upload de documentos, imagens ou links relevantes para a tarefa.",
+          "filtros de busca": "Você pode buscar por quadros e cartões específicos utilizando a barra de busca no topo da aplicação.",
           "ola": "Olá! Eu sou o assistente Virtual D. Como posso ajudar você hoje com o Maju Tasks?",
           "oi": "Olá! Eu sou o assistente Virtual D. Como posso ajudar você hoje com o Maju Tasks?",
-          "ajuda": "Eu posso te ajudar com dúvidas sobre: criar quadros, listas, cartões, espelhamento, permissões e muito mais. O que você deseja saber?",
+          "ajuda": "Eu posso te ajudar com dúvidas sobre: criar quadros, listas, cartões, espelhamento, prazos, etiquetas, checklists e muito mais. O que você deseja saber?",
         };
 
         // Verificação de contato com o Dev
