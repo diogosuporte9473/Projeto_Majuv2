@@ -66,6 +66,7 @@ export default function CardDetailModal({
   const upsertProjectDatesMutation = trpc.cardDetails.upsertProjectDates.useMutation();
   const updateDescriptionMutation = trpc.cardDetails.updateDescription.useMutation();
   const updateDueDateMutation = trpc.cardDetails.updateDueDate.useMutation();
+  const updateStartDateMutation = trpc.cardDetails.updateStartDate.useMutation();
   const updateAssignedToMutation = trpc.cardDetails.updateAssignedTo.useMutation();
   const upsertCustomFieldMutation = trpc.cards.upsertCustomField.useMutation();
   const createMirrorMutation = trpc.cardDetails.createMirror.useMutation();
@@ -175,9 +176,19 @@ export default function CardDetailModal({
     try {
       await updateDueDateMutation.mutateAsync({ cardId, dueDate: date });
       await utils.cards.getDetails.invalidate({ id: cardId });
-      toast.success("Data atualizada");
+      toast.success("Data de entrega atualizada");
     } catch (error) {
-      toast.error("Erro ao atualizar data");
+      toast.error("Erro ao atualizar data de entrega");
+    }
+  };
+
+  const handleUpdateStartDate = async (date: Date | null) => {
+    try {
+      await updateStartDateMutation.mutateAsync({ cardId, startDate: date });
+      await utils.cards.getDetails.invalidate({ id: cardId });
+      toast.success("Data de início atualizada");
+    } catch (error) {
+      toast.error("Erro ao atualizar data de início");
     }
   };
 
@@ -376,14 +387,23 @@ export default function CardDetailModal({
                 </div>
               )}
 
-              {card?.dueDate && (
+              {(card?.startDate || card?.dueDate) && (
                 <div className="space-y-2">
                   <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Prazo</h4>
                   <div className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium ${ 
-                    new Date(card.dueDate) < new Date() ? "bg-red-950/40 text-red-300" : "bg-[#2a2a2a] text-gray-200" 
+                    card.dueDate && new Date(card.dueDate) < new Date() ? "bg-red-950/40 text-red-300" : "bg-[#2a2a2a] text-gray-200" 
                   }`}>
                     <Clock size={14} />
-                    {format(new Date(card.dueDate), "dd 'de' MMM, yyyy", { locale: ptBR })}
+                    {card.startDate && (
+                      <span>
+                        {format(new Date(card.startDate), "dd 'de' MMM", { locale: ptBR })} -{" "}
+                      </span>
+                    )}
+                    {card.dueDate ? (
+                      <span>{format(new Date(card.dueDate), "dd 'de' MMM, yyyy", { locale: ptBR })}</span>
+                    ) : (
+                      <span className="text-gray-500 italic">Sem data de entrega</span>
+                    )}
                   </div>
                 </div>
               )}
@@ -495,25 +515,45 @@ export default function CardDetailModal({
                       <Clock className="w-3.5 h-3.5 mr-2" /> Datas
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-[#333]">
-                    <div className="p-4 space-y-3">
-                      <h3 className="text-sm font-bold text-gray-200">Data de Entrega</h3>
-                      <input 
-                        type="date" 
-                        className="bg-[#2a2a2a] border border-[#333] rounded px-3 py-2 text-xs text-white w-full"
-                        onChange={(e) => handleUpdateDueDate(e.target.value ? new Date(e.target.value) : null)}
-                        defaultValue={card?.dueDate ? new Date(card.dueDate).toISOString().split('T')[0] : ''}
-                      />
-                      {card?.dueDate && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="w-full text-[10px] text-red-400 hover:text-red-500 hover:bg-red-500/10"
-                          onClick={() => handleUpdateDueDate(null)}
-                        >
-                          Remover Data
-                        </Button>
-                      )}
+                  <PopoverContent className="w-72 p-0 bg-[#1a1a1a] border-[#333] shadow-2xl">
+                    <div className="p-4 space-y-4">
+                      <h3 className="text-sm font-bold text-gray-200">Definir Período</h3>
+                      
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Data de Início</label>
+                        <input 
+                          type="date" 
+                          className="bg-[#2a2a2a] border border-[#333] rounded px-3 py-2 text-xs text-white w-full focus:ring-1 focus:ring-accent outline-none"
+                          onChange={(e) => handleUpdateStartDate(e.target.value ? new Date(e.target.value) : null)}
+                          defaultValue={card?.startDate ? new Date(card.startDate).toISOString().split('T')[0] : ''}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Data de Entrega</label>
+                        <input 
+                          type="date" 
+                          className="bg-[#2a2a2a] border border-[#333] rounded px-3 py-2 text-xs text-white w-full focus:ring-1 focus:ring-accent outline-none"
+                          onChange={(e) => handleUpdateDueDate(e.target.value ? new Date(e.target.value) : null)}
+                          defaultValue={card?.dueDate ? new Date(card.dueDate).toISOString().split('T')[0] : ''}
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        {(card?.startDate || card?.dueDate) && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="flex-1 text-[10px] text-red-400 hover:text-red-500 hover:bg-red-500/10 h-8"
+                            onClick={() => {
+                              handleUpdateStartDate(null);
+                              handleUpdateDueDate(null);
+                            }}
+                          >
+                            Remover Tudo
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </PopoverContent>
                 </Popover>

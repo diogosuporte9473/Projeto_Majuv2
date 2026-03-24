@@ -604,6 +604,7 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
               listId={listId}
               title={card.title}
               description={card.description || undefined}
+              startDate={card.startDate ? new Date(card.startDate) : undefined}
               dueDate={card.dueDate ? new Date(card.dueDate) : undefined}
               listName={listName}
               assignedToName={card.assignedToName}

@@ -9,6 +9,7 @@ interface DraggableCardProps {
   listId: number;
   title: string;
   description?: string;
+  startDate?: Date;
   dueDate?: Date;
   listName?: string;
   assignedToName?: string | null;
@@ -19,6 +20,7 @@ export function DraggableCard({
   listId,
   title,
   description,
+  startDate,
   dueDate,
   listName,
   assignedToName,
@@ -62,10 +64,20 @@ export function DraggableCard({
               {description}
             </p>
           )}
-          {dueDate && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Due: {new Date(dueDate).toLocaleDateString()}
-            </p>
+          {(startDate || dueDate) && (
+            <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-md w-fit">
+              <Clock size={10} className="text-muted-foreground/70" />
+              {startDate && (
+                <span>
+                  {new Date(startDate).toLocaleDateString("pt-BR", { day: '2-digit', month: 'short' })} -{" "}
+                </span>
+              )}
+              {dueDate ? (
+                <span>{new Date(dueDate).toLocaleDateString("pt-BR", { day: '2-digit', month: 'short' })}</span>
+              ) : (
+                <span className="italic">Sem entrega</span>
+              )}
+            </div>
           )}
         </Card>
       </div>
