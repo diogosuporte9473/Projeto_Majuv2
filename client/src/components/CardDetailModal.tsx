@@ -11,7 +11,7 @@ import {
   X, Plus, Trash2, Tag, CheckSquare, Calendar, Loader2, 
   AlignLeft, LayoutGrid, Clock, Copy, Archive, Trash, 
   MessageSquare, Paperclip, Send, MoreVertical, Maximize2, Minimize2, 
-  CalendarDays, User as UserIcon, 
+  CalendarDays, User as UserIcon, Edit2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -78,6 +78,8 @@ export default function CardDetailModal({
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [description, setDescription] = useState(cardDescription || "");
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(cardTitle);
   const [newComment, setNewComment] = useState("");
   const [isMaximized, setIsMaximized] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -99,11 +101,36 @@ export default function CardDetailModal({
     { enabled: !!selectedBoardId }
   );
 
+  const updateCardMutation = trpc.cards.update.useMutation();
+
   useEffect(() => {
     setDescription(cardDescription || "");
   }, [cardDescription]);
 
+  useEffect(() => {
+    setEditedTitle(cardTitle);
+  }, [cardTitle]);
+
   // Handlers
+  const handleUpdateTitle = async () => {
+    if (!editedTitle.trim() || editedTitle === cardTitle) {
+      setIsEditingTitle(false);
+      setEditedTitle(cardTitle);
+      return;
+    }
+    try {
+      await updateCardMutation.mutateAsync({
+        id: cardId,
+        title: editedTitle,
+      });
+      setIsEditingTitle(false);
+      await utils.cards.getDetails.invalidate({ id: cardId });
+      await utils.cards.getByList.invalidate();
+      toast.success("Título do cartão atualizado");
+    } catch (error) {
+      toast.error("Erro ao atualizar título");
+    }
+  };
   const handleAddLabel = async () => {
     if (!newLabel.trim()) return;
     try {
@@ -342,9 +369,27 @@ export default function CardDetailModal({
         <DialogHeader className="p-5 border-b border-[#333]/60 bg-[#1e1e1e] flex-shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <DialogTitle className="text-xl font-bold leading-tight break-words">
-                {cardTitle}
-              </DialogTitle>
+              {isEditingTitle ? (
+                <div className="flex items-center gap-2 mb-1">
+                  <input
+                    type="text"
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    className="text-xl font-bold bg-[#2a2a2a] border-b-2 border-accent outline-none text-white w-full px-2 py-1 rounded shadow-inner"
+                    autoFocus
+                    onBlur={handleUpdateTitle}
+                    onKeyDown={(e) => e.key === "Enter" && handleUpdateTitle()}
+                  />
+                </div>
+              ) : (
+                <DialogTitle 
+                  className="text-xl font-bold leading-tight break-words cursor-pointer hover:text-accent transition-colors flex items-center gap-2 group"
+                  onClick={() => setIsEditingTitle(true)}
+                >
+                  {cardTitle}
+                  <Edit2 className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </DialogTitle>
+              )}
               <p className="text-sm text-gray-400 mt-1">
                 na lista <span className="font-medium text-gray-300 underline">{listName}</span>
               </p>
@@ -951,12 +996,12 @@ export default function CardDetailModal({
                   <div key={comment.id} className="flex gap-4 group">
                     <Avatar className="w-9 h-9 flex-shrink-0 border border-white/5">
                       <AvatarFallback className="bg-[#2a2a2a] text-gray-500 text-xs font-bold">
-                        {comment.user?.name?.charAt(0).toUpperCase()}
+                        {comment.userName?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 space-y-2 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-gray-200">{comment.user?.name || comment.user?.username}</span>
+                        <span className="text-sm font-bold text-gray-200">{comment.userName}</span>
                         <span className="text-[10px] text-gray-500 font-medium bg-[#222] px-2 py-0.5 rounded">
                           {format(new Date(comment.created_at), "dd 'de' MMM, HH:mm", { locale: ptBR })}
                         </span>
@@ -1000,14 +1045,16 @@ export default function CardDetailModal({
               </Button>
             </div>
             
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleDeleteCard}
-              className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 gap-2 h-9 px-4 rounded-lg text-xs font-bold transition-all"
-            >
-              <Trash className="w-4 h-4" /> Excluir Cartão
-            </Button>
+            {currentUser?.role === 'admin' && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleDeleteCard}
+                className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 gap-2 h-9 px-4 rounded-lg text-xs font-bold transition-all"
+              >
+                <Trash className="w-4 h-4" /> Excluir Cartão
+              </Button>
+            )}
           </div>
         </div>
 

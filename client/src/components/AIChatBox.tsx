@@ -117,7 +117,7 @@ export function AIChatBox({
   placeholder = "Type your message...",
   className,
   height = "600px",
-  emptyStateMessage = "Start a conversation with AI",
+  emptyStateMessage = "Ola sou assistente Virtual D. como posso Ajuadar.",
   suggestedPrompts,
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");

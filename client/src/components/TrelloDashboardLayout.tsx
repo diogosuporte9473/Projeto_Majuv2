@@ -42,12 +42,14 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
     <div className="flex h-screen bg-background">
       <aside className="w-64 bg-primary text-primary-foreground border-r border-border flex flex-col">
         <div className="p-6 border-b border-primary-foreground/10">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
-              <span className="text-primary font-bold">M</span>
-            </div>
-            Maju Tasks
-          </h1>
+          <Link href="/">
+            <h1 className="text-2xl font-bold flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
+                <span className="text-primary font-bold">M</span>
+              </div>
+              Maju Tasks
+            </h1>
+          </Link>
           <p className="text-sm text-primary-foreground/70 mt-1">Task Manager</p>
         </div>
 

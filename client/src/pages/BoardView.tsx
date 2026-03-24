@@ -390,7 +390,7 @@ export default function BoardView() {
               <div className="bg-primary text-primary-foreground p-3 rounded-t-lg flex items-center justify-between border-b border-primary-foreground/10">
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
-                  <span className="font-semibold">Maju AI</span>
+                  <span className="font-semibold">Maju IA</span>
                 </div>
                 <Button 
                   onClick={() => setShowAIChat(false)} 
