@@ -391,8 +391,19 @@ export default function CardDetailModal({
                   <Edit2 className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </DialogTitle>
               )}
-              <p className="text-sm text-gray-400 mt-1">
+              <p className="text-sm text-gray-400 mt-1 flex items-center gap-2">
                 na lista <span className="font-medium text-gray-300 underline">{listName}</span>
+                {(card?.startDate || card?.dueDate) && (
+                  <>
+                    <span className="text-gray-600">•</span>
+                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500">
+                      <CalendarDays size={12} className="text-gray-600" />
+                      {card.startDate && format(new Date(card.startDate), "dd/MM/yy")}
+                      {card.startDate && card.dueDate && " — "}
+                      {card.dueDate && format(new Date(card.dueDate), "dd/MM/yy")}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
 
