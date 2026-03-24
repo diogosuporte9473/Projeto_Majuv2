@@ -1056,6 +1056,27 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    upsertCustomField: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        fieldName: z.string(),
+        fieldValue: z.string(),
+        fieldType: z.enum(["text", "select", "date", "number"]).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("card_custom_fields")
+          .upsert({
+            card_id: input.cardId,
+            field_name: input.fieldName,
+            field_value: input.fieldValue,
+            field_type: input.fieldType || "text",
+          }, { onConflict: 'card_id,field_name' });
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
+
     getProjectDates: protectedProcedure
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {
@@ -1192,6 +1213,12 @@ export const appRouter = router({
         }
 
         return { success: true, mirrorId: mirrorCard.id };
+      }),
+
+    getMirroredCards: protectedProcedure
+      .input(z.object({ boardId: z.number() }))
+      .query(async ({ input }) => {
+        return await getMirroredCards(input.boardId);
       }),
   }),
 
