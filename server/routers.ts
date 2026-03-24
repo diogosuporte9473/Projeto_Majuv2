@@ -1020,10 +1020,13 @@ export const appRouter = router({
         if (input.dueDate !== undefined) updateData.due_date = input.dueDate ? input.dueDate.toISOString() : null;
         if (input.assignedUserId !== undefined) updateData.assigned_user_id = input.assignedUserId;
 
-        const { error } = await supabase
+        // 1. Atualizar o item atual
+        const { data: updatedItem, error } = await supabase
           .from("card_checklists")
           .update(updateData)
-          .eq("id", input.id);
+          .eq("id", input.id)
+          .select("card_id, title, group_id")
+          .single();
 
         if (error) {
           console.error("[Database] Checklist update failed via Supabase:", error);
@@ -1031,6 +1034,55 @@ export const appRouter = router({
             code: "INTERNAL_SERVER_ERROR",
             message: `Erro ao atualizar checklist: ${error.message}`,
           });
+        }
+
+        // 2. Sincronizar com cards espelhados (se houver)
+        try {
+          // Busca se este card é original ou espelho
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("*")
+            .or(`original_card_id.eq.${updatedItem.card_id},mirror_card_id.eq.${updatedItem.card_id}`);
+
+          if (mirrors && mirrors.length > 0) {
+            // Coletar todos os IDs de cards relacionados (excluindo o atual)
+            const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+              .filter(id => id !== updatedItem.card_id);
+
+            if (relatedCardIds.length > 0) {
+              // Buscar o título do grupo para encontrar o correspondente nos outros cards
+              const { data: currentGroup } = await supabase
+                .from("card_checklist_groups")
+                .select("title")
+                .eq("id", updatedItem.group_id)
+                .single();
+
+              if (currentGroup) {
+                // Para cada card relacionado, encontrar o item com o mesmo título dentro de um grupo com o mesmo título
+                for (const cardId of relatedCardIds) {
+                  const { data: targetGroups } = await supabase
+                    .from("card_checklist_groups")
+                    .select("id")
+                    .eq("card_id", cardId)
+                    .eq("title", currentGroup.title);
+
+                  if (targetGroups && targetGroups.length > 0) {
+                    const targetGroupIds = targetGroups.map(g => g.id);
+                    
+                    // Atualizar itens que tenham o mesmo título nos grupos correspondentes
+                    await supabase
+                      .from("card_checklists")
+                      .update(updateData)
+                      .eq("title", updatedItem.title)
+                      .in("group_id", targetGroupIds);
+                  }
+                }
+              }
+            }
+          }
+        } catch (syncError) {
+          console.error("[Mirror Sync] Failed to sync checklist item:", syncError);
+          // Não lançamos erro aqui para não travar a atualização principal
         }
 
         return { success: true };
