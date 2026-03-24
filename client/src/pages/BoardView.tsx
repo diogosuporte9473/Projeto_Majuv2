@@ -1,4 +1,4 @@
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useRealtimeSync } from "@/_core/hooks/useRealtimeSync";
 import { trpc } from "@/lib/trpc";
