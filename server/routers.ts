@@ -41,6 +41,7 @@ import {
   notes,
 } from "../drizzle/schema.js";
 import { invokeLLM, Message as LLMMessage } from "./_core/llm.js";
+import { ENV } from "./_core/env.js";
 
 import { supabase } from "./_core/supabase.js";
 
@@ -1593,21 +1594,31 @@ export const appRouter = router({
           }
         }
 
-        // Se não encontrar no banco simples, invoca o LLM com contexto do sistema
-        const systemPrompt: LLMMessage = {
-          role: "system",
-          content: `Você é o assistente Virtual D. do aplicativo Maju Tasks, desenvolvido por Diogo Martins. 
-          Seu objetivo é ajudar usuários com o funcionamento da aplicação. 
-          Se perguntarem sobre o desenvolvimento ou questões técnicas profundas, direcione-os para o Dev Diogo Martins.
-          Mantenha as respostas curtas, objetivas e em português.`
-        };
+        // Se não houver chave API, não tenta chamar o LLM
+        if (!ENV.forgeApiKey) {
+          return "Desculpe, meu sistema de inteligência geral está em manutenção (BUILT_IN_FORGE_API_KEY não configurada). Mas posso responder dúvidas sobre o Maju Tasks! Tente perguntar sobre 'como criar um quadro', 'espelhamento' ou 'prazos'.";
+        }
 
-        const response = await invokeLLM({
-          messages: [systemPrompt, ...input.messages] as LLMMessage[],
-        });
-        
-        const content = response.choices[0]?.message?.content;
-        return typeof content === "string" ? content : "Desculpe, não consegui processar sua pergunta.";
+        // Se não encontrar no banco simples, invoca o LLM com contexto do sistema
+        try {
+          const systemPrompt: LLMMessage = {
+            role: "system",
+            content: `Você é o assistente Virtual D. do aplicativo Maju Tasks, desenvolvido por Diogo Martins. 
+            Seu objetivo é ajudar usuários com o funcionamento da aplicação. 
+            Se perguntarem sobre o desenvolvimento ou questões técnicas profundas, direcione-os para o Dev Diogo Martins.
+            Mantenha as respostas curtas, objetivas e em português.`
+          };
+
+          const response = await invokeLLM({
+            messages: [systemPrompt, ...input.messages] as LLMMessage[],
+          });
+          
+          const content = response.choices[0]?.message?.content;
+          return typeof content === "string" ? content : "Desculpe, não consegui processar sua pergunta.";
+        } catch (error) {
+          console.error("[AI Chat Error]", error);
+          return "Desculpe, tive um problema ao processar sua pergunta agora. Você pode perguntar sobre o funcionamento básico do app!";
+        }
       }),
   }),
 });
