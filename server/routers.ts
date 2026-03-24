@@ -339,6 +339,62 @@ export const appRouter = router({
 
         return { success: true };
       }),
+
+    getMirrorSettings: protectedProcedure
+      .input(z.object({ boardId: z.number() }))
+      .query(async ({ input }) => {
+        const { data, error } = await supabase
+          .from("board_mirror_settings")
+          .select("*")
+          .eq("board_id", input.boardId)
+          .maybeSingle();
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        
+        if (!data) {
+          return {
+            mirror_labels: true,
+            mirror_checklists: true,
+            mirror_comments: false,
+            mirror_attachments: false,
+            mirror_custom_fields: true,
+            mirror_dates: true,
+            mirror_description: true,
+          };
+        }
+        return data;
+      }),
+
+    updateMirrorSettings: protectedProcedure
+      .input(z.object({
+        boardId: z.number(),
+        settings: z.object({
+          mirror_labels: z.boolean(),
+          mirror_checklists: z.boolean(),
+          mirror_comments: z.boolean(),
+          mirror_attachments: z.boolean(),
+          mirror_custom_fields: z.boolean(),
+          mirror_dates: z.boolean(),
+          mirror_description: z.boolean(),
+        })
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const board = await getBoardById(input.boardId, ctx.user.id);
+        if (!board || ctx.user.role !== 'admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem configurar espelhamento" });
+        }
+
+        const { error } = await supabase
+          .from("board_mirror_settings")
+          .upsert({
+            board_id: input.boardId,
+            ...input.settings,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'board_id' });
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
   }),
 
   // Lists routers
@@ -532,6 +588,14 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
+        // Restrição: Apenas administradores podem excluir cartões permanentemente
+        if (ctx.user.role !== 'admin') {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Apenas administradores podem excluir cartões. Usuários comuns devem arquivar.",
+          });
+        }
+
         const { error } = await supabase
           .from("cards")
           .delete()
@@ -1197,10 +1261,13 @@ export const appRouter = router({
 
         const originName = originalBoard?.name || "Desconhecido";
 
+        // Nome limpo: remove sufixos de mirror anteriores se existirem
+        const cleanTitle = originalCard.title.replace(/\s\(Mirror:.*\)$/, "");
+
         const { data: mirrorCard, error: mirrorError } = await supabase
           .from("cards")
           .insert({
-            title: `${originalCard.title} (Mirror: ${originName})`,
+            title: `${cleanTitle} (Mirror: ${originName})`,
             description: originalCard.description,
             list_id: input.targetListId,
             position: 0,

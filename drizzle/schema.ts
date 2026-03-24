@@ -40,6 +40,19 @@ export const boards = pgTable("boards", {
 export type Board = typeof boards.$inferSelect;
 export type InsertBoard = typeof boards.$inferInsert;
 
+export const boardMirrorSettings = pgTable("board_mirror_settings", {
+  id: serial("id").primaryKey(),
+  boardId: integer("board_id").notNull().references(() => boards.id, { onDelete: "cascade" }),
+  mirrorLabels: boolean("mirror_labels").notNull().default(true),
+  mirrorChecklists: boolean("mirror_checklists").notNull().default(true),
+  mirrorComments: boolean("mirror_comments").notNull().default(false),
+  mirrorAttachments: boolean("mirror_attachments").notNull().default(false),
+  mirrorCustomFields: boolean("mirror_custom_fields").notNull().default(true),
+  mirrorDates: boolean("mirror_dates").notNull().default(true),
+  mirrorDescription: boolean("mirror_description").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Board Members - Controle de acesso por quadro
 export const boardMembers = pgTable("board_members", {
   id: serial("id").primaryKey(),
