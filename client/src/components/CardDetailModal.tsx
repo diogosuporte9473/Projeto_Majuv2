@@ -54,6 +54,7 @@ export default function CardDetailModal({
   const { data: customFields } = trpc.cardDetails.getCustomFields.useQuery({ cardId });
   const { data: projectDates } = trpc.cardDetails.getProjectDates.useQuery({ cardId });
   const { data: mirrors } = trpc.cardDetails.getCardMirrors.useQuery({ cardId });
+  const { data: templates } = trpc.checklistTemplates.list.useQuery();
 
   // Mutations
   const addLabelMutation = trpc.cardDetails.addLabel.useMutation();
@@ -62,6 +63,8 @@ export default function CardDetailModal({
   const updateChecklistGroupMutation = trpc.cardDetails.updateChecklistGroup.useMutation();
   const deleteChecklistGroupMutation = trpc.cardDetails.deleteChecklistGroup.useMutation();
   const addChecklistMutation = trpc.cardDetails.addChecklist.useMutation();
+  const createTemplateMutation = trpc.checklistTemplates.create.useMutation();
+  const incrementUsageMutation = trpc.checklistTemplates.incrementUsage.useMutation();
   const updateChecklistMutation = trpc.cardDetails.updateChecklistItem.useMutation();
   const deleteChecklistMutation = trpc.cardDetails.deleteChecklist.useMutation();
   const upsertProjectDatesMutation = trpc.cardDetails.upsertProjectDates.useMutation();
@@ -94,6 +97,11 @@ export default function CardDetailModal({
   const [isMirrorDialogOpen, setIsMirrorDialogOpen] = useState(false);
   const [selectedBoardId, setSelectedBoardId] = useState<string>("");
   const [selectedListId, setSelectedListId] = useState<string>("");
+
+  // Template states
+  const [isSavingAsTemplate, setIsSavingAsTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
   const { data: userBoards } = trpc.boards.list.useQuery();
   const { data: allUsers } = trpc.admin.users.list.useQuery();
@@ -157,13 +165,49 @@ export default function CardDetailModal({
   const handleAddChecklistGroup = async () => {
     const title = newChecklistGroupTitle.trim() || "Checklist";
     try {
-      await addChecklistGroupMutation.mutateAsync({ cardId, title });
+      const group = await addChecklistGroupMutation.mutateAsync({ cardId, title });
+      
+      // Se um modelo foi selecionado, adicionar seus itens
+      if (selectedTemplateId) {
+        const template = templates?.find(t => t.id === parseInt(selectedTemplateId));
+        if (template && Array.isArray(template.items)) {
+          for (const itemTitle of template.items) {
+            await addChecklistMutation.mutateAsync({ 
+              cardId, 
+              groupId: group.id, 
+              title: itemTitle 
+            });
+          }
+          await incrementUsageMutation.mutateAsync({ id: template.id });
+        }
+      }
+
       setNewChecklistGroupTitle("");
+      setSelectedTemplateId("");
       setIsCreatingChecklist(false);
       await utils.cardDetails.getChecklists.invalidate({ cardId });
       toast.success("Checklist criado");
     } catch (error) {
       toast.error("Erro ao criar checklist");
+    }
+  };
+
+  const handleSaveAsTemplate = async (items: string[]) => {
+    if (!templateName.trim()) {
+      toast.error("Por favor, digite um nome para o modelo");
+      return;
+    }
+    try {
+      await createTemplateMutation.mutateAsync({
+        name: templateName,
+        items: items,
+      });
+      setTemplateName("");
+      setIsSavingAsTemplate(false);
+      await utils.checklistTemplates.list.invalidate();
+      toast.success("Modelo salvo com sucesso");
+    } catch (error) {
+      toast.error("Erro ao salvar modelo");
     }
   };
 
@@ -543,6 +587,33 @@ export default function CardDetailModal({
                           onKeyDown={(e) => e.key === "Enter" && handleAddChecklistGroup()}
                         />
                       </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Usar modelo existente</label>
+                        <Select 
+                          value={selectedTemplateId} 
+                          onValueChange={(val) => {
+                            setSelectedTemplateId(val);
+                            const template = templates?.find(t => t.id === parseInt(val));
+                            if (template) setNewChecklistGroupTitle(template.name);
+                          }}
+                        >
+                          <SelectTrigger className="bg-[#2a2a2a] border-[#333] h-9 text-xs text-gray-300">
+                            <SelectValue placeholder="Selecione um modelo..." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                            {templates?.map((t: any) => (
+                              <SelectItem key={t.id} value={t.id.toString()} className="text-xs">
+                                <div className="flex items-center gap-2">
+                                  <span>{t.name}</span>
+                                  {t.isGlobal && <span className="text-[8px] bg-accent/20 text-accent px-1 rounded">GLOBAL</span>}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
                       <div className="flex items-center gap-2">
                         <Button 
                           onClick={handleAddChecklistGroup} 
@@ -769,6 +840,54 @@ export default function CardDetailModal({
                         >
                           Remover
                         </Button>
+                        <Popover open={isSavingAsTemplate && editingGroupId === group.id} onOpenChange={(open) => {
+                          setIsSavingAsTemplate(open);
+                          setEditingGroupId(open ? group.id : null);
+                        }}>
+                          <PopoverTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-gray-500 hover:text-accent h-8 px-2"
+                              title="Salvar como modelo"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-3 shadow-2xl">
+                            <div className="space-y-3">
+                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Salvar como Modelo</p>
+                              <input
+                                type="text"
+                                value={templateName}
+                                onChange={(e) => setTemplateName(e.target.value)}
+                                placeholder="Nome do modelo..."
+                                className="w-full bg-[#222] border border-[#333] rounded px-2 py-1.5 text-xs text-white outline-none focus:border-accent"
+                                autoFocus
+                              />
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => {
+                                    setIsSavingAsTemplate(false);
+                                    setTemplateName("");
+                                  }}
+                                  className="h-7 text-[10px]"
+                                >
+                                  Cancelar
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handleSaveAsTemplate(groupItems.map((i: any) => i.title))}
+                                  className="h-7 text-[10px] bg-accent hover:bg-accent/90"
+                                >
+                                  Salvar
+                                </Button>
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
 

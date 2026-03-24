@@ -2,7 +2,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
-import { Clock } from "lucide-react";
+import { Clock, CalendarDays } from "lucide-react";
 import CardDetailModal from "./CardDetailModal";
 
 interface DraggableCardProps {
@@ -66,17 +66,18 @@ export function DraggableCard({
             </p>
           )}
           {(startDate || dueDate) && (
-            <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-md w-fit">
-              <Clock size={10} className="text-muted-foreground/70" />
+            <div className="flex items-center gap-2 mt-2">
               {startDate && (
-                <span>
-                  {new Date(startDate).toLocaleDateString("pt-BR", { day: '2-digit', month: 'short' })} -{" "}
-                </span>
+                <div className="flex items-center gap-1 text-[9px] text-muted-foreground bg-secondary/20 px-1.5 py-0.5 rounded border border-border/30">
+                  <CalendarDays size={9} className="text-accent/50" />
+                  <span>{new Date(startDate).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}</span>
+                </div>
               )}
-              {dueDate ? (
-                <span>{new Date(dueDate).toLocaleDateString("pt-BR", { day: '2-digit', month: 'short' })}</span>
-              ) : (
-                <span className="italic">Sem entrega</span>
+              {dueDate && (
+                <div className="flex items-center gap-1 text-[9px] text-muted-foreground bg-secondary/20 px-1.5 py-0.5 rounded border border-border/30">
+                  <Clock size={9} className="text-amber-500/50" />
+                  <span>{new Date(dueDate).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}</span>
+                </div>
               )}
             </div>
           )}
