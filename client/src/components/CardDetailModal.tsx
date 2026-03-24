@@ -53,6 +53,7 @@ export default function CardDetailModal({
   const { data: attachments } = trpc.cardDetails.getAttachments.useQuery({ cardId });
   const { data: customFields } = trpc.cardDetails.getCustomFields.useQuery({ cardId });
   const { data: projectDates } = trpc.cardDetails.getProjectDates.useQuery({ cardId });
+  const { data: mirrors } = trpc.cardDetails.getCardMirrors.useQuery({ cardId });
 
   // Mutations
   const addLabelMutation = trpc.cardDetails.addLabel.useMutation();
@@ -1025,36 +1026,50 @@ export default function CardDetailModal({
           </section>
 
           {/* Section 7: Final Actions Footer */}
-          <div className="pt-10 pb-6 border-t border-[#333]/30 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setIsMirrorDialogOpen(true)}
-                className="bg-[#222] hover:bg-[#2a2a2a] text-gray-300 gap-2 h-9 px-4 rounded-lg text-xs font-bold"
-              >
-                <Copy className="w-4 h-4" /> Espelhar
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleArchiveCard}
-                className="bg-[#222] hover:bg-amber-950/30 hover:text-amber-400 text-gray-300 gap-2 h-9 px-4 rounded-lg text-xs font-bold transition-all"
-              >
-                <Archive className="w-4 h-4" /> Arquivar
-              </Button>
-            </div>
-            
-            {currentUser?.role === 'admin' && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleDeleteCard}
-                className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 gap-2 h-9 px-4 rounded-lg text-xs font-bold transition-all"
-              >
-                <Trash className="w-4 h-4" /> Excluir Cartão
-              </Button>
+          <div className="pt-10 pb-6 border-t border-[#333]/30 flex flex-col space-y-4">
+            {mirrors && mirrors.length > 0 && (
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mr-2">Espelhado em:</span>
+                {mirrors.map((m: any) => (
+                  <div key={m.boardId} className="flex items-center gap-1.5 text-[10px] text-accent font-bold bg-accent/10 px-3 py-1 rounded-full border border-accent/20">
+                    <LayoutGrid size={12} />
+                    {m.boardName}
+                  </div>
+                ))}
+              </div>
             )}
+
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setIsMirrorDialogOpen(true)}
+                  className="bg-[#222] hover:bg-[#2a2a2a] text-gray-300 gap-2 h-9 px-4 rounded-lg text-xs font-bold"
+                >
+                  <Copy className="w-4 h-4" /> Espelhar
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleArchiveCard}
+                  className="bg-[#222] hover:bg-amber-950/30 hover:text-amber-400 text-gray-300 gap-2 h-9 px-4 rounded-lg text-xs font-bold transition-all"
+                >
+                  <Archive className="w-4 h-4" /> Arquivar
+                </Button>
+              </div>
+              
+              {currentUser?.role === 'admin' && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleDeleteCard}
+                  className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 gap-2 h-9 px-4 rounded-lg text-xs font-bold transition-all"
+                >
+                  <Trash className="w-4 h-4" /> Excluir Cartão
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
