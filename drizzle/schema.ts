@@ -158,10 +158,24 @@ export const userPreferences = pgTable("user_preferences", {
 export type UserPreference = typeof userPreferences.$inferSelect;
 export type InsertUserPreference = typeof userPreferences.$inferInsert;
 
+// Card Checklist Groups - Grupos de checklists para cartões
+export const cardChecklistGroups = pgTable("card_checklist_groups", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type CardChecklistGroup = typeof cardChecklistGroups.$inferSelect;
+export type InsertCardChecklistGroup = typeof cardChecklistGroups.$inferInsert;
+
 // Card Checklist - Checklist para cartões
 export const cardChecklists = pgTable("card_checklists", {
   id: serial("id").primaryKey(),
   cardId: integer("card_id").notNull(),
+  groupId: integer("group_id"), // Novo campo para vincular ao grupo
   title: varchar("title", { length: 255 }).notNull(),
   completed: boolean("completed").default(false).notNull(),
   position: integer("position").notNull().default(0),
