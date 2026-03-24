@@ -86,7 +86,51 @@ export default function BoardView() {
   const utils = trpc.useUtils();
   const createListMutation = trpc.lists.create.useMutation();
   const reorderCardMutation = trpc.cards.reorder.useMutation();
+  const updateBoardMutation = trpc.boards.update.useMutation();
+  const deleteBoardMutation = trpc.boards.delete.useMutation();
   const aiChatMutation = trpc.ai.chat.useMutation();
+  const [, setLocation] = useLocation();
+
+  const [isEditingBoardName, setIsEditingBoardName] = useState(false);
+  const [editedBoardName, setEditedBoardName] = useState("");
+
+  useEffect(() => {
+    if (board) {
+      setEditedBoardName(board.name);
+    }
+  }, [board]);
+
+  const handleUpdateBoardName = async () => {
+    if (!editedBoardName.trim() || !boardId || editedBoardName === board?.name) {
+      setIsEditingBoardName(false);
+      return;
+    }
+
+    try {
+      await updateBoardMutation.mutateAsync({
+        id: boardId,
+        name: editedBoardName,
+      });
+      setIsEditingBoardName(false);
+      toast.success("Quadro renomeado");
+      utils.boards.get.invalidate({ id: boardId });
+    } catch (error) {
+      toast.error("Erro ao renomear quadro");
+    }
+  };
+
+  const handleDeleteBoard = async () => {
+    if (!boardId) return;
+    if (!confirm("TEM CERTEZA? Esta ação excluirá o quadro e todos os seus dados permanentemente.")) return;
+
+    try {
+      await deleteBoardMutation.mutateAsync({ id: boardId });
+      toast.success("Quadro excluído");
+      setLocation("/");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao excluir quadro");
+    }
+  };
 
   const handleSendMessage = async (content: string) => {
     const newMessages: Message[] = [...messages, { role: "user", content }];
@@ -181,8 +225,28 @@ export default function BoardView() {
     <TrelloDashboardLayout>
       <div className="h-full flex flex-col">
         <div className="p-6 flex justify-between items-start flex-shrink-0">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">{board.name}</h1>
+          <div className="flex-1 min-w-0">
+            {isEditingBoardName ? (
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="text"
+                  value={editedBoardName}
+                  onChange={(e) => setEditedBoardName(e.target.value)}
+                  className="text-3xl font-bold bg-transparent border-b-2 border-accent outline-none text-foreground w-full max-w-lg"
+                  autoFocus
+                  onBlur={handleUpdateBoardName}
+                  onKeyDown={(e) => e.key === "Enter" && handleUpdateBoardName()}
+                />
+              </div>
+            ) : (
+              <h1 
+                className="text-3xl font-bold text-foreground mb-2 cursor-pointer hover:text-accent transition-colors flex items-center gap-2 group"
+                onClick={() => setIsEditingBoardName(true)}
+              >
+                {board.name}
+                <Edit2 className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </h1>
+            )}
             {board.description && (
               <p className="text-muted-foreground">{board.description}</p>
             )}
@@ -191,6 +255,17 @@ export default function BoardView() {
             <Button onClick={() => setShowArchivedModal(true)} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" title="Itens Arquivados">
               <Archive className="w-4 h-4" />
             </Button>
+            {user?.role === 'admin' && (
+              <Button 
+                onClick={handleDeleteBoard} 
+                variant="ghost" 
+                size="icon" 
+                className="text-muted-foreground hover:text-red-500 hover:bg-red-500/10" 
+                title="Excluir Quadro"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
             {isOwnerOrAdmin && (
               <Button onClick={() => setShowShareModal(true)} variant="outline" className="flex items-center gap-2">
                 <UserPlus className="w-4 h-4" /> Compartilhar
