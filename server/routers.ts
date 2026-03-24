@@ -1450,19 +1450,57 @@ export const appRouter = router({
         }))
       }))
       .mutation(async ({ input }) => {
+        const lastUserMessage = [...input.messages].reverse().find(m => m.role === 'user')?.content.toLowerCase() || "";
+
+        // Banco de Dados de Perguntas e Respostas (Knowledge Base)
+        const knowledgeBase: Record<string, string> = {
+          "como criar um quadro": "Para criar um novo quadro, utilize o botão '+ New Board' na barra lateral esquerda. Digite o nome desejado e pressione Enter.",
+          "como criar uma lista": "Dentro de um quadro, clique no botão '+ Adicionar outra lista' ao final das colunas existentes.",
+          "como criar um cartao": "Em qualquer lista, clique no botão '+ Adicionar um cartão' na parte inferior da coluna.",
+          "como excluir um quadro": "Apenas administradores podem excluir quadros. Se você for ADM, clique no ícone de lixeira no canto superior direito do quadro.",
+          "como renomear um quadro": "Clique diretamente sobre o título do quadro no topo da página, digite o novo nome e pressione Enter.",
+          "como espelhar um cartao": "Abra os detalhes do cartão e clique no botão 'Espelhar' no rodapé. Escolha o quadro e a lista de destino.",
+          "como funciona o espelhamento": "O espelhamento cria uma cópia sincronizada. Alterações feitas no cartão original ou no espelho serão refletidas em ambos, dependendo das configurações de espelhamento do quadro.",
+          "quem criou o app": "Este aplicativo foi desenvolvido por Diogo Martins. Para questões sobre o desenvolvimento, entre em contato diretamente com o Dev Diogo Martins.",
+          "quem desenvolveu": "Este aplicativo foi desenvolvido por Diogo Martins. Para questões sobre o desenvolvimento, entre em contato diretamente com o Dev Diogo Martins.",
+          "como configurar o espelhamento": "Administradores podem clicar no ícone de engrenagem no topo do quadro para definir quais atributos (etiquetas, checklists, etc.) devem ser sincronizados.",
+          "como adicionar membros": "Clique no botão 'Compartilhar' no topo do quadro para adicionar novos usuários e definir seus níveis de permissão.",
+          "o que é o modo ia": "O modo Maju IA é o seu assistente virtual D., projetado para ajudar na organização e tirar dúvidas sobre a plataforma.",
+          "ola": "Olá! Eu sou o assistente Virtual D. Como posso ajudar você hoje com o Maju Tasks?",
+          "oi": "Olá! Eu sou o assistente Virtual D. Como posso ajudar você hoje com o Maju Tasks?",
+          "ajuda": "Eu posso te ajudar com dúvidas sobre: criar quadros, listas, cartões, espelhamento, permissões e muito mais. O que você deseja saber?",
+        };
+
+        // Verificação de contato com o Dev
+        if (lastUserMessage.includes("desenvolvimento") || 
+            lastUserMessage.includes("codigo") || 
+            lastUserMessage.includes("programado") ||
+            lastUserMessage.includes("dev")) {
+          return "Para questões técnicas ou sobre o desenvolvimento da aplicação, por favor, entre em contato com o Dev Diogo Martins.";
+        }
+
+        // Busca no banco de conhecimento simples
+        for (const question in knowledgeBase) {
+          if (lastUserMessage.includes(question)) {
+            return knowledgeBase[question];
+          }
+        }
+
+        // Se não encontrar no banco simples, invoca o LLM com contexto do sistema
+        const systemPrompt: LLMMessage = {
+          role: "system",
+          content: `Você é o assistente Virtual D. do aplicativo Maju Tasks, desenvolvido por Diogo Martins. 
+          Seu objetivo é ajudar usuários com o funcionamento da aplicação. 
+          Se perguntarem sobre o desenvolvimento ou questões técnicas profundas, direcione-os para o Dev Diogo Martins.
+          Mantenha as respostas curtas, objetivas e em português.`
+        };
+
         const response = await invokeLLM({
-          messages: input.messages as LLMMessage[],
+          messages: [systemPrompt, ...input.messages] as LLMMessage[],
         });
         
         const content = response.choices[0]?.message?.content;
-        if (typeof content !== "string") {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Unexpected AI response format",
-          });
-        }
-        
-        return content;
+        return typeof content === "string" ? content : "Desculpe, não consegui processar sua pergunta.";
       }),
   }),
 });
