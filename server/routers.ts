@@ -1588,9 +1588,19 @@ export const appRouter = router({
         }
 
         // Busca no banco de conhecimento simples
+        // Primeiro tenta encontrar palavras-chave específicas na mensagem do usuário
         for (const question in knowledgeBase) {
           if (lastUserMessage.includes(question)) {
             return knowledgeBase[question];
+          }
+        }
+
+        // Se a mensagem for muito curta (ex: "quadro"), tenta ver se a palavra-chave está contida na pergunta da base
+        if (lastUserMessage.length < 15) {
+          for (const question in knowledgeBase) {
+            if (question.includes(lastUserMessage)) {
+              return knowledgeBase[question];
+            }
           }
         }
 
