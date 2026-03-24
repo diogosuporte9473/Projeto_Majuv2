@@ -40,7 +40,7 @@ import {
   projectDates,
   notes,
 } from "../drizzle/schema.js";
-import { invokeLLM, Message as LLMMessage } from "./_core/llm.js";
+import { invokeLLM, Message } from "./_core/llm.js";
 import { ENV } from "./_core/env.js";
 
 import { supabase } from "./_core/supabase.js";
@@ -1663,7 +1663,7 @@ export const appRouter = router({
 
         // Se não encontrar no banco simples, invoca o LLM com contexto do sistema
         try {
-          const systemPrompt: LLMMessage = {
+          const systemPrompt: Message = {
             role: "system",
             content: `Você é o assistente Virtual D. do aplicativo Maju Tasks, desenvolvido por Diogo Martins. 
             Seu objetivo é ajudar usuários com o funcionamento da aplicação. 
@@ -1672,13 +1672,16 @@ export const appRouter = router({
           };
 
           const response = await invokeLLM({
-            messages: [systemPrompt, ...input.messages] as LLMMessage[],
+            messages: [systemPrompt, ...input.messages] as Message[],
           });
           
           const content = response.choices[0]?.message?.content;
           return typeof content === "string" ? content : "Desculpe, não consegui processar sua pergunta.";
-        } catch (error) {
+        } catch (error: any) {
           console.error("[AI Chat Error]", error);
+          if (error.message === "NO_API_KEY") {
+            return "No momento estou operando apenas com meu manual local (chaves de API não configuradas). Você pode me perguntar sobre 'como criar um quadro', 'espelhamento' ou 'prazos'!";
+          }
           return "Desculpe, tive um problema ao processar sua pergunta agora. Você pode perguntar sobre o funcionamento básico do app!";
         }
       }),
