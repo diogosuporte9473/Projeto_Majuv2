@@ -214,7 +214,10 @@ function UserManagement() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="bg-background border-border">
+        <DialogContent 
+          aria-describedby={undefined}
+          className="bg-background border-border"
+        >
           <DialogHeader>
             <DialogTitle>{editingUser ? "Editar Usuário" : "Novo Usuário"}</DialogTitle>
           </DialogHeader>

@@ -317,6 +317,7 @@ export default function CardDetailModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
+        aria-describedby={undefined}
         showCloseButton={false}
         className={`
           ${isMaximized 

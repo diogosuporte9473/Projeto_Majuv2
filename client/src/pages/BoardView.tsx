@@ -357,7 +357,10 @@ function ShareBoardModal({ isOpen, onClose, boardId }: { isOpen: boolean, onClos
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-background border-border">
+      <DialogContent 
+        aria-describedby={undefined}
+        className="max-w-md bg-background border-border"
+      >
         <DialogHeader>
           <DialogTitle>Compartilhar Quadro</DialogTitle>
         </DialogHeader>
@@ -431,7 +434,10 @@ function ArchivedCardsModal({ isOpen, onClose, boardId }: { isOpen: boolean, onC
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-[#1a1a1a] border-[#333] text-white">
+      <DialogContent 
+        aria-describedby={undefined}
+        className="max-w-2xl bg-[#1a1a1a] border-[#333] text-white"
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Archive className="w-5 h-5 text-accent" />

@@ -6,15 +6,17 @@ export function useRealtimeSync(boardId?: number) {
   const utils = trpc.useUtils();
 
   useEffect(() => {
-    // Configura o canal de tempo real
+    console.log(`[Supabase Realtime] Subscribing to changes for board: ${boardId || 'all'}`);
+
+    // Configura o canal de tempo real com identificador único para evitar conflitos
     const channel = supabase
-      .channel("db-changes")
+      .channel(`db-changes-${boardId || 'global'}`)
       // Escuta mudanças na tabela de cartões
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "cards" },
-        () => {
-          console.log("Realtime: Cards updated, invalidating queries...");
+        (payload) => {
+          console.log("[Realtime] Cards change detected:", payload.eventType);
           utils.cards.getByList.invalidate();
           if (boardId) {
             utils.cardDetails.getMirroredCards.invalidate({ boardId });
@@ -26,7 +28,7 @@ export function useRealtimeSync(boardId?: number) {
         "postgres_changes",
         { event: "*", schema: "public", table: "lists" },
         () => {
-          console.log("Realtime: Lists updated, invalidating queries...");
+          console.log("[Realtime] Lists change detected");
           if (boardId) {
             utils.lists.getByBoard.invalidate({ boardId });
           }
@@ -37,7 +39,7 @@ export function useRealtimeSync(boardId?: number) {
         "postgres_changes",
         { event: "*", schema: "public", table: "boards" },
         () => {
-          console.log("Realtime: Boards updated, invalidating queries...");
+          console.log("[Realtime] Boards change detected");
           utils.boards.list.invalidate();
           if (boardId) {
             utils.boards.get.invalidate({ id: boardId });
@@ -48,43 +50,69 @@ export function useRealtimeSync(boardId?: number) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "card_labels" },
-        () => utils.cardDetails.getLabels.invalidate()
+        () => {
+          console.log("[Realtime] Labels change detected");
+          utils.cardDetails.getLabels.invalidate();
+        }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "card_checklists" },
-        () => utils.cardDetails.getChecklists.invalidate()
+        () => {
+          console.log("[Realtime] Checklists change detected");
+          utils.cardDetails.getChecklists.invalidate();
+        }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "card_custom_fields" },
-        () => utils.cardDetails.getCustomFields.invalidate()
+        () => {
+          console.log("[Realtime] Custom fields change detected");
+          utils.cardDetails.getCustomFields.invalidate();
+        }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "project_dates" },
-        () => utils.cardDetails.getProjectDates.invalidate()
+        () => {
+          console.log("[Realtime] Project dates change detected");
+          utils.cardDetails.getProjectDates.invalidate();
+        }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "card_comments" },
-        () => utils.cardDetails.getComments.invalidate()
+        () => {
+          console.log("[Realtime] Comments change detected");
+          utils.cardDetails.getComments.invalidate();
+        }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "card_attachments" },
-        () => utils.cardDetails.getAttachments.invalidate()
+        () => {
+          console.log("[Realtime] Attachments change detected");
+          utils.cardDetails.getAttachments.invalidate();
+        }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "mirrored_cards" },
         () => {
+          console.log("[Realtime] Mirrored cards change detected");
           if (boardId) utils.cardDetails.getMirroredCards.invalidate({ boardId });
         }
-      )
-      .subscribe();
+      );
+
+    channel.subscribe((status) => {
+      console.log(`[Supabase Realtime] Subscription status for ${boardId || 'global'}:`, status);
+      if (status === 'CHANNEL_ERROR') {
+        console.error("[Supabase Realtime] WebSocket connection error detected");
+      }
+    });
 
     return () => {
+      console.log(`[Supabase Realtime] Unsubscribing from board: ${boardId || 'all'}`);
       supabase.removeChannel(channel);
     };
   }, [boardId, utils]);
