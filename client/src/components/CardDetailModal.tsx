@@ -169,7 +169,7 @@ export default function CardDetailModal({
       
       // Se um modelo foi selecionado, adicionar seus itens
       if (selectedTemplateId) {
-        const template = templates?.find(t => t.id === parseInt(selectedTemplateId));
+        const template = (templates as any)?.find((t: any) => t.id === parseInt(selectedTemplateId));
         if (template && Array.isArray(template.items)) {
           for (const itemTitle of template.items) {
             await addChecklistMutation.mutateAsync({ 
@@ -204,7 +204,7 @@ export default function CardDetailModal({
       });
       setTemplateName("");
       setIsSavingAsTemplate(false);
-      await utils.checklistTemplates.list.invalidate();
+      await (utils as any).checklistTemplates.list.invalidate();
       toast.success("Modelo salvo com sucesso");
     } catch (error) {
       toast.error("Erro ao salvar modelo");
@@ -594,7 +594,7 @@ export default function CardDetailModal({
                           value={selectedTemplateId} 
                           onValueChange={(val) => {
                             setSelectedTemplateId(val);
-                            const template = templates?.find(t => t.id === parseInt(val));
+                            const template = (templates as any)?.find((t: any) => t.id === parseInt(val));
                             if (template) setNewChecklistGroupTitle(template.name);
                           }}
                         >
@@ -602,7 +602,7 @@ export default function CardDetailModal({
                             <SelectValue placeholder="Selecione um modelo..." />
                           </SelectTrigger>
                           <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
-                            {templates?.map((t: any) => (
+                            {(templates as any)?.map((t: any) => (
                               <SelectItem key={t.id} value={t.id.toString()} className="text-xs">
                                 <div className="flex items-center gap-2">
                                   <span>{t.name}</span>
