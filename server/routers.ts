@@ -856,42 +856,6 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    getLabels: protectedProcedure
-      .input(z.object({ cardId: z.number() }))
-      .query(async ({ input }) => {
-        return await getCardLabels(input.cardId);
-      }),
-    addLabel: protectedProcedure
-      .input(z.object({ cardId: z.number(), label: z.string(), color: z.string() }))
-      .mutation(async ({ input }) => {
-        const { data, error } = await supabase
-          .from("card_labels")
-          .insert({
-            card_id: input.cardId,
-            label: input.label,
-            color: input.color,
-          })
-          .select("id")
-          .single();
-
-        if (error) {
-          console.error("[Database] Label creation failed via Supabase:", error);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `Erro ao adicionar etiqueta: ${error.message}`,
-          });
-        }
-
-        return { id: data.id };
-      }),
-    deleteLabel: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        const { error } = await supabase.from("card_labels").delete().eq("id", input.id);
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-        return { success: true };
-      }),
-
     getAttachments: protectedProcedure
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {
@@ -1669,7 +1633,7 @@ export const appRouter = router({
         items: typeof t.items === 'string' ? JSON.parse(t.items) : t.items
       }));
     }),
-    apply: protectedProcedure
+    applyTemplate: protectedProcedure
       .input(z.object({
         cardId: z.number(),
         templateId: z.number(),
