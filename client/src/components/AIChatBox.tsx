@@ -1,79 +1,186 @@
-// client/src/components/AIChatBox.tsx
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Loader2, Send, User, Sparkles, Globe, Minimize2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Streamdown } from "streamdown";
+import { Toggle } from "@/components/ui/toggle";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+/**
+ * Message type matching server-side LLM Message interface
+ */
 export type Message = {
   role: "system" | "user" | "assistant";
   content: string;
 };
 
 export type AIChatBoxProps = {
+  /**
+   * Messages array to display in the chat.
+   * Should match the format used by invokeLLM on the server.
+   */
   messages: Message[];
-  onSendMessage: (
-    content: string,
-    options?: { useWebSearch?: boolean; shortResponse?: boolean }
-  ) => void;
+
+  /**
+   * Callback when user sends a message.
+   * Typically you'll call a tRPC mutation here to invoke the LLM.
+   */
+  onSendMessage: (content: string, options?: { useWebSearch?: boolean; shortResponse?: boolean }) => void;
+
+  /**
+   * Whether the AI is currently generating a response
+   */
   isLoading?: boolean;
+
+  /**
+   * Placeholder text for the input field
+   */
   placeholder?: string;
+
+  /**
+   * Custom className for the container
+   */
   className?: string;
+
+  /**
+   * Height of the chat box (default: 600px)
+   */
   height?: string | number;
+
+  /**
+   * Empty state message to display when no messages
+   */
   emptyStateMessage?: string;
+
+  /**
+   * Suggested prompts to display in empty state
+   * Click to send directly
+   */
   suggestedPrompts?: string[];
 };
 
+/**
+ * A ready-to-use AI chat box component that integrates with the LLM system.
+ *
+ * Features:
+ * - Matches server-side Message interface for seamless integration
+ * - Markdown rendering with Streamdown
+ * - Auto-scrolls to latest message
+ * - Loading states
+ * - Uses global theme colors from index.css
+ *
+ * @example
+ * ```tsx
+ * const ChatPage = () => {
+ *   const [messages, setMessages] = useState<Message[]>([
+ *     { role: "system", content: "You are a helpful assistant." }
+ *   ]);
+ *
+ *   const chatMutation = trpc.ai.chat.useMutation({
+ *     onSuccess: (response) => {
+ *       // Assuming your tRPC endpoint returns the AI response as a string
+ *       setMessages(prev => [...prev, {
+ *         role: "assistant",
+ *         content: response
+ *       }]);
+ *     },
+ *     onError: (error) => {
+ *       console.error("Chat error:", error);
+ *       // Optionally show error message to user
+ *     }
+ *   });
+ *
+ *   const handleSend = (content: string, options?: any) => {
+ *     const newMessages = [...messages, { role: "user", content }];
+ *     setMessages(newMessages);
+ *     chatMutation.mutate({ messages: newMessages, ...options });
+ *   };
+ *
+ *   return (
+ *     <AIChatBox
+ *       messages={messages}
+ *       onSendMessage={handleSend}
+ *       isLoading={chatMutation.isPending}
+ *       suggestedPrompts={[
+ *         "Explain quantum computing",
+ *         "Write a hello world in Python"
+ *       ]}
+ *     />
+ *   );
+ * };
+ * ```
+ */
 export function AIChatBox({
   messages,
   onSendMessage,
   isLoading = false,
-  placeholder = "Digite sua mensagem...",
+  placeholder = "Type your message...",
   className,
   height = "600px",
-  emptyStateMessage = "Olá! Sou o Maju IA. Como posso ajudar você hoje?",
+  emptyStateMessage = "Ola sou assistente Virtual D. como posso Ajudar.",
   suggestedPrompts,
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
   const [useWebSearch, setUseWebSearch] = useState(false);
   const [shortResponse, setShortResponse] = useState(false);
-
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputAreaRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Filter out system messages
   const displayMessages = messages.filter((msg) => msg.role !== "system");
 
-  // Auto scroll to bottom
+  // Calculate min-height for last assistant message to push user message to top
+  const [minHeightForLastMessage, setMinHeightForLastMessage] = useState(0);
+
   useEffect(() => {
+    if (containerRef.current && inputAreaRef.current) {
+      const containerHeight = containerRef.current.offsetHeight;
+      const inputHeight = inputAreaRef.current.offsetHeight;
+      const scrollAreaHeight = containerHeight - inputHeight;
+
+      // Reserve space for:
+      // - padding (p-4 = 32px top+bottom)
+      // - user message: 40px (item height) + 16px (margin-top from space-y-4) = 56px
+      // Note: margin-bottom is not counted because it naturally pushes the assistant message down
+      const userMessageReservedHeight = 56;
+      const calculatedHeight = scrollAreaHeight - 32 - userMessageReservedHeight;
+
+      setMinHeightForLastMessage(Math.max(0, calculatedHeight));
+    }
+  }, []);
+
+  // Scroll to bottom helper function with smooth animation
+  const scrollToBottom = () => {
     const viewport = scrollAreaRef.current?.querySelector(
-      "[data-radix-scroll-area-viewport]"
+      '[data-radix-scroll-area-viewport]'
     ) as HTMLDivElement;
 
     if (viewport) {
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         viewport.scrollTo({
           top: viewport.scrollHeight,
-          behavior: "smooth",
+          behavior: 'smooth'
         });
-      }, 100);
+      });
     }
-  }, [messages, isLoading]);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedInput = input.trim();
     if (!trimmedInput || isLoading) return;
 
-    onSendMessage(trimmedInput, {
-      useWebSearch,
-      shortResponse,
-    });
-
+    onSendMessage(trimmedInput, { useWebSearch, shortResponse });
     setInput("");
+
+    // Scroll immediately after sending
+    scrollToBottom();
+
+    // Keep focus on input
     textareaRef.current?.focus();
   };
 
@@ -84,125 +191,113 @@ export function AIChatBox({
     }
   };
 
-  const handleSuggestedPrompt = (prompt: string) => {
-    onSendMessage(prompt, { useWebSearch, shortResponse });
-  };
-
   return (
     <div
+      ref={containerRef}
       className={cn(
-        "flex flex-col bg-[#1a1a1a] text-white rounded-xl border border-[#333] shadow-xl overflow-hidden",
+        "flex flex-col bg-card text-card-foreground rounded-lg border shadow-sm",
         className
       )}
       style={{ height }}
     >
-      {/* Header com toggles */}
-      <div className="flex items-center justify-between border-b border-[#333] px-4 py-3 bg-[#222]">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-yellow-400" />
-          <span className="font-semibold text-sm">Maju IA</span>
-        </div>
-
-        <div className="flex items-center gap-4 text-xs">
-          {/* Toggle Pesquisar na Web */}
-          <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-blue-400" />
-            <Label htmlFor="web-search" className="text-xs cursor-pointer">
-              Web
-            </Label>
-            <Switch
-              id="web-search"
-              checked={useWebSearch}
-              onCheckedChange={setUseWebSearch}
-            />
-          </div>
-
-          {/* Toggle Resposta Curta */}
-          <div className="flex items-center gap-2">
-            <Minimize2 className="w-4 h-4 text-emerald-400" />
-            <Label htmlFor="short-response" className="text-xs cursor-pointer">
-              Curto
-            </Label>
-            <Switch
-              id="short-response"
-              checked={shortResponse}
-              onCheckedChange={setShortResponse}
-            />
-          </div>
-        </div>
-      </div>
-
       {/* Messages Area */}
-      <div className="flex-1 overflow-hidden">
+      <div ref={scrollAreaRef} className="flex-1 overflow-hidden">
         {displayMessages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-            <Sparkles className="w-16 h-16 text-yellow-400/30 mb-6" />
-            <p className="text-lg text-gray-400 mb-8">{emptyStateMessage}</p>
-
-            {suggestedPrompts && suggestedPrompts.length > 0 && (
-              <div className="flex flex-wrap gap-2 justify-center max-w-md">
-                {suggestedPrompts.map((prompt, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleSuggestedPrompt(prompt)}
-                    disabled={isLoading}
-                    className="px-4 py-2 text-sm bg-[#2a2a2a] hover:bg-[#333] border border-[#444] rounded-full transition-colors disabled:opacity-50"
-                  >
-                    {prompt}
-                  </button>
-                ))}
+          <div className="flex h-full flex-col p-4">
+            <div className="flex flex-1 flex-col items-center justify-center gap-6 text-muted-foreground">
+              <div className="flex flex-col items-center gap-3">
+                <Sparkles className="size-12 opacity-20" />
+                <p className="text-sm">{emptyStateMessage}</p>
               </div>
-            )}
+
+              {suggestedPrompts && suggestedPrompts.length > 0 && (
+                <div className="flex max-w-2xl flex-wrap justify-center gap-2">
+                  {suggestedPrompts.map((prompt, index) => (
+                    <button
+                      key={index}
+                      onClick={() => onSendMessage(prompt, { useWebSearch, shortResponse })}
+                      disabled={isLoading}
+                      className="rounded-lg border border-border bg-card px-4 py-2 text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
-          <ScrollArea className="h-full" ref={scrollAreaRef}>
-            <div className="p-4 space-y-6">
-              {displayMessages.map((message, index) => (
-                <div
-                  key={index}
-                  className={cn(
-                    "flex gap-3",
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  )}
-                >
-                  {message.role === "assistant" && (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex-shrink-0 flex items-center justify-center mt-1">
-                      <Sparkles className="w-4 h-4 text-black" />
-                    </div>
-                  )}
+          <ScrollArea className="h-full">
+            <div className="flex flex-col space-y-4 p-4">
+              {displayMessages.map((message, index) => {
+                // Apply min-height to last message only if NOT loading (when loading, the loading indicator gets it)
+                const isLastMessage = index === displayMessages.length - 1;
+                const shouldApplyMinHeight =
+                  isLastMessage && !isLoading && minHeightForLastMessage > 0;
 
+                return (
                   <div
+                    key={index}
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-4 py-3 text-sm",
+                      "flex gap-3",
                       message.role === "user"
-                        ? "bg-yellow-500 text-black"
-                        : "bg-[#2a2a2a] text-gray-200"
+                        ? "justify-end items-start"
+                        : "justify-start items-start"
                     )}
+                    style={
+                      shouldApplyMinHeight
+                        ? { minHeight: `${minHeightForLastMessage}px` }
+                        : undefined
+                    }
                   >
-                    {message.role === "assistant" ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <Streamdown>{message.content}</Streamdown>
+                    {message.role === "assistant" && (
+                      <div className="size-8 shrink-0 mt-1 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Sparkles className="size-4 text-primary" />
                       </div>
-                    ) : (
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    )}
+
+                    <div
+                      className={cn(
+                        "max-w-[80%] rounded-lg px-4 py-2.5",
+                        message.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-foreground"
+                      )}
+                    >
+                      {message.role === "assistant" ? (
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <Streamdown>{message.content}</Streamdown>
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap text-sm">
+                          {message.content}
+                        </p>
+                      )}
+                    </div>
+
+                    {message.role === "user" && (
+                      <div className="size-8 shrink-0 mt-1 rounded-full bg-secondary flex items-center justify-center">
+                        <User className="size-4 text-secondary-foreground" />
+                      </div>
                     )}
                   </div>
-
-                  {message.role === "user" && (
-                    <div className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 flex items-center justify-center mt-1">
-                      <User className="w-4 h-4" />
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
 
               {isLoading && (
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex-shrink-0 flex items-center justify-center mt-1">
-                    <Sparkles className="w-4 h-4 text-black" />
+                <div
+                  className="flex items-start gap-3"
+                  style={
+                    minHeightForLastMessage > 0
+                      ? { minHeight: `${minHeightForLastMessage}px` }
+                      : undefined
+                  }
+                >
+                  <div className="size-8 shrink-0 mt-1 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="size-4 text-primary" />
                   </div>
-                  <div className="bg-[#2a2a2a] rounded-2xl px-4 py-3">
-                    <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                  <div className="rounded-lg bg-muted px-4 py-2.5">
+                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
                   </div>
                 </div>
               )}
@@ -212,37 +307,72 @@ export function AIChatBox({
       </div>
 
       {/* Input Area */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-[#333] bg-[#1a1a1a]">
-        <div className="flex gap-2">
+      <div className="border-t bg-background/50 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Toggle
+                  size="sm"
+                  pressed={useWebSearch}
+                  onPressedChange={setUseWebSearch}
+                  className="h-8 w-8 p-0 data-[state=on]:bg-primary/20 data-[state=on]:text-primary"
+                >
+                  <Globe className="h-4 w-4" />
+                </Toggle>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Pesquisar na Web</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Toggle
+                  size="sm"
+                  pressed={shortResponse}
+                  onPressedChange={setShortResponse}
+                  className="h-8 w-8 p-0 data-[state=on]:bg-primary/20 data-[state=on]:text-primary"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                </Toggle>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Resposta Curta</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <div className="flex-1" />
+        </div>
+
+        <form
+          ref={inputAreaRef}
+          onSubmit={handleSubmit}
+          className="flex gap-2 items-end"
+        >
           <Textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            className="flex-1 min-h-[52px] max-h-[160px] resize-y bg-[#222] border-[#444] focus:border-yellow-500 text-sm"
+            className="flex-1 max-h-32 resize-none min-h-9"
             rows={1}
-            disabled={isLoading}
           />
           <Button
             type="submit"
             size="icon"
             disabled={!input.trim() || isLoading}
-            className="h-[52px] w-[52px] bg-yellow-500 hover:bg-yellow-600 text-black shrink-0"
+            className="shrink-0 h-[38px] w-[38px]"
           >
             {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
             ) : (
-              <Send className="w-5 h-5" />
+              <Send className="size-4" />
             )}
           </Button>
-        </div>
-
-        <p className="text-[10px] text-gray-500 mt-2 text-center">
-          {useWebSearch && "🔍 Pesquisando na web • "}
-          {shortResponse && "📝 Resposta curta ativada"}
-        </p>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

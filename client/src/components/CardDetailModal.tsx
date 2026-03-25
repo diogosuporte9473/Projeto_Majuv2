@@ -4,7 +4,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter, 
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { 
@@ -171,13 +172,15 @@ export default function CardDetailModal({
       if (selectedTemplateId) {
         const template = (templates as any)?.find((t: any) => t.id === parseInt(selectedTemplateId));
         if (template && Array.isArray(template.items)) {
-          for (const itemTitle of template.items) {
-            await addChecklistMutation.mutateAsync({ 
+          // Usar Promise.all para performance
+          await Promise.all(template.items.map((itemTitle: string, index: number) => 
+            addChecklistMutation.mutateAsync({ 
               cardId, 
               groupId: group.id, 
-              title: itemTitle 
-            });
-          }
+              title: itemTitle,
+              position: index
+            })
+          ));
           await incrementUsageMutation.mutateAsync({ id: template.id });
         }
       }
@@ -188,6 +191,7 @@ export default function CardDetailModal({
       await utils.cardDetails.getChecklists.invalidate({ cardId });
       toast.success("Checklist criado");
     } catch (error) {
+      console.error("Erro ao criar checklist:", error);
       toast.error("Erro ao criar checklist");
     }
   };
@@ -400,16 +404,19 @@ export default function CardDetailModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        aria-describedby={undefined}
         showCloseButton={false}
         className={`
           ${isMaximized 
             ? "max-w-[100vw] w-full h-full rounded-none" 
-            : "max-w-5xl w-[95vw] h-[92vh] rounded-xl"} 
+            : "max-w-7xl w-[95vw] h-[92vh] rounded-xl"} 
           overflow-hidden bg-[#1a1a1a] text-white border-[#333] p-0 transition-all duration-300 
           flex flex-col fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
         `}
       >
+        <div className="sr-only">
+          <DialogTitle>{cardTitle}</DialogTitle>
+          <DialogDescription>Detalhes do cartão {cardTitle} na lista {listName}</DialogDescription>
+        </div>
         {/* Header */}
         <DialogHeader className="p-5 border-b border-[#333]/60 bg-[#1e1e1e] flex-shrink-0">
           <div className="flex items-start justify-between gap-4">
@@ -435,38 +442,70 @@ export default function CardDetailModal({
                   <Edit2 className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </DialogTitle>
               )}
-              <p className="text-sm text-gray-400 mt-1 flex items-center gap-2">
-                na lista <span className="font-medium text-gray-300 underline">{listName}</span>
+              
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
+                <p className="text-xs text-gray-400 flex items-center gap-2">
+                  na lista <span className="font-medium text-gray-300 underline">{listName}</span>
+                </p>
+
                 {(card?.startDate || card?.dueDate) && (
-                  <>
-                    <span className="text-gray-600">•</span>
-                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500">
-                      <CalendarDays size={12} className="text-gray-600" />
-                      {card.startDate && format(new Date(card.startDate), "dd/MM/yy")}
-                      {card.startDate && card.dueDate && " — "}
-                      {card.dueDate && format(new Date(card.dueDate), "dd/MM/yy")}
-                    </span>
-                  </>
+                  <div className="flex items-center gap-3 border-l border-[#333] pl-4">
+                    {card.startDate && (
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter">Início</span>
+                        <span className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-400">
+                          <Calendar size={12} />
+                          {format(new Date(card.startDate), "dd 'de' MMM, yyyy", { locale: ptBR })}
+                        </span>
+                      </div>
+                    )}
+                    {card.dueDate && (
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter">Entrega</span>
+                        <span className={`flex items-center gap-1.5 text-[11px] font-semibold ${
+                          new Date(card.dueDate) < new Date() ? "text-red-400" : "text-green-400"
+                        }`}>
+                          <Clock size={12} />
+                          {format(new Date(card.dueDate), "dd 'de' MMM, yyyy", { locale: ptBR })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={() => setIsMaximized(!isMaximized)}>
-                {isMaximized ? <Minimize2 /> : <Maximize2 />}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsMaximized(!isMaximized)}
+                className="hover:bg-white/10 text-gray-400"
+                title={isMaximized ? "Recolher" : "Expandir"}
+              >
+                {isMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
               </Button>
-              <Button variant="ghost" size="icon" onClick={onClose}>
-                <X />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onClose}
+                className="hover:bg-red-500/10 hover:text-red-400 text-gray-400"
+              >
+                <X size={18} />
               </Button>
             </div>
           </div>
         </DialogHeader>
 
-        {/* Main content - Single Column Layout */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-          
-          {/* Section 1: Quick Info & Actions Row */}
-          <div className="flex flex-col md:flex-row justify-between gap-6 pb-6 border-b border-[#333]/30">
+        {/* Main content - Dynamic Column Layout */}
+        <div className={`flex-1 overflow-y-auto p-6 custom-scrollbar ${isMaximized ? "px-12" : "px-6"}`}>
+          <div className={`grid gap-8 ${isMaximized ? "grid-cols-12" : "grid-cols-1"}`}>
+            
+            {/* Left/Main Column */}
+            <div className={`${isMaximized ? "col-span-9" : "w-full"} space-y-8`}>
+              
+              {/* Section 1: Quick Info & Actions Row */}
+              <div className="flex flex-col md:flex-row justify-between gap-6 pb-6 border-b border-[#333]/30">
             <div className="flex flex-wrap gap-8">
               {labels && labels.length > 0 && (
                 <div className="space-y-2">
@@ -1155,51 +1194,64 @@ export default function CardDetailModal({
             </div>
           </section>
 
-          {/* Section 7: Final Actions Footer */}
-          <div className="pt-10 pb-6 border-t border-[#333]/30 flex flex-col space-y-4">
-            {mirrors && mirrors.length > 0 && (
-              <div className="flex flex-wrap gap-2 items-center">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mr-2">Espelhado em:</span>
-                {mirrors.map((m: any) => (
-                  <div key={m.boardId} className="flex items-center gap-1.5 text-[10px] text-accent font-bold bg-accent/10 px-3 py-1 rounded-full border border-accent/20">
-                    <LayoutGrid size={12} />
-                    {m.boardName}
+            </div>
+
+            {/* Right/Sidebar Column (Visible only in Maximized mode) */}
+            {isMaximized && (
+              <div className="col-span-3 space-y-8 bg-[#1e1e1e]/50 p-6 rounded-2xl border border-[#333]/30 h-fit sticky top-0">
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                      <LayoutGrid size={12} /> Ações Rápidas
+                    </h4>
+                    <div className="grid grid-cols-1 gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setIsMirrorDialogOpen(true)}
+                        className="bg-[#2a2a2a] hover:bg-[#333] text-gray-300 justify-start h-9 px-4 rounded-lg text-xs font-bold"
+                      >
+                        <Copy className="w-3.5 h-3.5 mr-2" /> Espelhar
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={handleArchiveCard}
+                        className="bg-[#2a2a2a] hover:bg-amber-950/30 hover:text-amber-400 text-gray-300 justify-start h-9 px-4 rounded-lg text-xs font-bold transition-all"
+                      >
+                        <Archive className="w-3.5 h-3.5 mr-2" /> Arquivar
+                      </Button>
+                      {currentUser?.role === 'admin' && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={handleDeleteCard}
+                          className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 justify-start h-9 px-4 rounded-lg text-xs font-bold transition-all"
+                        >
+                          <Trash className="w-3.5 h-3.5 mr-2" /> Excluir Cartão
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                ))}
+
+                  <Separator className="bg-[#333]/50" />
+
+                  {mirrors && mirrors.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Espelhamento Ativo</h4>
+                      <div className="space-y-2">
+                        {mirrors.map((m: any) => (
+                          <div key={m.boardId} className="flex items-center gap-2 text-[10px] text-accent font-bold bg-accent/10 px-3 py-2 rounded-lg border border-accent/20">
+                            <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                            {m.boardName}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex flex-wrap gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setIsMirrorDialogOpen(true)}
-                  className="bg-[#222] hover:bg-[#2a2a2a] text-gray-300 gap-2 h-9 px-4 rounded-lg text-xs font-bold"
-                >
-                  <Copy className="w-4 h-4" /> Espelhar
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleArchiveCard}
-                  className="bg-[#222] hover:bg-amber-950/30 hover:text-amber-400 text-gray-300 gap-2 h-9 px-4 rounded-lg text-xs font-bold transition-all"
-                >
-                  <Archive className="w-4 h-4" /> Arquivar
-                </Button>
-              </div>
-              
-              {currentUser?.role === 'admin' && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleDeleteCard}
-                  className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 gap-2 h-9 px-4 rounded-lg text-xs font-bold transition-all"
-                >
-                  <Trash className="w-4 h-4" /> Excluir Cartão
-                </Button>
-              )}
-            </div>
           </div>
         </div>
 

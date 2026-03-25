@@ -135,12 +135,16 @@ export default function BoardView() {
     }
   };
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, options?: { useWebSearch?: boolean; shortResponse?: boolean }) => {
     const newMessages: Message[] = [...messages, { role: "user", content }];
     setMessages(newMessages);
     
     try {
-      const response = await aiChatMutation.mutateAsync({ messages: newMessages });
+      const response = await aiChatMutation.mutateAsync({ 
+        messages: newMessages,
+        useWebSearch: options?.useWebSearch,
+        shortResponse: options?.shortResponse
+      });
       setMessages(prev => [...prev, { role: "assistant", content: response }]);
     } catch (error) {
       toast.error("Erro ao falar com a IA");
