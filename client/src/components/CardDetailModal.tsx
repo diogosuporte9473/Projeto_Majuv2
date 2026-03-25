@@ -22,9 +22,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { format } from "date-fns";
+import { format, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 interface CardDetailModalProps {
   isOpen: boolean;
@@ -397,28 +398,26 @@ export default function CardDetailModal({
     }
   };
 
-  const checklistProgress = checklists?.length 
-    ? (checklists.filter((i: any) => i.completed).length / checklists.length) * 100 
-    : 0;
+  const isOverdue = card?.dueDate && isBefore(new Date(card.dueDate), new Date());
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
         showCloseButton={false}
-        className={`
-          ${isMaximized 
-            ? "max-w-[100vw] w-full h-full rounded-none" 
-            : "max-w-7xl w-[95vw] h-[92vh] rounded-xl"} 
-          overflow-hidden bg-[#1a1a1a] text-white border-[#333] p-0 transition-all duration-300 
-          flex flex-col fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-        `}
+        className={cn(
+          "overflow-hidden bg-[#1a1a1a] text-white border-[#333] p-0 transition-all duration-500 ease-in-out flex flex-col fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+          isMaximized 
+            ? "max-w-[95vw] w-[1400px] h-[94vh] rounded-2xl shadow-2xl" 
+            : "max-w-[1100px] w-[90vw] h-[88vh] rounded-xl shadow-xl"
+        )}
       >
         <div className="sr-only">
           <DialogTitle>{cardTitle}</DialogTitle>
           <DialogDescription>Detalhes do cartão {cardTitle} na lista {listName}</DialogDescription>
         </div>
+
         {/* Header */}
-        <DialogHeader className="p-5 border-b border-[#333]/60 bg-[#1e1e1e] flex-shrink-0">
+        <DialogHeader className="p-6 border-b border-[#333]/60 bg-[#1e1e1e] flex-shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               {isEditingTitle ? (
@@ -427,7 +426,7 @@ export default function CardDetailModal({
                     type="text"
                     value={editedTitle}
                     onChange={(e) => setEditedTitle(e.target.value)}
-                    className="text-xl font-bold bg-[#2a2a2a] border-b-2 border-accent outline-none text-white w-full px-2 py-1 rounded shadow-inner"
+                    className="text-2xl font-bold bg-[#2a2a2a] border-b-2 border-accent outline-none text-white w-full px-2 py-1 rounded shadow-inner"
                     autoFocus
                     onBlur={handleUpdateTitle}
                     onKeyDown={(e) => e.key === "Enter" && handleUpdateTitle()}
@@ -435,908 +434,951 @@ export default function CardDetailModal({
                 </div>
               ) : (
                 <DialogTitle 
-                  className="text-xl font-bold leading-tight break-words cursor-pointer hover:text-accent transition-colors flex items-center gap-2 group"
+                  className="text-2xl font-bold leading-tight break-words cursor-pointer hover:text-accent transition-colors flex items-center gap-2 group"
                   onClick={() => setIsEditingTitle(true)}
                 >
                   {cardTitle}
-                  <Edit2 className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Edit2 className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400" />
                 </DialogTitle>
               )}
               
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
-                <p className="text-xs text-gray-400 flex items-center gap-2">
-                  na lista <span className="font-medium text-gray-300 underline">{listName}</span>
+              <div className="flex flex-col gap-2 mt-2">
+                <p className="text-sm text-gray-400 flex items-center gap-2">
+                  na lista <span className="font-semibold text-gray-200 underline decoration-gray-600 underline-offset-4">{listName}</span>
                 </p>
 
-                {(card?.startDate || card?.dueDate) && (
-                  <div className="flex items-center gap-3 border-l border-[#333] pl-4">
-                    {card.startDate && (
-                      <div className="flex flex-col">
-                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter">Início</span>
-                        <span className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-400">
-                          <Calendar size={12} />
-                          {format(new Date(card.startDate), "dd 'de' MMM, yyyy", { locale: ptBR })}
-                        </span>
-                      </div>
-                    )}
-                    {card.dueDate && (
-                      <div className="flex flex-col">
-                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tighter">Entrega</span>
-                        <span className={`flex items-center gap-1.5 text-[11px] font-semibold ${
-                          new Date(card.dueDate) < new Date() ? "text-red-400" : "text-green-400"
-                        }`}>
-                          <Clock size={12} />
+                <div className="flex items-center gap-4 py-1">
+                  {card?.startDate && (
+                    <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-blue-500/5 border border-blue-500/10">
+                      <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                      <span className="text-xs font-medium text-gray-400">
+                        Início: <span className="text-gray-200">{format(new Date(card.startDate), "dd 'de' MMM, yyyy", { locale: ptBR })}</span>
+                      </span>
+                    </div>
+                  )}
+                  
+                  {card?.dueDate && (
+                    <div className={cn(
+                      "flex items-center gap-2 px-2.5 py-1 rounded-md border",
+                      isOverdue 
+                        ? "bg-red-500/10 border-red-500/20 animate-pulse" 
+                        : "bg-green-500/5 border-green-500/10"
+                    )}>
+                      <Clock className={cn("w-3.5 h-3.5", isOverdue ? "text-red-400" : "text-green-400")} />
+                      <span className="text-xs font-medium text-gray-400">
+                        Entrega: <span className={cn(isOverdue ? "text-red-400 font-bold" : "text-gray-200")}>
                           {format(new Date(card.dueDate), "dd 'de' MMM, yyyy", { locale: ptBR })}
                         </span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      </span>
+                    </div>
+                  )}
+
+                  {!card?.startDate && !card?.dueDate && (
+                    <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest opacity-60">Sem datas definidas</span>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-3">
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsMaximized(!isMaximized)}
-                className="hover:bg-white/10 text-gray-400"
+                className={cn(
+                  "hover:bg-accent/10 h-10 w-10 rounded-xl transition-all duration-300",
+                  isMaximized ? "text-accent bg-accent/5" : "text-gray-400"
+                )}
                 title={isMaximized ? "Recolher" : "Expandir"}
               >
-                {isMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                {isMaximized ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
               </Button>
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={onClose}
-                className="hover:bg-red-500/10 hover:text-red-400 text-gray-400"
+                className="hover:bg-red-500/10 hover:text-red-400 text-gray-400 h-10 w-10 rounded-xl transition-colors"
               >
-                <X size={18} />
+                <X size={20} />
               </Button>
             </div>
           </div>
         </DialogHeader>
 
-        {/* Main content - Dynamic Column Layout */}
-        <div className={`flex-1 overflow-y-auto p-6 custom-scrollbar ${isMaximized ? "px-12" : "px-6"}`}>
-          <div className={`grid gap-8 ${isMaximized ? "grid-cols-12" : "grid-cols-1"}`}>
+        {/* Main Content Area */}
+        <div className={cn(
+          "flex-1 overflow-y-auto custom-scrollbar transition-all duration-500",
+          isMaximized ? "p-10 px-16" : "p-8 px-10"
+        )}>
+          <div className={cn(
+            "grid gap-12",
+            isMaximized ? "grid-cols-12" : "grid-cols-12"
+          )}>
             
-            {/* Left/Main Column */}
-            <div className={`${isMaximized ? "col-span-9" : "w-full"} space-y-8`}>
+            {/* Left Column (Main Content) */}
+            <div className={cn(
+              "space-y-12 transition-all duration-500",
+              isMaximized ? "col-span-8" : "col-span-12 lg:col-span-9"
+            )}>
               
-              {/* Section 1: Quick Info & Actions Row */}
-              <div className="flex flex-col md:flex-row justify-between gap-6 pb-6 border-b border-[#333]/30">
-            <div className="flex flex-wrap gap-8">
-              {labels && labels.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Etiquetas</h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {labels.map((label: any) => (
-                      <div 
-                        key={label.id} 
-                        className="px-3 py-1 rounded text-xs font-semibold text-white shadow-sm" 
-                        style={{ backgroundColor: label.color }}
-                      >
-                        {label.label}
-                      </div>
-                    ))}
-                    <Button variant="ghost" size="icon" className="w-6 h-6 rounded-full bg-[#2a2a2a] hover:bg-[#333]">
-                      <Plus className="w-3 h-3 text-gray-400" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {(card?.startDate || card?.dueDate) && (
-                <div className="space-y-2">
-                  <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Prazo</h4>
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium ${ 
-                    card.dueDate && new Date(card.dueDate) < new Date() ? "bg-red-950/40 text-red-300" : "bg-[#2a2a2a] text-gray-200" 
-                  }`}>
-                    <Clock size={14} />
-                    {card.startDate && (
-                      <span>
-                        {format(new Date(card.startDate), "dd 'de' MMM", { locale: ptBR })} -{" "}
-                      </span>
-                    )}
-                    {card.dueDate ? (
-                      <span>{format(new Date(card.dueDate), "dd 'de' MMM, yyyy", { locale: ptBR })}</span>
-                    ) : (
-                      <span className="text-gray-500 italic">Sem data de entrega</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Adicionar ao cartão</h4>
-              <div className="flex flex-wrap gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
-                      <Tag className="w-3.5 h-3.5 mr-2" /> Etiquetas
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-4">
+              {/* Quick Actions & Labels */}
+              <div className="flex flex-col md:flex-row justify-between items-start gap-8 pb-10 border-b border-[#333]/40">
+                <div className="flex flex-wrap gap-10">
+                  {labels && labels.length > 0 && (
                     <div className="space-y-4">
-                      <h3 className="text-sm font-bold text-gray-200">Etiquetas</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {labels?.map((label: any) => (
-                          <div
-                            key={label.id}
-                            className="flex items-center gap-2 px-2 py-1 rounded text-white text-[10px] font-bold group"
+                      <h4 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                        <Tag className="w-3 h-3" /> Etiquetas
+                      </h4>
+                      <div className="flex flex-wrap gap-2.5">
+                        {labels.map((label: any) => (
+                          <div 
+                            key={label.id} 
+                            className="px-4 py-1.5 rounded-md text-[11px] font-bold text-white shadow-sm ring-1 ring-white/10 hover:brightness-110 transition-all cursor-default" 
                             style={{ backgroundColor: label.color }}
                           >
                             {label.label}
-                            <button onClick={() => handleRemoveLabel(label.id)} className="hover:bg-black/20 rounded p-0.5 transition-colors">
-                              <X className="w-3 h-3" />
-                            </button>
                           </div>
                         ))}
-                      </div>
-                      <Separator className="bg-[#333]" />
-                      <div className="space-y-3">
-                        <input
-                          type="text"
-                          value={newLabel}
-                          onChange={(e) => setNewLabel(e.target.value)}
-                          placeholder="Nova etiqueta..."
-                          className="w-full bg-[#2a2a2a] border border-[#333] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-accent"
-                        />
-                        <div className="flex items-center justify-between gap-3">
-                          <input
-                            type="color"
-                            value={newLabelColor}
-                            onChange={(e) => setNewLabelColor(e.target.value)}
-                            className="w-8 h-8 rounded bg-transparent border-none cursor-pointer p-0"
-                          />
-                          <Button onClick={handleAddLabel} size="sm" className="bg-accent text-white h-8 text-[10px]">
-                            Adicionar
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-
-                <Popover open={isCreatingChecklist} onOpenChange={setIsCreatingChecklist}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
-                      <CheckSquare className="w-3.5 h-3.5 mr-2" /> Checklist
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72 bg-[#1a1a1a] border-[#333] p-4 shadow-2xl animate-in fade-in zoom-in duration-200">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-gray-200">Adicionar Checklist</h3>
-                        <button onClick={() => setIsCreatingChecklist(false)} className="text-gray-500 hover:text-white transition-colors">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Título</label>
-                        <input
-                          autoFocus
-                          type="text"
-                          value={newChecklistGroupTitle}
-                          onChange={(e) => setNewChecklistGroupTitle(e.target.value)}
-                          placeholder="Ex: Checklist de Pagamento"
-                          className="w-full bg-[#2a2a2a] border border-[#333] rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-accent transition-all"
-                          onKeyDown={(e) => e.key === "Enter" && handleAddChecklistGroup()}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Usar modelo existente</label>
-                        <Select 
-                          value={selectedTemplateId} 
-                          onValueChange={(val) => {
-                            setSelectedTemplateId(val);
-                            const template = (templates as any)?.find((t: any) => t.id === parseInt(val));
-                            if (template) setNewChecklistGroupTitle(template.name);
-                          }}
-                        >
-                          <SelectTrigger className="bg-[#2a2a2a] border-[#333] h-9 text-xs text-gray-300">
-                            <SelectValue placeholder="Selecione um modelo..." />
-                          </SelectTrigger>
-                          <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
-                            {(templates as any)?.map((t: any) => (
-                              <SelectItem key={t.id} value={t.id.toString()} className="text-xs">
-                                <div className="flex items-center gap-2">
-                                  <span>{t.name}</span>
-                                  {t.isGlobal && <span className="text-[8px] bg-accent/20 text-accent px-1 rounded">GLOBAL</span>}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          onClick={handleAddChecklistGroup} 
-                          size="sm" 
-                          className="bg-accent text-white h-9 px-4 text-xs font-bold rounded-lg shadow-lg shadow-accent/20"
-                          disabled={addChecklistGroupMutation.isPending}
-                        >
-                          {addChecklistGroupMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : null}
-                          Adicionar checklist
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => setIsCreatingChecklist(false)} 
-                          className="h-9 text-xs text-gray-400 hover:text-white"
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8">
-                      <Clock className="w-3.5 h-3.5 mr-2" /> Datas
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72 p-0 bg-[#1a1a1a] border-[#333] shadow-2xl">
-                    <div className="p-4 space-y-4">
-                      <h3 className="text-sm font-bold text-gray-200">Definir Período</h3>
-                      
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Data de Início</label>
-                        <input 
-                          type="date" 
-                          className="bg-[#2a2a2a] border border-[#333] rounded px-3 py-2 text-xs text-white w-full focus:ring-1 focus:ring-accent outline-none"
-                          onChange={(e) => handleUpdateStartDate(e.target.value ? new Date(e.target.value) : null)}
-                          defaultValue={card?.startDate ? new Date(card.startDate).toISOString().split('T')[0] : ''}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Data de Entrega</label>
-                        <input 
-                          type="date" 
-                          className="bg-[#2a2a2a] border border-[#333] rounded px-3 py-2 text-xs text-white w-full focus:ring-1 focus:ring-accent outline-none"
-                          onChange={(e) => handleUpdateDueDate(e.target.value ? new Date(e.target.value) : null)}
-                          defaultValue={card?.dueDate ? new Date(card.dueDate).toISOString().split('T')[0] : ''}
-                        />
-                      </div>
-
-                      <div className="flex gap-2 pt-2">
-                        {(card?.startDate || card?.dueDate) && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="flex-1 text-[10px] text-red-400 hover:text-red-500 hover:bg-red-500/10 h-8"
-                            onClick={() => {
-                              handleUpdateStartDate(null);
-                              handleUpdateDueDate(null);
-                            }}
-                          >
-                            Remover Tudo
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="bg-[#2a2a2a] border-none hover:bg-[#333] text-xs h-8"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Paperclip className="w-3.5 h-3.5 mr-2" /> Anexar
-                </Button>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  onChange={handleFileUpload}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Description */}
-          <section className="space-y-4">
-            <div className="flex items-center gap-3">
-              <AlignLeft className="w-5 h-5 text-gray-400" />
-              <h3 className="font-bold text-lg text-gray-200">Descrição</h3>
-            </div>
-            <div className="pl-8">
-              <textarea 
-                value={description} 
-                onChange={(e) => setDescription(e.target.value)} 
-                onBlur={handleUpdateDescription} 
-                placeholder="Adicione uma descrição mais detalhada..." 
-                className="w-full min-h-[120px] bg-[#222] border border-[#333] rounded-xl p-4 text-sm resize-y focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all outline-none" 
-              />
-            </div>
-          </section>
-
-          {/* Section 3: Custom Fields */}
-          <section className="space-y-4">
-            <div className="flex items-center gap-3">
-              <LayoutGrid className="w-5 h-5 text-gray-400" />
-              <h3 className="font-bold text-lg text-gray-200">Campos personalizados</h3>
-            </div>
-            <div className="pl-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Mapa de Calor</label>
-                </div>
-                <Select 
-                  value={getCustomFieldValue("Mapa de Calor")}
-                  onValueChange={(val) => handleUpsertCustomField("Mapa de Calor", val)}
-                >
-                  <SelectTrigger className="bg-[#222] border-[#333] h-10 rounded-lg text-xs font-medium">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
-                    <SelectItem value="Baixo">Baixo</SelectItem>
-                    <SelectItem value="Médio">Médio</SelectItem>
-                    <SelectItem value="Alto">Alto</SelectItem>
-                    <SelectItem value="Crítico">Crítico</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</label>
-                </div>
-                <Select 
-                  value={getCustomFieldValue("Status")}
-                  onValueChange={(val) => handleUpsertCustomField("Status", val)}
-                >
-                  <SelectTrigger className="bg-[#222] border-[#333] h-10 rounded-lg text-xs font-medium">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
-                    <SelectItem value="Pendente">Pendente</SelectItem>
-                    <SelectItem value="Em Andamento">Em Andamento</SelectItem>
-                    <SelectItem value="Concluído">Concluído</SelectItem>
-                    <SelectItem value="Bloqueado">Bloqueado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Classificação do Cliente</label>
-                </div>
-                <Select 
-                  value={getCustomFieldValue("Classificação")}
-                  onValueChange={(val) => handleUpsertCustomField("Classificação", val)}
-                >
-                  <SelectTrigger className="bg-[#222] border-[#333] h-10 rounded-lg text-xs font-medium">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
-                    <SelectItem value="Bronze">Bronze</SelectItem>
-                    <SelectItem value="Prata">Prata</SelectItem>
-                    <SelectItem value="Ouro">Ouro</SelectItem>
-                    <SelectItem value="Diamante">Diamante</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </section>
-
-          {/* Section 4: Checklists (Multiple Groups) */}
-          {checklistsLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin text-accent" />
-            </div>
-          ) : (
-            <div className="space-y-12">
-              {checklists?.map((group: any) => {
-                const groupItems = group.items || [];
-                const groupProgress = groupItems.length 
-                  ? (groupItems.filter((i: any) => i.completed).length / groupItems.length) * 100 
-                  : 0;
-
-                return (
-                  <section key={group.id} className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <CheckSquare className="w-5 h-5 text-gray-400" />
-                        {editingGroupId === group.id ? (
-                          <input
-                            autoFocus
-                            defaultValue={group.title}
-                            onBlur={(e) => handleUpdateChecklistGroup(group.id, e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleUpdateChecklistGroup(group.id, (e.target as HTMLInputElement).value)}
-                            className="bg-[#2a2a2a] border border-accent/40 rounded px-2 py-1 text-lg font-bold text-gray-200 outline-none w-full max-w-md focus:ring-1 focus:ring-accent/30"
-                          />
-                        ) : (
-                          <h3 
-                            onClick={() => setEditingGroupId(group.id)}
-                            className="font-bold text-lg text-gray-200 cursor-pointer hover:bg-white/5 px-2 py-1 rounded transition-all"
-                          >
-                            {group.title}
-                          </h3>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-sm font-bold text-gray-500 bg-[#222] px-2 py-1 rounded border border-[#333]">
-                          {Math.round(groupProgress)}%
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleDeleteChecklistGroup(group.id)}
-                          className="text-gray-500 hover:text-red-400 h-8 px-2"
-                        >
-                          Remover
-                        </Button>
-                        <Popover open={isSavingAsTemplate && editingGroupId === group.id} onOpenChange={(open) => {
-                          setIsSavingAsTemplate(open);
-                          setEditingGroupId(open ? group.id : null);
-                        }}>
+                        <Popover>
                           <PopoverTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="text-gray-500 hover:text-accent h-8 px-2"
-                              title="Salvar como modelo"
-                            >
-                              <Copy className="w-3.5 h-3.5" />
+                            <Button variant="ghost" size="icon" className="w-8 h-8 rounded-md bg-[#2a2a2a] hover:bg-[#333] transition-colors border border-[#333]">
+                              <Plus className="w-4 h-4 text-gray-400" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-3 shadow-2xl">
-                            <div className="space-y-3">
-                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Salvar como Modelo</p>
-                              <input
-                                type="text"
-                                value={templateName}
-                                onChange={(e) => setTemplateName(e.target.value)}
-                                placeholder="Nome do modelo..."
-                                className="w-full bg-[#222] border border-[#333] rounded px-2 py-1.5 text-xs text-white outline-none focus:border-accent"
-                                autoFocus
-                              />
-                              <div className="flex justify-end gap-2">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  onClick={() => {
-                                    setIsSavingAsTemplate(false);
-                                    setTemplateName("");
-                                  }}
-                                  className="h-7 text-[10px]"
-                                >
-                                  Cancelar
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  onClick={() => handleSaveAsTemplate(groupItems.map((i: any) => i.title))}
-                                  className="h-7 text-[10px] bg-accent hover:bg-accent/90"
-                                >
-                                  Salvar
-                                </Button>
+                          <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-4 shadow-2xl">
+                            <div className="space-y-4">
+                              <h3 className="text-sm font-bold text-gray-200">Gerenciar Etiquetas</h3>
+                              <div className="flex flex-wrap gap-2">
+                                {labels?.map((label: any) => (
+                                  <div
+                                    key={label.id}
+                                    className="flex items-center gap-2 px-2.5 py-1 rounded text-white text-[10px] font-bold group ring-1 ring-white/10"
+                                    style={{ backgroundColor: label.color }}
+                                  >
+                                    {label.label}
+                                    <button onClick={() => handleRemoveLabel(label.id)} className="hover:bg-black/20 rounded p-0.5 transition-colors">
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                              <Separator className="bg-[#333]" />
+                              <div className="space-y-3">
+                                <input
+                                  type="text"
+                                  value={newLabel}
+                                  onChange={(e) => setNewLabel(e.target.value)}
+                                  placeholder="Nome da etiqueta..."
+                                  className="w-full bg-[#2a2a2a] border border-[#333] rounded px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-accent"
+                                />
+                                <div className="flex items-center justify-between gap-3">
+                                  <input
+                                    type="color"
+                                    value={newLabelColor}
+                                    onChange={(e) => setNewLabelColor(e.target.value)}
+                                    className="w-10 h-10 rounded-lg bg-transparent border-none cursor-pointer p-0"
+                                  />
+                                  <Button onClick={handleAddLabel} size="sm" className="bg-accent text-white h-9 px-4 text-xs font-bold">
+                                    Adicionar
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </PopoverContent>
                         </Popover>
                       </div>
                     </div>
+                  )}
+                </div>
 
-                    <div className="pl-8 space-y-4">
-                      <Progress value={groupProgress} className="h-2 bg-[#222]" />
-                      
-                      <div className="space-y-1">
-                        {groupItems.map((item: any) => {
-                          const isOverdue = item.due_date && new Date(item.due_date) < new Date() && !item.completed;
-                          const assignedUser = allUsers?.find((u: any) => u.id === item.assignedUserId);
+                <div className="space-y-4">
+                  <h4 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Adicionar ao cartão</h4>
+                  <div className="flex flex-wrap gap-3">
+                    <Popover open={isCreatingChecklist} onOpenChange={setIsCreatingChecklist}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="bg-[#2a2a2a] border border-[#333] hover:bg-[#333] text-xs h-10 px-5 font-bold rounded-xl transition-all">
+                          <CheckSquare className="w-4 h-4 mr-2.5 text-accent" /> Checklist
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 bg-[#1a1a1a] border-[#333] p-5 shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <div className="space-y-5">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-gray-200">Novo Checklist</h3>
+                            <button onClick={() => setIsCreatingChecklist(false)} className="text-gray-500 hover:text-white transition-colors">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
                           
-                          return (
-                            <div key={item.id} className="group flex items-start gap-4 p-2.5 rounded-xl hover:bg-white/5 transition-all">
-                              <input
-                                type="checkbox"
-                                checked={item.completed}
-                                onChange={() => handleUpdateChecklistItem(item.id, { completed: !item.completed })}
-                                className="w-5 h-5 mt-0.5 rounded border-[#444] bg-[#1a1a1a] text-accent focus:ring-0 cursor-pointer"
-                              />
-                              <div className="flex-1 min-w-0 space-y-2">
-                                <div className="flex items-center justify-between gap-2">
-                                  <input
-                                    defaultValue={item.title}
-                                    onBlur={(e) => handleUpdateChecklistItem(item.id, { title: e.target.value })}
-                                    className={`text-sm flex-1 bg-transparent border-none p-0 focus:ring-0 focus:outline-none font-medium ${item.completed ? "line-through text-gray-500" : "text-gray-200"}`}
-                                  />
-                                  <div className="flex items-center gap-1">
-                                    {/* Atribuir Usuário */}
-                                    <Popover>
-                                      <PopoverTrigger asChild>
-                                        <button className="p-1 rounded-full hover:bg-white/10 text-gray-500 transition-all" title="Atribuir tarefa">
-                                          {assignedUser ? (
-                                            <Avatar className="w-5 h-5">
-                                              <AvatarFallback className="bg-accent text-[8px] text-white">
-                                                {assignedUser.name?.charAt(0).toUpperCase()}
-                                              </AvatarFallback>
-                                            </Avatar>
-                                          ) : (
-                                            <UserIcon className="w-4 h-4" />
-                                          )}
-                                        </button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-1 shadow-2xl">
-                                        <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                                          <div className="p-2 border-b border-[#333] mb-1">
-                                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Atribuir a...</p>
-                                          </div>
-                                          {allUsers?.map((u: any) => (
-                                            <button
-                                              key={u.id}
-                                              onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: u.id })}
-                                              className={`w-full flex items-center gap-2 p-2 rounded hover:bg-white/5 text-left transition-colors ${item.assignedUserId === u.id ? "bg-accent/10 text-accent" : "text-gray-300"}`}
-                                            >
-                                              <Avatar className="w-6 h-6">
-                                                <AvatarFallback className="bg-[#2a2a2a] text-[10px]">
-                                                  {u.name?.charAt(0).toUpperCase()}
-                                                </AvatarFallback>
-                                              </Avatar>
-                                              <div className="flex flex-col">
-                                                <span className="text-xs font-bold">{u.name}</span>
-                                                <span className="text-[10px] text-gray-500">@{u.username}</span>
-                                              </div>
-                                            </button>
-                                          ))}
-                                          {item.assignedUserId && (
-                                            <button
-                                              onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: null })}
-                                              className="w-full text-center p-2 text-[10px] text-red-400 hover:bg-red-400/10 mt-1 rounded transition-colors"
-                                            >
-                                              Remover Atribuição
-                                            </button>
-                                          )}
-                                        </div>
-                                      </PopoverContent>
-                                    </Popover>
-
-                                    {/* Definir Data */}
-                                    <Popover>
-                                      <PopoverTrigger asChild>
-                                        <button className={`p-1 rounded-full hover:bg-white/10 transition-all ${item.due_date ? "text-accent" : "text-gray-500"}`} title="Definir data">
-                                          <CalendarDays className="w-4 h-4" />
-                                        </button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-[#333] shadow-2xl">
-                                        <div className="p-3 space-y-3">
-                                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Prazo do item</p>
-                                          <input
-                                            type="date"
-                                            className="bg-[#2a2a2a] border border-[#333] rounded px-3 py-1.5 text-xs text-white outline-none focus:ring-1 focus:ring-accent"
-                                            onChange={(e) => handleUpdateChecklistItem(item.id, { dueDate: e.target.value ? new Date(e.target.value) : null })}
-                                            defaultValue={item.due_date ? new Date(item.due_date).toISOString().split('T')[0] : ''}
-                                          />
-                                          {item.due_date && (
-                                            <button
-                                              onClick={() => handleUpdateChecklistItem(item.id, { dueDate: null })}
-                                              className="w-full text-center text-[10px] text-red-400 hover:text-red-500 py-1"
-                                            >
-                                              Remover Data
-                                            </button>
-                                          )}
-                                        </div>
-                                      </PopoverContent>
-                                    </Popover>
-
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <button className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-white/10 transition-all">
-                                          <MoreVertical className="w-4 h-4 text-gray-500" />
-                                        </button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent className="bg-[#1a1a1a] border-[#333] text-white shadow-2xl">
-                                        <DropdownMenuItem onClick={() => handleRemoveChecklist(item.id)} className="text-red-400 focus:text-red-400 focus:bg-red-400/10 cursor-pointer text-xs">
-                                          <Trash2 className="w-3.5 h-3.5 mr-2" /> Remover item
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-wrap items-center gap-3">
-                                  {item.due_date && (
-                                    <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded ${isOverdue ? "bg-red-500/10 text-red-400" : "bg-accent/10 text-accent"}`}>
-                                      <Clock className="w-3 h-3" />
-                                      {format(new Date(item.due_date), "dd 'de' MMM", { locale: ptBR })}
-                                    </div>
-                                  )}
-                                  {assignedUser && (
-                                    <div className="flex items-center gap-1.5 bg-[#2a2a2a] px-2 py-0.5 rounded border border-[#333]">
-                                      <Avatar className="w-3.5 h-3.5">
-                                        <AvatarFallback className="bg-accent text-[7px] text-white">
-                                          {assignedUser.name?.charAt(0).toUpperCase()}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <span className="text-[10px] font-bold text-gray-400">{assignedUser.name}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        
-                        <div className="mt-4">
-                          <div className="relative group">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Título</label>
                             <input
+                              autoFocus
                               type="text"
-                              value={newChecklistItems[group.id] || ""}
-                              onChange={(e) => setNewChecklistItems(prev => ({ ...prev, [group.id]: e.target.value }))}
-                              placeholder="Adicionar um item..."
-                              className="w-full bg-[#222] hover:bg-[#2a2a2a] border border-transparent focus:border-accent/40 rounded-lg px-4 py-2 text-sm text-gray-300 outline-none transition-all"
-                              onKeyDown={(e) => e.key === "Enter" && handleAddChecklistItem(group.id)}
+                              value={newChecklistGroupTitle}
+                              onChange={(e) => setNewChecklistGroupTitle(e.target.value)}
+                              placeholder="Ex: Tarefas Iniciais"
+                              className="w-full bg-[#2a2a2a] border border-[#333] rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-accent transition-all"
+                              onKeyDown={(e) => e.key === "Enter" && handleAddChecklistGroup()}
                             />
-                            {newChecklistItems[group.id] && (
-                              <Button 
-                                onClick={() => handleAddChecklistItem(group.id)} 
-                                size="sm" 
-                                className="absolute right-1 top-1 bg-accent hover:bg-accent/90 h-7 text-[10px] px-3 rounded-md"
-                              >
-                                Adicionar
-                              </Button>
-                            )}
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Usar Modelo</label>
+                            <Select 
+                              value={selectedTemplateId} 
+                              onValueChange={(val) => {
+                                setSelectedTemplateId(val);
+                                const template = (templates as any)?.find((t: any) => t.id === parseInt(val));
+                                if (template) setNewChecklistGroupTitle(template.name);
+                              }}
+                            >
+                              <SelectTrigger className="bg-[#2a2a2a] border-[#333] h-10 rounded-lg text-xs text-gray-300">
+                                <SelectValue placeholder="Selecione um modelo..." />
+                              </SelectTrigger>
+                              <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                                {(templates as any)?.map((t: any) => (
+                                  <SelectItem key={t.id} value={t.id.toString()} className="text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span>{t.name}</span>
+                                      {t.isGlobal && <span className="text-[8px] bg-accent/20 text-accent px-1 rounded font-bold uppercase">Global</span>}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-2">
+                            <Button 
+                              onClick={handleAddChecklistGroup} 
+                              size="sm" 
+                              className="flex-1 bg-accent text-white h-10 text-xs font-bold rounded-lg shadow-lg shadow-accent/20"
+                              disabled={addChecklistGroupMutation.isPending}
+                            >
+                              {addChecklistGroupMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                              Criar Checklist
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => setIsCreatingChecklist(false)} 
+                              className="h-10 px-4 text-xs text-gray-400 hover:text-white"
+                            >
+                              Cancelar
+                            </Button>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
-          )}
+                      </PopoverContent>
+                    </Popover>
 
-          {/* Section 5: Attachments */}
-          {attachments && attachments.length > 0 && (
-            <section className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Paperclip className="w-5 h-5 text-gray-400" />
-                <h3 className="font-bold text-lg text-gray-200">Anexos</h3>
-              </div>
-              <div className="pl-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {attachments.map((file: any) => (
-                  <a 
-                    key={file.id} 
-                    href={file.file_url} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="flex items-center gap-3 p-3 rounded-xl bg-[#222] hover:bg-[#2a2a2a] transition-all border border-[#333] group"
-                  >
-                    <div className="w-10 h-10 rounded-lg bg-[#1a1a1a] flex items-center justify-center flex-shrink-0 group-hover:bg-accent/10 transition-colors">
-                      <Paperclip className="w-4 h-4 text-gray-500 group-hover:text-accent" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-gray-300 truncate">{file.filename}</p>
-                      <p className="text-[10px] text-gray-500 uppercase font-medium">{(file.file_size / 1024).toFixed(0)} KB</p>
-                    </div>
-                  </a>
-                ))}
-              </div>
-            </section>
-          )}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="bg-[#2a2a2a] border border-[#333] hover:bg-[#333] text-xs h-10 px-5 font-bold rounded-xl transition-all">
+                          <Clock className="w-4 h-4 mr-2.5 text-blue-400" /> Datas
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-0 bg-[#1a1a1a] border-[#333] shadow-2xl overflow-hidden rounded-xl">
+                        <div className="p-5 space-y-5">
+                          <h3 className="text-sm font-bold text-gray-200">Gerenciar Prazos</h3>
+                          
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Data de Início</label>
+                            <input 
+                              type="date" 
+                              className="bg-[#2a2a2a] border border-[#333] rounded-lg px-3.5 py-2.5 text-sm text-white w-full focus:ring-1 focus:ring-accent outline-none transition-all"
+                              onChange={(e) => handleUpdateStartDate(e.target.value ? new Date(e.target.value) : null)}
+                              defaultValue={card?.startDate ? new Date(card.startDate).toISOString().split('T')[0] : ''}
+                            />
+                          </div>
 
-          {/* Section 6: Comments */}
-          <section className="space-y-6 pt-4">
-            <div className="flex items-center gap-3">
-              <MessageSquare className="w-5 h-5 text-gray-400" />
-              <h3 className="font-bold text-lg text-gray-200">Comentários</h3>
-            </div>
-            
-            <div className="pl-8 space-y-8">
-              <div className="flex gap-4">
-                <Avatar className="w-9 h-9 flex-shrink-0 border border-white/5">
-                  <AvatarFallback className="bg-accent text-white text-xs font-bold shadow-lg">
-                    {currentUser?.name?.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-3">
-                  <textarea
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="Escreva um comentário..."
-                    className="w-full bg-[#222] border border-[#333] rounded-xl p-4 text-sm focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all outline-none resize-none min-h-[100px]"
-                  />
-                  <div className="flex justify-end">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Data de Entrega</label>
+                            <input 
+                              type="date" 
+                              className="bg-[#2a2a2a] border border-[#333] rounded-lg px-3.5 py-2.5 text-sm text-white w-full focus:ring-1 focus:ring-accent outline-none transition-all"
+                              onChange={(e) => handleUpdateDueDate(e.target.value ? new Date(e.target.value) : null)}
+                              defaultValue={card?.dueDate ? new Date(card.dueDate).toISOString().split('T')[0] : ''}
+                            />
+                          </div>
+
+                          {(card?.startDate || card?.dueDate) && (
+                            <div className="pt-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="w-full text-xs text-red-400 hover:text-red-500 hover:bg-red-500/10 h-10 rounded-lg font-bold"
+                                onClick={() => {
+                                  handleUpdateStartDate(null);
+                                  handleUpdateDueDate(null);
+                                }}
+                              >
+                                <Trash className="w-3.5 h-3.5 mr-2" /> Remover Datas
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+
                     <Button 
-                      onClick={handleAddComment} 
-                      disabled={!newComment.trim()} 
+                      variant="outline" 
                       size="sm" 
-                      className="bg-accent hover:bg-accent/90 px-6 rounded-full font-bold text-xs"
+                      className="bg-[#2a2a2a] border border-[#333] hover:bg-[#333] text-xs h-10 px-5 font-bold rounded-xl transition-all"
+                      onClick={() => fileInputRef.current?.click()}
                     >
-                      <Send className="w-3.5 h-3.5 mr-2" /> Comentar
+                      <Paperclip className="w-4 h-4 mr-2.5 text-amber-400" /> Anexar
                     </Button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      onChange={handleFileUpload}
+                    />
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-6">
-                {comments?.map((comment: any) => (
-                  <div key={comment.id} className="flex gap-4 group">
-                    <Avatar className="w-9 h-9 flex-shrink-0 border border-white/5">
-                      <AvatarFallback className="bg-[#2a2a2a] text-gray-500 text-xs font-bold">
-                        {comment.userName?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 space-y-2 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-gray-200">{comment.userName}</span>
-                        <span className="text-[10px] text-gray-500 font-medium bg-[#222] px-2 py-0.5 rounded">
-                          {format(new Date(comment.created_at), "dd 'de' MMM, HH:mm", { locale: ptBR })}
-                        </span>
-                      </div>
-                      <div className="bg-[#222] p-4 rounded-2xl rounded-tl-none text-sm text-gray-300 border border-[#333]/30 shadow-sm leading-relaxed break-words">
-                        {comment.content}
-                      </div>
-                      {(comment.user_id === currentUser?.id || currentUser?.role === 'admin') && (
-                        <button 
-                          onClick={() => handleDeleteComment(comment.id)}
-                          className="text-[10px] text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 font-bold ml-2"
-                        >
-                          Excluir
-                        </button>
-                      )}
-                    </div>
+              {/* Description Section */}
+              <section className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 shadow-inner">
+                    <AlignLeft className="w-5 h-5 text-gray-400" />
                   </div>
-                ))}
-              </div>
-            </div>
-          </section>
+                  <h3 className="font-bold text-xl text-gray-200 tracking-tight">Descrição</h3>
+                </div>
+                <div className={cn("transition-all duration-500", isMaximized ? "pl-14" : "pl-14")}>
+                  <textarea 
+                    value={description} 
+                    onChange={(e) => setDescription(e.target.value)} 
+                    onBlur={handleUpdateDescription} 
+                    placeholder="Adicione uma descrição detalhada sobre esta tarefa..." 
+                    className="w-full min-h-[160px] bg-[#222]/50 border border-[#333] rounded-2xl p-6 text-sm leading-relaxed text-gray-300 resize-y focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all outline-none shadow-inner" 
+                  />
+                </div>
+              </section>
 
-            </div>
-
-            {/* Right/Sidebar Column (Visible only in Maximized mode) */}
-            {isMaximized && (
-              <div className="col-span-3 space-y-8 bg-[#1e1e1e]/50 p-6 rounded-2xl border border-[#333]/30 h-fit sticky top-0">
-                <div className="space-y-6">
+              {/* Custom Fields Section */}
+              <section className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 shadow-inner">
+                    <LayoutGrid className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <h3 className="font-bold text-xl text-gray-200 tracking-tight">Dados Adicionais</h3>
+                </div>
+                <div className={cn(
+                  "grid gap-8 transition-all duration-500",
+                  isMaximized ? "pl-14 grid-cols-4" : "pl-14 grid-cols-1 md:grid-cols-3"
+                )}>
                   <div className="space-y-3">
-                    <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                      <LayoutGrid size={12} /> Ações Rápidas
-                    </h4>
-                    <div className="grid grid-cols-1 gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setIsMirrorDialogOpen(true)}
-                        className="bg-[#2a2a2a] hover:bg-[#333] text-gray-300 justify-start h-9 px-4 rounded-lg text-xs font-bold"
-                      >
-                        <Copy className="w-3.5 h-3.5 mr-2" /> Espelhar
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={handleArchiveCard}
-                        className="bg-[#2a2a2a] hover:bg-amber-950/30 hover:text-amber-400 text-gray-300 justify-start h-9 px-4 rounded-lg text-xs font-bold transition-all"
-                      >
-                        <Archive className="w-3.5 h-3.5 mr-2" /> Arquivar
-                      </Button>
-                      {currentUser?.role === 'admin' && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={handleDeleteCard}
-                          className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 justify-start h-9 px-4 rounded-lg text-xs font-bold transition-all"
-                        >
-                          <Trash className="w-3.5 h-3.5 mr-2" /> Excluir Cartão
-                        </Button>
-                      )}
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.6)] animate-pulse" />
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Prioridade</label>
                     </div>
+                    <Select 
+                      value={getCustomFieldValue("Mapa de Calor")}
+                      onValueChange={(val) => handleUpsertCustomField("Mapa de Calor", val)}
+                    >
+                      <SelectTrigger className="bg-[#222] border-[#333] h-11 rounded-xl text-xs font-bold text-gray-300 hover:bg-[#2a2a2a] transition-all hover:border-gray-600">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                        <SelectItem value="Baixo">Baixo</SelectItem>
+                        <SelectItem value="Médio">Médio</SelectItem>
+                        <SelectItem value="Alto">Alto</SelectItem>
+                        <SelectItem value="Crítico">Crítico</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  <Separator className="bg-[#333]/50" />
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)] animate-pulse" />
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status Atual</label>
+                    </div>
+                    <Select 
+                      value={getCustomFieldValue("Status")}
+                      onValueChange={(val) => handleUpsertCustomField("Status", val)}
+                    >
+                      <SelectTrigger className="bg-[#222] border-[#333] h-11 rounded-xl text-xs font-bold text-gray-300 hover:bg-[#2a2a2a] transition-all hover:border-gray-600">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                        <SelectItem value="Pendente">Pendente</SelectItem>
+                        <SelectItem value="Em Andamento">Em Andamento</SelectItem>
+                        <SelectItem value="Concluído">Concluído</SelectItem>
+                        <SelectItem value="Bloqueado">Bloqueado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                  {mirrors && mirrors.length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Espelhamento Ativo</h4>
-                      <div className="space-y-2">
-                        {mirrors.map((m: any) => (
-                          <div key={m.boardId} className="flex items-center gap-2 text-[10px] text-accent font-bold bg-accent/10 px-3 py-2 rounded-lg border border-accent/20">
-                            <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                            {m.boardName}
-                          </div>
-                        ))}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)] animate-pulse" />
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Perfil do Cliente</label>
+                    </div>
+                    <Select 
+                      value={getCustomFieldValue("Classificação")}
+                      onValueChange={(val) => handleUpsertCustomField("Classificação", val)}
+                    >
+                      <SelectTrigger className="bg-[#222] border-[#333] h-11 rounded-xl text-xs font-bold text-gray-300 hover:bg-[#2a2a2a] transition-all hover:border-gray-600">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                        <SelectItem value="Bronze">Bronze</SelectItem>
+                        <SelectItem value="Prata">Prata</SelectItem>
+                        <SelectItem value="Ouro">Ouro</SelectItem>
+                        <SelectItem value="Diamante">Diamante</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {isMaximized && (
+                    <div className="space-y-3 animate-in fade-in slide-in-from-left-2 duration-500">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.6)] animate-pulse" />
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Origem</label>
+                      </div>
+                      <div className="h-11 rounded-xl bg-[#222] border border-[#333] flex items-center px-4 text-xs text-gray-400 font-bold">
+                        {listName || "N/A"}
                       </div>
                     </div>
                   )}
                 </div>
+              </section>
+
+              {/* Checklists Section */}
+              {checklistsLoading ? (
+                <div className="flex justify-center py-20">
+                  <Loader2 className="w-12 h-12 animate-spin text-accent/40" />
+                </div>
+              ) : (
+                <div className="space-y-16">
+                  {checklists?.map((group: any) => {
+                    const groupItems = group.items || [];
+                    const groupProgress = groupItems.length 
+                      ? (groupItems.filter((i: any) => i.completed).length / groupItems.length) * 100 
+                      : 0;
+
+                    return (
+                      <section key={group.id} className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-700">
+                        <div className="flex items-center justify-between gap-6 pb-2">
+                          <div className="flex items-center gap-4 flex-1 min-w-0">
+                            <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/10">
+                              <CheckSquare className="w-5 h-5 text-accent" />
+                            </div>
+                            {editingGroupId === group.id ? (
+                              <input
+                                autoFocus
+                                defaultValue={group.title}
+                                onBlur={(e) => handleUpdateChecklistGroup(group.id, e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleUpdateChecklistGroup(group.id, (e.target as HTMLInputElement).value)}
+                                className="bg-[#2a2a2a] border border-accent/40 rounded-xl px-4 py-2 text-xl font-bold text-gray-200 outline-none w-full max-w-2xl focus:ring-2 focus:ring-accent/20"
+                              />
+                            ) : (
+                              <h3 
+                                onClick={() => setEditingGroupId(group.id)}
+                                className="font-bold text-2xl text-gray-200 cursor-pointer hover:text-accent transition-all truncate tracking-tight"
+                              >
+                                {group.title}
+                              </h3>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-xs font-black text-accent bg-accent/10 px-4 py-2 rounded-full border border-accent/20 shadow-sm shadow-accent/5">
+                              {Math.round(groupProgress)}%
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => handleDeleteChecklistGroup(group.id)}
+                              className="text-gray-500 hover:text-red-400 h-10 px-4 rounded-xl hover:bg-red-400/5 transition-all font-bold"
+                            >
+                              Remover
+                            </Button>
+                            <Popover open={isSavingAsTemplate && editingGroupId === group.id} onOpenChange={(open) => {
+                              setIsSavingAsTemplate(open);
+                              setEditingGroupId(open ? group.id : null);
+                            }}>
+                              <PopoverTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-gray-500 hover:text-accent h-10 px-4 rounded-xl hover:bg-accent/5 transition-all"
+                                  title="Salvar como modelo"
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-72 bg-[#1a1a1a] border-[#333] p-4 shadow-2xl rounded-xl">
+                                <div className="space-y-4">
+                                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Nome do Novo Modelo</p>
+                                  <input
+                                    type="text"
+                                    value={templateName}
+                                    onChange={(e) => setTemplateName(e.target.value)}
+                                    placeholder="Ex: Padrão de Entrega..."
+                                    className="w-full bg-[#222] border border-[#333] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-accent transition-all"
+                                    autoFocus
+                                  />
+                                  <div className="flex justify-end gap-2">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      onClick={() => {
+                                        setIsSavingAsTemplate(false);
+                                        setTemplateName("");
+                                      }}
+                                      className="h-9 px-4 text-xs font-bold"
+                                    >
+                                      Cancelar
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      onClick={() => handleSaveAsTemplate(groupItems.map((i: any) => i.title))}
+                                      className="h-9 px-5 text-xs font-bold bg-accent hover:bg-accent/90 rounded-lg"
+                                    >
+                                      Salvar Modelo
+                                    </Button>
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+
+                        <div className={cn(
+                          isMaximized ? "pl-4 pr-2" : "pl-14", 
+                          "space-y-8 transition-all duration-500"
+                        )}>
+                          <div className="flex items-center gap-5">
+                            <Progress value={groupProgress} className="h-2 bg-[#222] rounded-full flex-1" />
+                            <span className="text-[11px] font-bold text-gray-500 tabular-nums w-8">{Math.round(groupProgress)}%</span>
+                          </div>
+                          
+                          <div className="grid gap-3">
+                            {groupItems.map((item: any) => {
+                              const isItemOverdue = item.due_date && isBefore(new Date(item.due_date), new Date()) && !item.completed;
+                              const assignedUser = allUsers?.find((u: any) => u.id === item.assignedUserId);
+                              
+                              return (
+                                <div 
+                                  key={item.id} 
+                                  className={cn(
+                                    "group flex items-start gap-5 rounded-2xl transition-all border border-transparent hover:border-[#333]/60 hover:bg-white/[0.03] shadow-sm",
+                                    isMaximized ? "p-5" : "p-4"
+                                  )}
+                                >
+                                  <div className="pt-1.5">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.completed}
+                                      onChange={() => handleUpdateChecklistItem(item.id, { completed: !item.completed })}
+                                      className="w-5 h-5 rounded border-[#444] bg-[#1a1a1a] text-accent focus:ring-0 cursor-pointer transition-transform active:scale-90"
+                                    />
+                                  </div>
+                                  <div className="flex-1 min-w-0 flex flex-col gap-3">
+                                    <div className="flex items-start justify-between gap-8">
+                                      <textarea
+                                        defaultValue={item.title}
+                                        onBlur={(e) => handleUpdateChecklistItem(item.id, { title: e.target.value })}
+                                        rows={1}
+                                        className={cn(
+                                          "text-[15px] flex-1 bg-transparent border-none p-0 focus:ring-0 focus:outline-none font-medium transition-colors break-words h-auto whitespace-normal leading-relaxed resize-none overflow-hidden",
+                                          item.completed ? "line-through text-gray-500" : "text-gray-200"
+                                        )}
+                                        onInput={(e) => {
+                                          const target = e.target as HTMLTextAreaElement;
+                                          target.style.height = 'auto';
+                                          target.style.height = target.scrollHeight + 'px';
+                                        }}
+                                      />
+                                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <button className="p-2 rounded-xl hover:bg-white/10 text-gray-500 transition-all border border-transparent hover:border-[#333]" title="Atribuir responsável">
+                                              {assignedUser ? (
+                                                <Avatar className="w-7 h-7 ring-2 ring-accent/20">
+                                                  <AvatarFallback className="bg-accent text-[10px] text-white font-black">
+                                                    {assignedUser.name?.charAt(0).toUpperCase()}
+                                                  </AvatarFallback>
+                                                </Avatar>
+                                              ) : (
+                                                <UserIcon className="w-4.5 h-4.5" />
+                                              )}
+                                            </button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-72 bg-[#1a1a1a] border-[#333] p-2 shadow-2xl rounded-xl">
+                                            <div className="max-h-72 overflow-y-auto custom-scrollbar">
+                                              <div className="p-2 border-b border-[#333] mb-2">
+                                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Delegar Tarefa</p>
+                                              </div>
+                                              {allUsers?.map((u: any) => (
+                                                <button
+                                                  key={u.id}
+                                                  onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: u.id })}
+                                                  className={cn(
+                                                    "w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all",
+                                                    item.assignedUserId === u.id ? "bg-accent/15 text-accent" : "text-gray-300 hover:bg-white/5"
+                                                  )}
+                                                >
+                                                  <Avatar className="w-8 h-8">
+                                                    <AvatarFallback className="bg-[#2a2a2a] text-xs font-bold">
+                                                      {u.name?.charAt(0).toUpperCase()}
+                                                    </AvatarFallback>
+                                                  </Avatar>
+                                                  <div className="flex flex-col min-w-0">
+                                                    <span className="text-xs font-bold truncate">{u.name}</span>
+                                                    <span className="text-[10px] text-gray-500 truncate">@{u.username}</span>
+                                                  </div>
+                                                </button>
+                                              ))}
+                                              {item.assignedUserId && (
+                                                <button
+                                                  onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: null })}
+                                                  className="w-full text-center p-2.5 text-[10px] text-red-400 hover:bg-red-400/10 mt-2 rounded-lg transition-colors font-bold"
+                                                >
+                                                  Remover Responsável
+                                                </button>
+                                              )}
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
+
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <button className={cn(
+                                              "p-2 rounded-xl hover:bg-white/10 transition-all border border-transparent hover:border-[#333]",
+                                              item.due_date ? "text-accent" : "text-gray-500"
+                                            )} title="Definir prazo do item">
+                                              <CalendarDays className="w-4.5 h-4.5" />
+                                            </button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-[#333] shadow-2xl rounded-xl overflow-hidden">
+                                            <div className="p-4 space-y-4">
+                                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Prazo da Subtarefa</p>
+                                              <input
+                                                type="date"
+                                                className="bg-[#2a2a2a] border border-[#333] rounded-lg px-3.5 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-accent/30 transition-all"
+                                                onChange={(e) => handleUpdateChecklistItem(item.id, { dueDate: e.target.value ? new Date(e.target.value) : null })}
+                                                defaultValue={item.due_date ? new Date(item.due_date).toISOString().split('T')[0] : ''}
+                                              />
+                                              {item.due_date && (
+                                                <button
+                                                  onClick={() => handleUpdateChecklistItem(item.id, { dueDate: null })}
+                                                  className="w-full text-center text-[10px] text-red-400 hover:text-red-500 py-2 font-bold transition-colors"
+                                                >
+                                                  Limpar Prazo
+                                                </button>
+                                              )}
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
+
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <button className="p-2 rounded-xl hover:bg-white/10 transition-all border border-transparent hover:border-[#333]">
+                                              <MoreVertical className="w-4.5 h-4.5 text-gray-500" />
+                                            </button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent className="bg-[#1a1a1a] border-[#333] text-white shadow-2xl rounded-xl min-w-[160px]">
+                                            <DropdownMenuItem 
+                                              onClick={() => handleRemoveChecklist(item.id)} 
+                                              className="text-red-400 focus:text-red-400 focus:bg-red-400/10 cursor-pointer text-xs font-bold p-3 rounded-lg"
+                                            >
+                                              <Trash2 className="w-4 h-4 mr-2.5" /> Remover item
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-3">
+                                      {item.due_date && (
+                                        <div className={cn(
+                                          "flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-md border",
+                                          isItemOverdue 
+                                            ? "bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.1)]" 
+                                            : "bg-accent/10 text-accent border-accent/20 shadow-[0_0_10px_rgba(var(--accent-rgb),0.1)]"
+                                        )}>
+                                          <Clock className="w-3 h-3" />
+                                          {format(new Date(item.due_date), "dd 'de' MMM", { locale: ptBR })}
+                                        </div>
+                                      )}
+                                      {assignedUser && (
+                                        <div className="flex items-center gap-2 bg-[#2a2a2a] px-3 py-1 rounded-md border border-[#333] shadow-sm">
+                                          <Avatar className="w-4 h-4 ring-1 ring-white/10">
+                                            <AvatarFallback className="bg-accent text-[7px] text-white font-black">
+                                              {assignedUser.name?.charAt(0).toUpperCase()}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <span className="text-[10px] font-bold text-gray-400">{assignedUser.name}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            
+                            <div className="mt-6">
+                              <div className="relative group">
+                                <input
+                                  type="text"
+                                  value={newChecklistItems[group.id] || ""}
+                                  onChange={(e) => setNewChecklistItems(prev => ({ ...prev, [group.id]: e.target.value }))}
+                                  placeholder="Escreva uma nova subtarefa..."
+                                  className="w-full bg-[#222]/50 hover:bg-[#2a2a2a]/60 border border-transparent focus:border-accent/40 rounded-2xl px-6 py-4 text-sm text-gray-300 outline-none transition-all shadow-inner pr-28"
+                                  onKeyDown={(e) => e.key === "Enter" && handleAddChecklistItem(group.id)}
+                                />
+                                {newChecklistItems[group.id] && (
+                                  <Button 
+                                    onClick={() => handleAddChecklistItem(group.id)} 
+                                    size="sm" 
+                                    className="absolute right-2.5 top-2.5 bg-accent hover:bg-accent/90 h-10 px-6 text-xs font-bold rounded-xl shadow-lg shadow-accent/30 animate-in fade-in slide-in-from-right-2 duration-300"
+                                  >
+                                    Adicionar
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Attachments Section */}
+              {attachments && attachments.length > 0 && (
+                <section className="space-y-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 shadow-inner">
+                      <Paperclip className="w-5 h-5 text-gray-400" />
+                    </div>
+                    <h3 className="font-bold text-xl text-gray-200 tracking-tight">Anexos</h3>
+                  </div>
+                  <div className={cn(
+                    "grid gap-6 transition-all duration-500",
+                    isMaximized ? "pl-14 grid-cols-4" : "pl-14 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                  )}>
+                    {attachments.map((file: any) => (
+                      <a 
+                        key={file.id} 
+                        href={file.file_url} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="flex items-center gap-5 p-5 rounded-2xl bg-[#222]/50 hover:bg-[#2a2a2a]/80 transition-all border border-[#333] group hover:border-accent/40 shadow-sm"
+                      >
+                        <div className="w-12 h-12 rounded-xl bg-[#1a1a1a] flex items-center justify-center flex-shrink-0 group-hover:bg-accent/10 transition-colors border border-[#333] group-hover:border-accent/20">
+                          <Paperclip className="w-5 h-5 text-gray-500 group-hover:text-accent" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-black text-gray-300 truncate group-hover:text-accent transition-colors">{file.filename}</p>
+                          <p className="text-[10px] text-gray-500 uppercase font-black mt-1.5 tracking-wider">{(file.file_size / 1024).toFixed(0)} KB</p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Comments Section */}
+              <section className="space-y-8 pt-8 border-t border-[#333]/40">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 shadow-inner">
+                    <MessageSquare className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <h3 className="font-bold text-xl text-gray-200 tracking-tight">Comentários</h3>
+                </div>
+                
+                <div className={cn("transition-all duration-500 space-y-12", isMaximized ? "pl-14" : "pl-14")}>
+                  <div className="flex gap-6">
+                    <Avatar className="w-12 h-12 flex-shrink-0 border-2 border-accent/20 shadow-lg shadow-accent/5">
+                      <AvatarFallback className="bg-accent text-white text-sm font-black uppercase">
+                        {currentUser?.name?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-4">
+                      <textarea
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Escreva um comentário ou anote algo importante..."
+                        className="w-full bg-[#222]/50 border border-[#333] rounded-2xl p-6 text-sm leading-relaxed text-gray-300 focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all outline-none resize-none min-h-[120px] shadow-inner"
+                      />
+                      <div className="flex justify-end">
+                        <Button 
+                          onClick={handleAddComment} 
+                          disabled={!newComment.trim()} 
+                          size="sm" 
+                          className="bg-accent hover:bg-accent/90 px-10 h-12 rounded-full font-black text-xs shadow-lg shadow-accent/20 transition-all active:scale-95"
+                        >
+                          <Send className="w-4 h-4 mr-3" /> Enviar Comentário
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-10">
+                    {comments?.map((comment: any) => (
+                      <div key={comment.id} className="flex gap-6 group">
+                        <Avatar className="w-12 h-12 flex-shrink-0 border-2 border-[#333] shadow-md transition-transform group-hover:scale-105">
+                          <AvatarFallback className="bg-[#2a2a2a] text-gray-400 text-sm font-black uppercase">
+                            {comment.userName?.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 space-y-3.5 min-w-0">
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm font-black text-gray-200">{comment.userName}</span>
+                            <span className="text-[10px] text-gray-500 font-bold bg-[#222] px-3 py-1 rounded-md border border-[#333]/50">
+                              {format(new Date(comment.created_at), "dd 'de' MMM, HH:mm", { locale: ptBR })}
+                            </span>
+                          </div>
+                          <div className="bg-[#222]/80 p-6 rounded-3xl rounded-tl-none text-sm text-gray-300 border border-[#333]/40 shadow-sm leading-relaxed break-words relative ring-1 ring-white/5">
+                            {comment.content}
+                          </div>
+                          {(comment.user_id === currentUser?.id || currentUser?.role === 'admin') && (
+                            <button 
+                              onClick={() => handleDeleteComment(comment.id)}
+                              className="text-[10px] text-gray-500 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100 font-black ml-4 uppercase tracking-widest"
+                            >
+                              Excluir Registro
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            {/* Right Sidebar Column */}
+            <div className={cn(
+              "space-y-10 transition-all duration-500",
+              isMaximized ? "col-span-4" : "col-span-12 lg:col-span-3"
+            )}>
+              <div className="bg-[#1e1e1e]/80 p-8 rounded-3xl border border-[#333]/60 h-fit sticky top-0 shadow-2xl backdrop-blur-sm space-y-10">
+                <div className="space-y-6">
+                  <h4 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] flex items-center gap-3">
+                    <LayoutGrid size={14} className="text-gray-600" /> Ações Rápidas
+                  </h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setIsMirrorDialogOpen(true)}
+                      className="bg-[#2a2a2a] hover:bg-[#333] text-gray-200 justify-start h-12 px-6 rounded-2xl text-xs font-black transition-all border border-[#333]/50 hover:border-accent/30 shadow-sm"
+                    >
+                      <Copy className="w-4 h-4 mr-4 text-accent" /> Espelhar Cartão
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={handleArchiveCard}
+                      className="bg-[#2a2a2a] hover:bg-amber-950/20 hover:text-amber-400 text-gray-200 justify-start h-12 px-6 rounded-2xl text-xs font-black transition-all border border-[#333]/50 hover:border-amber-400/30 shadow-sm"
+                    >
+                      <Archive className="w-4 h-4 mr-4 text-amber-500" /> Arquivar Cartão
+                    </Button>
+                    {currentUser?.role === 'admin' && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={handleDeleteCard}
+                        className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 justify-start h-12 px-6 rounded-2xl text-xs font-black transition-all"
+                      >
+                        <Trash className="w-4 h-4 mr-4" /> Excluir Permanentemente
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <Separator className="bg-[#333]/80" />
+
+                {mirrors && mirrors.length > 0 && (
+                  <div className="space-y-5">
+                    <h4 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em]">Conexões Ativas</h4>
+                    <div className="space-y-3">
+                      {mirrors.map((m: any) => (
+                        <div key={m.boardId} className="flex items-center gap-4 text-[11px] text-accent font-black bg-accent/10 px-5 py-4 rounded-2xl border border-accent/20 shadow-sm shadow-accent/5">
+                          <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                          <span className="truncate">{m.boardName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Info Card (Visible in sidebar) */}
+                <div className="bg-white/[0.02] p-6 rounded-2xl border border-white/[0.05] space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Responsável</span>
+                    <span className="text-[10px] font-black text-gray-300">Nenhum</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Criado em</span>
+                    <span className="text-[10px] font-black text-gray-300">
+                      {card?.created_at ? format(new Date(card.created_at), "dd/MM/yyyy") : "-"}
+                    </span>
+                  </div>
+                </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
 
         {/* Mirror Selection Modal */}
         <Dialog open={isMirrorDialogOpen} onOpenChange={setIsMirrorDialogOpen}>
-          <DialogContent className="bg-[#1a1a1a] text-white border-[#333] max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-lg">Espelhar Cartão</DialogTitle>
-              <p className="text-xs text-gray-400">Crie uma cópia sincronizada deste cartão em outro quadro.</p>
+          <DialogContent className="bg-[#1a1a1a] text-white border-[#333] max-w-md rounded-2xl shadow-2xl">
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-xl font-black">Espelhar este Cartão</DialogTitle>
+              <p className="text-xs text-gray-400 font-medium leading-relaxed">Crie uma cópia sincronizada em tempo real deste cartão em outro quadro estratégico.</p>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold text-gray-500 uppercase">Quadro de Destino</label>
+            <div className="space-y-5 py-6">
+              <div className="space-y-2.5">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Quadro de Destino</label>
                 <Select value={selectedBoardId} onValueChange={(val) => {
                   setSelectedBoardId(val);
                   setSelectedListId("");
                 }}>
-                  <SelectTrigger className="bg-[#2a2a2a] border-none text-white h-11">
+                  <SelectTrigger className="bg-[#2a2a2a] border border-[#333] text-white h-12 rounded-xl px-4 font-bold focus:ring-accent">
                     <SelectValue placeholder="Selecione um quadro..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white rounded-xl">
                     {userBoards?.map(board => (
-                      <SelectItem key={board.id} value={board.id.toString()}>{board.name}</SelectItem>
+                      <SelectItem key={board.id} value={board.id.toString()} className="font-bold py-3">{board.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold text-gray-500 uppercase">Lista de Destino</label>
+              <div className="space-y-2.5">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Lista de Destino</label>
                 <Select value={selectedListId} onValueChange={setSelectedListId} disabled={!selectedBoardId}>
-                  <SelectTrigger className="bg-[#2a2a2a] border-none text-white h-11">
-                    <SelectValue placeholder="Selecione uma lista..." />
+                  <SelectTrigger className="bg-[#2a2a2a] border border-[#333] text-white h-12 rounded-xl px-4 font-bold focus:ring-accent disabled:opacity-50">
+                    <SelectValue placeholder="Escolha uma coluna..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white">
+                  <SelectContent className="bg-[#1a1a1a] border-[#333] text-white rounded-xl">
                     {targetLists?.map(list => (
-                      <SelectItem key={list.id} value={list.id.toString()}>{list.name}</SelectItem>
+                      <SelectItem key={list.id} value={list.id.toString()} className="font-bold py-3">{list.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <DialogFooter className="gap-2">
-              <Button variant="ghost" onClick={() => setIsMirrorDialogOpen(false)} className="text-xs">Cancelar</Button>
+            <DialogFooter className="gap-3 pt-2">
+              <Button variant="ghost" onClick={() => setIsMirrorDialogOpen(false)} className="text-xs font-black uppercase tracking-widest h-11 px-6 rounded-xl">Cancelar</Button>
               <Button 
                 onClick={handleCreateMirror} 
-                className="bg-accent hover:bg-accent/90 text-xs px-6"
+                className="bg-accent hover:bg-accent/90 text-xs font-black uppercase tracking-widest px-8 h-11 rounded-xl shadow-lg shadow-accent/20 transition-all active:scale-95"
                 disabled={createMirrorMutation.isPending || !selectedListId}
               >
-                {createMirrorMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Criar Espelho"}
+                {createMirrorMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirmar Espelhamento"}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </DialogContent>
     </Dialog>
-  );
-}
-
-// Small helper component to standardize sidebar buttons
-function SidebarActionButton({
-  icon: Icon,
-  label,
-  onClick,
-  variant = "default",
-}: {
-  icon: any;
-  label: string;
-  onClick?: () => void;
-  variant?: "default" | "amber" | "red";
-}) {
-  const variantStyles = {
-    default: "hover:bg-[#333] text-gray-300",
-    amber:   "hover:bg-amber-950/40 text-amber-300",
-    red:     "hover:bg-red-950/40 text-red-400",
-  };
-
-  return (
-    <Button
-      variant="ghost"
-      className={`w-full justify-start gap-3 h-10 text-sm font-medium transition-colors ${variantStyles[variant]}`}
-      onClick={onClick}
-    >
-      <Icon size={18} />
-      {label}
-    </Button>
   );
 }
