@@ -405,10 +405,10 @@ export default function CardDetailModal({
       <DialogContent 
         showCloseButton={false}
         className={cn(
-          "overflow-hidden bg-[#1a1a1a] text-white border-[#333] p-0 transition-all duration-500 ease-in-out flex flex-col fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+          "overflow-hidden bg-[#1a1a1a] text-white border-[#333] p-0 transition-all duration-500 ease-in-out flex flex-col",
           isMaximized 
-            ? "max-w-[95vw] w-[1400px] h-[94vh] rounded-2xl shadow-2xl" 
-            : "max-w-[1100px] w-[90vw] h-[88vh] rounded-xl shadow-xl"
+            ? "max-w-[95vw] w-[min(1400px,95vw)] h-[94vh] rounded-2xl shadow-2xl" 
+            : "max-w-[1100px] w-[min(1100px,92vw)] h-[88vh] rounded-xl shadow-xl"
         )}
       >
         <div className="sr-only">
@@ -417,7 +417,7 @@ export default function CardDetailModal({
         </div>
 
         {/* Header */}
-        <DialogHeader className="p-6 border-b border-[#333]/60 bg-[#1e1e1e] flex-shrink-0">
+        <DialogHeader className="p-4 px-6 border-b border-[#333]/60 bg-[#1e1e1e] flex-shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               {isEditingTitle ? (
@@ -426,7 +426,7 @@ export default function CardDetailModal({
                     type="text"
                     value={editedTitle}
                     onChange={(e) => setEditedTitle(e.target.value)}
-                    className="text-2xl font-bold bg-[#2a2a2a] border-b-2 border-accent outline-none text-white w-full px-2 py-1 rounded shadow-inner"
+                    className="text-xl font-bold bg-[#2a2a2a] border-b-2 border-accent outline-none text-white w-full px-2 py-1 rounded shadow-inner"
                     autoFocus
                     onBlur={handleUpdateTitle}
                     onKeyDown={(e) => e.key === "Enter" && handleUpdateTitle()}
@@ -434,7 +434,7 @@ export default function CardDetailModal({
                 </div>
               ) : (
                 <DialogTitle 
-                  className="text-2xl font-bold leading-tight break-words cursor-pointer hover:text-accent transition-colors flex items-center gap-2 group"
+                  className="text-xl font-bold leading-tight break-words cursor-pointer hover:text-accent transition-colors flex items-center gap-2 group"
                   onClick={() => setIsEditingTitle(true)}
                 >
                   {cardTitle}
@@ -442,7 +442,7 @@ export default function CardDetailModal({
                 </DialogTitle>
               )}
               
-              <div className="flex flex-col gap-2 mt-2">
+              <div className="flex flex-col gap-1.5 mt-1.5">
                 <p className="text-sm text-gray-400 flex items-center gap-2">
                   na lista <span className="font-semibold text-gray-200 underline decoration-gray-600 underline-offset-4">{listName}</span>
                 </p>
@@ -508,22 +508,22 @@ export default function CardDetailModal({
         {/* Main Content Area */}
         <div className={cn(
           "flex-1 overflow-y-auto custom-scrollbar transition-all duration-500",
-          isMaximized ? "p-10 px-16" : "p-8 px-10"
+          isMaximized ? "p-6 px-10" : "p-5 px-6"
         )}>
           <div className={cn(
-            "grid gap-12",
-            isMaximized ? "grid-cols-12" : "grid-cols-12"
+            "grid gap-6",
+            isMaximized ? "grid-cols-12" : "grid-cols-1 lg:grid-cols-12"
           )}>
             
             {/* Left Column (Main Content) */}
             <div className={cn(
-              "space-y-12 transition-all duration-500",
+              "space-y-8 transition-all duration-500",
               isMaximized ? "col-span-8" : "col-span-12 lg:col-span-9"
             )}>
               
               {/* Quick Actions & Labels */}
-              <div className="flex flex-col md:flex-row justify-between items-start gap-8 pb-10 border-b border-[#333]/40">
-                <div className="flex flex-wrap gap-10">
+              <div className="flex flex-col md:flex-row justify-between items-start gap-4 pb-5 border-b border-[#333]/40">
+                <div className="flex flex-wrap gap-4">
                   {labels && labels.length > 0 && (
                     <div className="space-y-4">
                       <h4 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
@@ -746,7 +746,7 @@ export default function CardDetailModal({
                   </div>
                   <h3 className="font-bold text-xl text-gray-200 tracking-tight">Descrição</h3>
                 </div>
-                <div className={cn("transition-all duration-500", isMaximized ? "pl-14" : "pl-14")}>
+                <div className={cn("transition-all duration-500", isMaximized ? "pl-10" : "pl-10")}>
                   <textarea 
                     value={description} 
                     onChange={(e) => setDescription(e.target.value)} 
@@ -767,7 +767,7 @@ export default function CardDetailModal({
                 </div>
                 <div className={cn(
                   "grid gap-8 transition-all duration-500",
-                  isMaximized ? "pl-14 grid-cols-4" : "pl-14 grid-cols-1 md:grid-cols-3"
+                  isMaximized ? "pl-10 grid-cols-4" : "pl-10 grid-cols-1 md:grid-cols-3"
                 )}>
                   <div className="space-y-3">
                     <div className="flex items-center gap-2.5">
@@ -848,11 +848,11 @@ export default function CardDetailModal({
 
               {/* Checklists Section */}
               {checklistsLoading ? (
-                <div className="flex justify-center py-20">
+                <div className="flex justify-center py-10">
                   <Loader2 className="w-12 h-12 animate-spin text-accent/40" />
                 </div>
               ) : (
-                <div className="space-y-16">
+                <div className="space-y-10">
                   {checklists?.map((group: any) => {
                     const groupItems = group.items || [];
                     const groupProgress = groupItems.length 
@@ -947,8 +947,8 @@ export default function CardDetailModal({
                         </div>
 
                         <div className={cn(
-                          isMaximized ? "pl-4 pr-2" : "pl-14", 
-                          "space-y-8 transition-all duration-500"
+                          isMaximized ? "pl-4 pr-2" : "pl-10", 
+                          "space-y-6 transition-all duration-500"
                         )}>
                           <div className="flex items-center gap-5">
                             <Progress value={groupProgress} className="h-2 bg-[#222] rounded-full flex-1" />
@@ -1160,7 +1160,7 @@ export default function CardDetailModal({
                   </div>
                   <div className={cn(
                     "grid gap-6 transition-all duration-500",
-                    isMaximized ? "pl-14 grid-cols-4" : "pl-14 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                    isMaximized ? "pl-10 grid-cols-4" : "pl-10 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
                   )}>
                     {attachments.map((file: any) => (
                       <a 
@@ -1192,7 +1192,7 @@ export default function CardDetailModal({
                   <h3 className="font-bold text-xl text-gray-200 tracking-tight">Comentários</h3>
                 </div>
                 
-                <div className={cn("transition-all duration-500 space-y-12", isMaximized ? "pl-14" : "pl-14")}>
+                <div className={cn("transition-all duration-500 space-y-8", isMaximized ? "pl-10" : "pl-10")}>
                   <div className="flex gap-6">
                     <Avatar className="w-12 h-12 flex-shrink-0 border-2 border-accent/20 shadow-lg shadow-accent/5">
                       <AvatarFallback className="bg-accent text-white text-sm font-black uppercase">
@@ -1219,7 +1219,7 @@ export default function CardDetailModal({
                     </div>
                   </div>
 
-                  <div className="space-y-10">
+                  <div className="space-y-6">
                     {comments?.map((comment: any) => (
                       <div key={comment.id} className="flex gap-6 group">
                         <Avatar className="w-12 h-12 flex-shrink-0 border-2 border-[#333] shadow-md transition-transform group-hover:scale-105">
@@ -1255,10 +1255,10 @@ export default function CardDetailModal({
 
             {/* Right Sidebar Column */}
             <div className={cn(
-              "space-y-10 transition-all duration-500",
+              "space-y-6 transition-all duration-500",
               isMaximized ? "col-span-4" : "col-span-12 lg:col-span-3"
             )}>
-              <div className="bg-[#1e1e1e]/80 p-8 rounded-3xl border border-[#333]/60 h-fit sticky top-0 shadow-2xl backdrop-blur-sm space-y-10">
+              <div className="bg-[#1e1e1e]/80 p-5 rounded-2xl border border-[#333]/60 h-fit shadow-xl backdrop-blur-sm space-y-6">
                 <div className="space-y-6">
                   <h4 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] flex items-center gap-3">
                     <LayoutGrid size={14} className="text-gray-600" /> Ações Rápidas
