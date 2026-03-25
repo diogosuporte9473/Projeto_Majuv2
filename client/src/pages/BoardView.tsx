@@ -103,7 +103,7 @@ export default function BoardView() {
     return () => { delete (window as any).showBoardActivity; };
   }, []);
 
-  const { data: boardActivity } = trpc.audit.list.useQuery({
+  const { data: boardActivity, isLoading: logsLoading } = trpc.audit.list.useQuery({
     search: board?.name,
     limit: 10,
   }, { enabled: !!board?.name && showActivityModal } as any);
