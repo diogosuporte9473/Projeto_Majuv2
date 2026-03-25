@@ -405,10 +405,10 @@ export default function CardDetailModal({
       <DialogContent 
         showCloseButton={false}
         className={cn(
-          "overflow-hidden bg-[#1a1a1a] text-white border-[#333] p-0 transition-all duration-500 ease-in-out flex flex-col",
+          "overflow-y-auto bg-[#1a1a1a] text-white border-[#333] p-0 transition-all duration-500 ease-in-out flex flex-col",
           isMaximized 
-            ? "max-w-[95vw] w-[min(1400px,95vw)] h-[94vh] rounded-2xl shadow-2xl" 
-            : "max-w-[1100px] w-[min(1100px,92vw)] h-[88vh] rounded-xl shadow-xl"
+            ? "max-w-[95vw] w-[min(1400px,95vw)] min-w-[1000px] h-[94vh] rounded-2xl shadow-2xl" 
+            : "max-w-[1100px] w-[min(1100px,92vw)] min-w-[768px] h-[88vh] rounded-xl shadow-xl"
         )}
       >
         <div className="sr-only">
@@ -511,14 +511,14 @@ export default function CardDetailModal({
           isMaximized ? "p-6 px-10" : "p-5 px-6"
         )}>
           <div className={cn(
-            "grid gap-6",
-            isMaximized ? "grid-cols-12" : "grid-cols-1 lg:grid-cols-12"
+            "grid gap-8",
+            isMaximized ? "grid-cols-4" : "grid-cols-1 lg:grid-cols-4"
           )}>
             
             {/* Left Column (Main Content) */}
             <div className={cn(
               "space-y-8 transition-all duration-500",
-              isMaximized ? "col-span-8" : "col-span-12 lg:col-span-9"
+              isMaximized ? "col-span-3" : "col-span-1 lg:col-span-3"
             )}>
               
               {/* Quick Actions & Labels */}
@@ -766,8 +766,8 @@ export default function CardDetailModal({
                   <h3 className="font-bold text-xl text-gray-200 tracking-tight">Dados Adicionais</h3>
                 </div>
                 <div className={cn(
-                  "grid gap-8 transition-all duration-500",
-                  isMaximized ? "pl-10 grid-cols-4" : "pl-10 grid-cols-1 md:grid-cols-3"
+                  "grid gap-4 transition-all duration-500",
+                  isMaximized ? "pl-10 grid-cols-2 xl:grid-cols-4" : "pl-10 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
                 )}>
                   <div className="space-y-3">
                     <div className="flex items-center gap-2.5">
@@ -1160,7 +1160,7 @@ export default function CardDetailModal({
                   </div>
                   <div className={cn(
                     "grid gap-6 transition-all duration-500",
-                    isMaximized ? "pl-10 grid-cols-4" : "pl-10 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                    isMaximized ? "pl-10 grid-cols-2 xl:grid-cols-4" : "pl-10 grid-cols-1 sm:grid-cols-2"
                   )}>
                     {attachments.map((file: any) => (
                       <a 
@@ -1256,14 +1256,14 @@ export default function CardDetailModal({
             {/* Right Sidebar Column */}
             <div className={cn(
               "space-y-6 transition-all duration-500",
-              isMaximized ? "col-span-4" : "col-span-12 lg:col-span-3"
+              isMaximized ? "col-span-1" : "col-span-1 lg:col-span-1"
             )}>
               <div className="bg-[#1e1e1e]/80 p-5 rounded-2xl border border-[#333]/60 h-fit shadow-xl backdrop-blur-sm space-y-6">
                 <div className="space-y-6">
                   <h4 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] flex items-center gap-3">
                     <LayoutGrid size={14} className="text-gray-600" /> Ações Rápidas
                   </h4>
-                  <div className="grid grid-cols-1 gap-4">
+                    <div className="flex flex-col gap-3">
                     <Button 
                       variant="ghost" 
                       size="sm" 
@@ -1310,7 +1310,7 @@ export default function CardDetailModal({
                 )}
 
                 {/* Info Card (Visible in sidebar) */}
-                <div className="bg-white/[0.02] p-6 rounded-2xl border border-white/[0.05] space-y-4">
+                <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.05] space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Responsável</span>
                     <span className="text-[10px] font-black text-gray-300">Nenhum</span>
