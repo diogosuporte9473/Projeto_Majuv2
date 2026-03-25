@@ -544,7 +544,7 @@ export default function CardDetailModal({
                       )}
                     </div>
                   </div>
-                </div>>
+                </div>
 
                 <div className="space-y-4">
                   <h4 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Adicionar ao cartão</h4>
