@@ -772,13 +772,64 @@ export const appRouter = router({
           .single();
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar com espelhos
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("*")
+            .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+              .filter(id => id !== input.cardId);
+
+            for (const cardId of relatedCardIds) {
+              await supabase.from("card_labels").insert({
+                card_id: cardId,
+                label: input.label,
+                color: input.color || "#4b4897",
+              });
+            }
+          }
+        } catch (e) {
+          console.error("[Mirror Sync] Label add sync failed:", e);
+        }
+
         return { id: data.id };
       }),
     deleteLabel: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
+        // Buscar info da etiqueta antes de deletar para sincronizar
+        const { data: labelToDelete } = await supabase.from("card_labels").select("*").eq("id", input.id).single();
+
         const { error } = await supabase.from("card_labels").delete().eq("id", input.id);
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar com espelhos
+        if (labelToDelete) {
+          try {
+            const { data: mirrors } = await supabase
+              .from("mirrored_cards")
+              .select("*")
+              .or(`original_card_id.eq.${labelToDelete.card_id},mirror_card_id.eq.${labelToDelete.card_id}`);
+
+            if (mirrors && mirrors.length > 0) {
+              const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+                .filter(id => id !== labelToDelete.card_id);
+
+              await supabase
+                .from("card_labels")
+                .delete()
+                .in("card_id", relatedCardIds)
+                .eq("label", labelToDelete.label);
+            }
+          } catch (e) {
+            console.error("[Mirror Sync] Label delete sync failed:", e);
+          }
+        }
+
         return { success: true };
       }),
     updateDescription: protectedProcedure
@@ -796,6 +847,26 @@ export const appRouter = router({
               code: "INTERNAL_SERVER_ERROR",
               message: `Erro ao atualizar descrição: ${error.message}`,
             });
+          }
+
+          // Sincronizar com espelhos
+          try {
+            const { data: mirrors } = await supabase
+              .from("mirrored_cards")
+              .select("*")
+              .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+            if (mirrors && mirrors.length > 0) {
+              const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+                .filter(id => id !== input.cardId);
+
+              await supabase
+                .from("cards")
+                .update({ description: input.description })
+                .in("id", relatedCardIds);
+            }
+          } catch (e) {
+            console.error("[Mirror Sync] Description sync failed:", e);
           }
 
           return { success: true };
@@ -817,6 +888,27 @@ export const appRouter = router({
           .eq("id", input.cardId);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar com espelhos
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("*")
+            .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+              .filter(id => id !== input.cardId);
+
+            await supabase
+              .from("cards")
+              .update({ due_date: input.dueDate ? input.dueDate.toISOString() : null })
+              .in("id", relatedCardIds);
+          }
+        } catch (e) {
+          console.error("[Mirror Sync] Due date sync failed:", e);
+        }
+
         return { success: true };
       }),
 
@@ -829,6 +921,27 @@ export const appRouter = router({
           .eq("id", input.cardId);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar com espelhos
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("*")
+            .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+              .filter(id => id !== input.cardId);
+
+            await supabase
+              .from("cards")
+              .update({ start_date: input.startDate ? input.startDate.toISOString() : null })
+              .in("id", relatedCardIds);
+          }
+        } catch (e) {
+          console.error("[Mirror Sync] Start date sync failed:", e);
+        }
+
         return { success: true };
       }),
 
@@ -898,6 +1011,34 @@ export const appRouter = router({
           .single();
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar com espelhos
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("*")
+            .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+              .filter(id => id !== input.cardId);
+
+            for (const cardId of relatedCardIds) {
+              await supabase.from("card_attachments").insert({
+                card_id: cardId,
+                filename: input.filename,
+                file_url: input.fileUrl,
+                file_key: input.fileKey,
+                mime_type: input.mimeType,
+                file_size: input.fileSize,
+                uploaded_by: ctx.user.id,
+              });
+            }
+          }
+        } catch (e) {
+          console.error("[Mirror Sync] Attachment sync failed:", e);
+        }
+
         return { id: data.id };
       }),
     deleteAttachment: protectedProcedure
@@ -1203,6 +1344,33 @@ export const appRouter = router({
           }, { onConflict: 'card_id,field_name' });
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar com espelhos
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("*")
+            .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+              .filter(id => id !== input.cardId);
+
+            for (const cardId of relatedCardIds) {
+              await supabase
+                .from("card_custom_fields")
+                .upsert({
+                  card_id: cardId,
+                  field_name: input.fieldName,
+                  field_value: input.fieldValue,
+                  field_type: input.fieldType || "text",
+                }, { onConflict: 'card_id,field_name' });
+            }
+          }
+        } catch (e) {
+          console.error("[Mirror Sync] Custom field sync failed:", e);
+        }
+
         return { success: true };
       }),
 
@@ -1232,6 +1400,32 @@ export const appRouter = router({
           }, { onConflict: 'card_id' });
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar com espelhos
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("*")
+            .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+              .filter(id => id !== input.cardId);
+
+            for (const cardId of relatedCardIds) {
+              await supabase
+                .from("project_dates")
+                .upsert({
+                  card_id: cardId,
+                  start_date: input.startDate ? input.startDate.toISOString() : null,
+                  end_date: input.endDate ? input.endDate.toISOString() : null,
+                }, { onConflict: 'card_id' });
+            }
+          }
+        } catch (e) {
+          console.error("[Mirror Sync] Project dates sync failed:", e);
+        }
+
         return { success: true };
       }),
 
@@ -1265,6 +1459,30 @@ export const appRouter = router({
           .single();
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar com espelhos
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("*")
+            .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+              .filter(id => id !== input.cardId);
+
+            for (const cardId of relatedCardIds) {
+              await supabase.from("card_comments").insert({
+                card_id: cardId,
+                user_id: ctx.user.id,
+                content: input.content,
+              });
+            }
+          }
+        } catch (e) {
+          console.error("[Mirror Sync] Comment sync failed:", e);
+        }
+
         return { id: data.id };
       }),
     deleteComment: protectedProcedure
@@ -1314,11 +1532,30 @@ export const appRouter = router({
         // Nome limpo: remove sufixos de mirror anteriores se existirem
         const cleanTitle = originalCard.title.replace(/\s\(Mirror:.*\)$/, "");
 
+        // --- NOVO: Buscar configurações do QUADRO DE ORIGEM ---
+        const { data: settings } = await supabase
+          .from("board_mirror_settings")
+          .select("*")
+          .eq("board_id", originalList.board_id)
+          .maybeSingle();
+
+        const mirrorSettings = settings || {
+          mirror_labels: true,
+          mirror_checklists: true,
+          mirror_comments: false,
+          mirror_attachments: false,
+          mirror_custom_fields: true,
+          mirror_dates: true,
+          mirror_description: true,
+        };
+
         const { data: mirrorCard, error: mirrorError } = await supabase
           .from("cards")
           .insert({
             title: `${cleanTitle} (Mirror: ${originName})`,
-            description: originalCard.description,
+            description: mirrorSettings.mirror_description ? originalCard.description : null,
+            start_date: mirrorSettings.mirror_dates ? originalCard.start_date : null,
+            due_date: mirrorSettings.mirror_dates ? originalCard.due_date : null,
             list_id: input.targetListId,
             position: 0,
             created_by: ctx.user.id
@@ -1344,21 +1581,8 @@ export const appRouter = router({
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao vincular espelhos: ${linkError.message}` });
         }
 
-        // --- NOVO: Sincronização Inicial de Atributos ---
-        const { data: settings } = await supabase
-          .from("board_mirror_settings")
-          .select("*")
-          .eq("board_id", input.targetBoardId)
-          .maybeSingle();
-
-        const mirrorSettings = settings || {
-          mirror_labels: true,
-          mirror_checklists: true,
-          mirror_custom_fields: true,
-          mirror_dates: true,
-          mirror_description: true,
-        };
-
+        // --- Sincronização Inicial de Atributos Secundários ---
+        
         // 1. Sincronizar Etiquetas
         if (mirrorSettings.mirror_labels) {
           const { data: labels } = await supabase.from("card_labels").select("*").eq("card_id", input.cardId);
@@ -1398,14 +1622,14 @@ export const appRouter = router({
           }
         }
 
-        // 3. Sincronizar Datas do Projeto
+        // 3. Sincronizar Datas do Projeto (Tabela auxiliar)
         if (mirrorSettings.mirror_dates) {
           const { data: dates } = await supabase.from("project_dates").select("*").eq("card_id", input.cardId).maybeSingle();
           if (dates) {
             await supabase.from("project_dates").upsert({
               card_id: mirrorCard.id,
-              start_date: dates.start_date,
-              end_date: dates.end_date
+              project_start_date: dates.project_start_date,
+              project_end_date: dates.project_end_date
             });
           }
         }
@@ -1420,6 +1644,40 @@ export const appRouter = router({
                 field_name: f.field_name,
                 field_value: f.field_value,
                 field_type: f.field_type
+              }))
+            );
+          }
+        }
+
+        // 5. Sincronizar Comentários (Opcional conforme configuração)
+        if (mirrorSettings.mirror_comments) {
+          const { data: comments } = await supabase.from("card_comments").select("*").eq("card_id", input.cardId);
+          if (comments && comments.length > 0) {
+            await supabase.from("card_comments").insert(
+              comments.map(c => ({
+                card_id: mirrorCard.id,
+                user_id: c.user_id,
+                content: c.content,
+                created_at: c.created_at
+              }))
+            );
+          }
+        }
+
+        // 6. Sincronizar Anexos (Opcional conforme configuração)
+        if (mirrorSettings.mirror_attachments) {
+          const { data: attachments } = await supabase.from("card_attachments").select("*").eq("card_id", input.cardId);
+          if (attachments && attachments.length > 0) {
+            await supabase.from("card_attachments").insert(
+              attachments.map(a => ({
+                card_id: mirrorCard.id,
+                filename: a.filename,
+                file_url: a.file_url,
+                file_key: a.file_key,
+                mime_type: a.mime_type,
+                file_size: a.file_size,
+                uploaded_by: a.uploaded_by,
+                created_at: a.created_at
               }))
             );
           }
