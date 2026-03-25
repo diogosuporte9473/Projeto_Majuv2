@@ -447,11 +447,11 @@ export default function CardDetailModal({
                   na lista <span className="font-semibold text-gray-200 underline decoration-gray-600 underline-offset-4">{listName}</span>
                 </p>
 
-                <div className="flex items-center gap-4 py-1">
+                <div className="flex flex-wrap items-center gap-2.5 py-1">
                   {card?.startDate && (
-                    <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-blue-500/5 border border-blue-500/10">
-                      <Calendar className="w-3.5 h-3.5 text-blue-400" />
-                      <span className="text-xs font-medium text-gray-400">
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/5 border border-blue-500/10">
+                      <Calendar className="w-3 h-3 text-blue-400" />
+                      <span className="text-[11px] font-medium text-gray-400">
                         Início: <span className="text-gray-200">{format(new Date(card.startDate), "dd 'de' MMM, yyyy", { locale: ptBR })}</span>
                       </span>
                     </div>
@@ -459,13 +459,13 @@ export default function CardDetailModal({
                   
                   {card?.dueDate && (
                     <div className={cn(
-                      "flex items-center gap-2 px-2.5 py-1 rounded-md border",
+                      "flex items-center gap-1.5 px-2 py-1 rounded-md border",
                       isOverdue 
                         ? "bg-red-500/10 border-red-500/20 animate-pulse" 
                         : "bg-green-500/5 border-green-500/10"
                     )}>
-                      <Clock className={cn("w-3.5 h-3.5", isOverdue ? "text-red-400" : "text-green-400")} />
-                      <span className="text-xs font-medium text-gray-400">
+                      <Clock className={cn("w-3 h-3", isOverdue ? "text-red-400" : "text-green-400")} />
+                      <span className="text-[11px] font-medium text-gray-400">
                         Entrega: <span className={cn(isOverdue ? "text-red-400 font-bold" : "text-gray-200")}>
                           {format(new Date(card.dueDate), "dd 'de' MMM, yyyy", { locale: ptBR })}
                         </span>
