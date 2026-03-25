@@ -417,7 +417,7 @@ export async function getCardAttachments(cardId: number) {
       ...att,
       cardId: att.card_id,
       fileUrl: att.file_url,
-      fileKey: att.file_key,
+      fileKey: att.file_key || null,
       mimeType: att.mime_type,
       fileSize: att.file_size,
       uploadedBy: att.uploaded_by,

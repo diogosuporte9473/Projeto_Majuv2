@@ -879,17 +879,21 @@ export const appRouter = router({
         fileSize: z.number()
       }))
       .mutation(async ({ ctx, input }) => {
+        const insertData: any = {
+          card_id: input.cardId,
+          filename: input.filename,
+          file_url: input.fileUrl,
+          mime_type: input.mimeType,
+          file_size: input.fileSize,
+          uploaded_by: ctx.user.id,
+        };
+
+        // Adiciona file_key (requer que você execute o SQL no Supabase conforme discutido)
+        insertData.file_key = input.fileKey;
+
         const { data, error } = await supabase
           .from("card_attachments")
-          .insert({
-            card_id: input.cardId,
-            filename: input.filename,
-            file_url: input.fileUrl,
-            file_key: input.fileKey,
-            mime_type: input.mimeType,
-            file_size: input.fileSize,
-            uploaded_by: ctx.user.id,
-          })
+          .insert(insertData)
           .select("id")
           .single();
 
