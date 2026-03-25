@@ -12,7 +12,7 @@ import {
   X, Plus, Trash2, Tag, CheckSquare, Calendar, Loader2, 
   AlignLeft, LayoutGrid, Clock, Copy, Archive, Trash, 
   MessageSquare, Paperclip, Send, MoreVertical, Maximize2, Minimize2, 
-  CalendarDays, User as UserIcon, Edit2,
+  CalendarDays, User as UserIcon, Edit2, FileText, ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -82,6 +82,7 @@ export default function CardDetailModal({
   const addCommentMutation = trpc.cardDetails.addComment.useMutation();
   const deleteCommentMutation = trpc.cardDetails.deleteComment.useMutation();
   const addAttachmentMutation = trpc.cardDetails.addAttachment.useMutation();
+  const deleteAttachmentMutation = trpc.cardDetails.deleteAttachment.useMutation();
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [description, setDescription] = useState(cardDescription || "");
@@ -1188,23 +1189,74 @@ export default function CardDetailModal({
                     "grid gap-6 transition-all duration-500",
                     isMaximized ? "pl-10 grid-cols-2 xl:grid-cols-4" : "pl-10 grid-cols-1 sm:grid-cols-2"
                   )}>
-                    {attachments.map((file: any) => (
-                      <a 
-                        key={file.id} 
-                        href={file.file_url} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="flex items-center gap-5 p-5 rounded-2xl bg-[#222]/50 hover:bg-[#2a2a2a]/80 transition-all border border-[#333] group hover:border-accent/40 shadow-sm"
-                      >
-                        <div className="w-12 h-12 rounded-xl bg-[#1a1a1a] flex items-center justify-center flex-shrink-0 group-hover:bg-accent/10 transition-colors border border-[#333] group-hover:border-accent/20">
-                          <Paperclip className="w-5 h-5 text-gray-500 group-hover:text-accent" />
+                    {attachments.map((file: any) => {
+                      const isImage = file.mime_type?.startsWith('image/') || 
+                                    ['.png', '.jpg', '.jpeg', '.gif', '.webp'].some(ext => file.filename.toLowerCase().endsWith(ext));
+                      
+                      return (
+                        <div key={file.id} className="group relative">
+                          <a 
+                            href={file.file_url} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="flex flex-col overflow-hidden rounded-2xl bg-[#222]/50 hover:bg-[#2a2a2a]/80 transition-all border border-[#333] group hover:border-accent/40 shadow-sm h-full"
+                          >
+                            {/* Thumbnail Area */}
+                            <div className="aspect-video w-full bg-[#1a1a1a] flex items-center justify-center overflow-hidden border-b border-[#333]">
+                              {isImage ? (
+                                <img 
+                                  src={file.file_url} 
+                                  alt={file.filename}
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                />
+                              ) : (
+                                <div className="flex flex-col items-center gap-2">
+                                  <FileText className="w-8 h-8 text-gray-600 group-hover:text-accent/50 transition-colors" />
+                                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">
+                                    {file.filename.split('.').pop()}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Info Area */}
+                            <div className="p-4 flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-[#1a1a1a] flex items-center justify-center flex-shrink-0 group-hover:bg-accent/10 transition-colors border border-[#333] group-hover:border-accent/20">
+                                {isImage ? (
+                                  <ImageIcon className="w-4 h-4 text-gray-500 group-hover:text-accent" />
+                                ) : (
+                                  <Paperclip className="w-4 h-4 text-gray-500 group-hover:text-accent" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-black text-gray-300 truncate group-hover:text-accent transition-colors">
+                                  {file.filename}
+                                </p>
+                                <p className="text-[10px] text-gray-500 uppercase font-black mt-1 tracking-wider">
+                                  {(file.file_size / 1024).toFixed(0)} KB
+                                </p>
+                              </div>
+                            </div>
+                          </a>
+                          
+                          {/* Delete Button (Opcional, se quiser adicionar) */}
+                          <button 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if(confirm('Excluir anexo?')) {
+                                deleteAttachmentMutation.mutateAsync({ id: file.id }).then(() => {
+                                  utils.cardDetails.getAttachments.invalidate({ cardId });
+                                  toast.success("Anexo removido");
+                                });
+                              }
+                            }}
+                            className="absolute top-2 right-2 p-2 rounded-lg bg-black/50 text-white/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm border border-white/10"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-black text-gray-300 truncate group-hover:text-accent transition-colors">{file.filename}</p>
-                          <p className="text-[10px] text-gray-500 uppercase font-black mt-1.5 tracking-wider">{(file.file_size / 1024).toFixed(0)} KB</p>
-                        </div>
-                      </a>
-                    ))}
+                      );
+                    })}
                   </div>
                 </section>
               )}
