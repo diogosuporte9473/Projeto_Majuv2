@@ -141,7 +141,7 @@ export function DraggableCard({
 
               {/* Status Icons */}
               <div className="flex items-center gap-2 text-gray-500">
-                {description && <AlignLeft size={11} title="Tem descrição" />}
+                {description && <span title="Tem descrição"><AlignLeft size={11} /></span>}
                 {checklistCount > 0 && (
                   <div className={cn(
                     "flex items-center gap-0.5 text-[10px] font-bold",
