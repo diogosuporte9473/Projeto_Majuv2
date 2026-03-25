@@ -39,6 +39,7 @@ import {
   cardCustomFields,
   projectDates,
   notes,
+  checklistTemplates,
 } from "../drizzle/schema.js";
 import { invokeLLM, Message } from "./_core/llm.js";
 import { ENV } from "./_core/env.js";
@@ -752,6 +753,34 @@ export const appRouter = router({
 
   // Labels, Checklists, Custom Fields and Project Dates
   cardDetails: router({
+    getLabels: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        return await getCardLabels(input.cardId);
+      }),
+    addLabel: protectedProcedure
+      .input(z.object({ cardId: z.number(), label: z.string(), color: z.string().optional() }))
+      .mutation(async ({ input }) => {
+        const { data, error } = await supabase
+          .from("card_labels")
+          .insert({
+            card_id: input.cardId,
+            label: input.label,
+            color: input.color || "#4b4897",
+          })
+          .select("id")
+          .single();
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { id: data.id };
+      }),
+    deleteLabel: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase.from("card_labels").delete().eq("id", input.id);
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
+      }),
     updateDescription: protectedProcedure
       .input(z.object({ cardId: z.number(), description: z.string() }))
       .mutation(async ({ input }) => {
@@ -1594,6 +1623,142 @@ export const appRouter = router({
     }),
   }),
 
+  // Checklist Templates
+  checklistTemplates: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const { data, error } = await supabase
+        .from("checklist_templates")
+        .select("*")
+        .or(`is_global.eq.true,created_by.eq.${ctx.user.id}`)
+        .order("usage_count", { ascending: false })
+        .order("name", { ascending: true });
+
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      
+      // Os 13 modelos globais que devem existir se a tabela estiver vazia
+      const globalTemplates = [
+        { name: "Separação 1", items: ["Conferir pedido", "Separar itens", "Embalar"] },
+        { name: "Baixa no Sistema", items: ["Atualizar estoque", "Gerar protocolo", "Confirmar baixa"] },
+        { name: "Aprovação", items: ["Revisar documentos", "Validar dados", "Assinar aprovação"] },
+        { name: "Logística", items: ["Agendar coleta", "Definir rota", "Despachar"] },
+        { name: "Faturamento", items: ["Emitir NF", "Enviar boleto", "Registrar financeiro"] },
+        { name: "Qualidade", items: ["Inspecionar produto", "Testar funcionalidade", "Liberar lote"] },
+        { name: "Manutenção", items: ["Diagnosticar problema", "Trocar peças", "Testar reparo"] },
+        { name: "RH Admissão", items: ["Coletar docs", "Assinar contrato", "Onboarding"] },
+        { name: "TI Setup", items: ["Configurar PC", "Criar acessos", "Instalar softwares"] },
+        { name: "Vendas Lead", items: ["Qualificar contato", "Apresentar proposta", "Follow-up"] },
+        { name: "Marketing Campanha", items: ["Definir público", "Criar artes", "Lançar anúncios"] },
+        { name: "Compras Suprimentos", items: ["Cotar preços", "Escolher fornecedor", "Emitir pedido"] },
+        { name: "Atendimento", items: ["Abrir chamado", "Analisar dúvida", "Responder cliente"] }
+      ];
+
+      // Se não houver dados no banco, inserimos os globais (apenas para exibição inicial se desejar, 
+      // mas idealmente estariam no banco via migration ou seed)
+      if (!data || data.length === 0) {
+        return globalTemplates.map((t, idx) => ({
+          id: idx + 1000, // IDs fictícios para os padrões se o banco estiver vazio
+          name: t.name,
+          items: t.items,
+          isGlobal: true,
+          usageCount: 0
+        }));
+      }
+
+      return (data || []).map(t => ({
+        ...t,
+        items: typeof t.items === 'string' ? JSON.parse(t.items) : t.items
+      }));
+    }),
+    apply: protectedProcedure
+      .input(z.object({
+        cardId: z.number(),
+        templateId: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        // Buscar o template
+        const { data: template, error: tError } = await supabase
+          .from("checklist_templates")
+          .select("*")
+          .eq("id", input.templateId)
+          .single();
+        
+        if (tError || !template) throw new TRPCError({ code: "NOT_FOUND", message: "Modelo não encontrado" });
+
+        const items = typeof template.items === 'string' ? JSON.parse(template.items) : template.items;
+
+        // Criar o grupo de checklist baseado no nome do template
+        const { data: group, error: gError } = await supabase
+          .from("card_checklist_groups")
+          .insert({
+            card_id: input.cardId,
+            title: template.name,
+            position: 0
+          })
+          .select("id")
+          .single();
+        
+        if (gError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: gError.message });
+
+        // Inserir os itens
+        const checklistItems = items.map((title: string, index: number) => ({
+          card_id: input.cardId,
+          group_id: group.id,
+          title: title,
+          position: index,
+          completed: false
+        }));
+
+        const { error: iError } = await supabase
+          .from("card_checklists")
+          .insert(checklistItems);
+
+        if (iError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: iError.message });
+
+        // Incrementar uso
+        await supabase.rpc('increment_template_usage', { template_id: input.templateId });
+
+        return { success: true };
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string(),
+        items: z.array(z.string()),
+        isGlobal: z.boolean().default(false),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { data, error } = await supabase
+          .from("checklist_templates")
+          .insert({
+            name: input.name,
+            items: JSON.stringify(input.items),
+            is_global: input.isGlobal && ctx.user.role === 'admin',
+            created_by: ctx.user.id,
+          })
+          .select("id")
+          .single();
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { id: data.id };
+      }),
+    incrementUsage: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const { data: current } = await supabase
+          .from("checklist_templates")
+          .select("usage_count")
+          .eq("id", input.id)
+          .single();
+        
+        const count = (current?.usage_count || 0) + 1;
+        await supabase
+          .from("checklist_templates")
+          .update({ usage_count: count })
+          .eq("id", input.id);
+        
+        return { success: true };
+      }),
+  }),
+
   // AI Chat Assistant
   ai: router({
     chat: protectedProcedure
@@ -1601,7 +1766,9 @@ export const appRouter = router({
         messages: z.array(z.object({
           role: z.enum(["user", "assistant", "system"]),
           content: z.string(),
-        }))
+        })),
+        useWebSearch: z.boolean().optional(),
+        shortResponse: z.boolean().optional(),
       }))
       .mutation(async ({ input }) => {
         const lastUserMessage = [...input.messages].reverse().find(m => m.role === 'user')?.content.toLowerCase() || "";
@@ -1656,19 +1823,16 @@ export const appRouter = router({
           }
         }
 
-        // Se não houver chave API, não tenta chamar o LLM
-        if (!ENV.forgeApiKey) {
-          return "Desculpe, meu sistema de inteligência geral está em manutenção (BUILT_IN_FORGE_API_KEY não configurada). Mas posso responder dúvidas sobre o Maju Tasks! Tente perguntar sobre 'como criar um quadro', 'espelhamento' ou 'prazos'.";
-        }
-
         // Se não encontrar no banco simples, invoca o LLM com contexto do sistema
         try {
           const systemPrompt: Message = {
             role: "system",
             content: `Você é o assistente Virtual D. do aplicativo Maju Tasks, desenvolvido por Diogo Martins. 
             Seu objetivo é ajudar usuários com o funcionamento da aplicação. 
+            ${input.shortResponse ? "Mantenha a resposta extremamente curta e direta ao ponto." : ""}
+            ${input.useWebSearch ? "Se necessário, utilize informações recentes da web para responder." : ""}
             Se perguntarem sobre o desenvolvimento ou questões técnicas profundas, direcione-os para o Dev Diogo Martins.
-            Mantenha as respostas curtas, objetivas e em português.`
+            Mantenha as respostas em português.`
           };
 
           const response = await invokeLLM({
@@ -1679,9 +1843,13 @@ export const appRouter = router({
           return typeof content === "string" ? content : "Desculpe, não consegui processar sua pergunta.";
         } catch (error: any) {
           console.error("[AI Chat Error]", error);
+          
+          // Se o erro for de falta de chave, mas temos o openrouter configurado ou o fallback ativado
           if (error.message === "NO_API_KEY") {
-            return "No momento estou operando apenas com meu manual local (chaves de API não configuradas). Você pode me perguntar sobre 'como criar um quadro', 'espelhamento' ou 'prazos'!";
+             // Tenta uma mensagem amigável antes de desistir
+             return "Olá! No momento meu módulo de IA avançada está em repouso, mas posso te ajudar com o básico do Maju Tasks. Tente perguntar sobre 'como criar um quadro' ou 'espelhamento'!";
           }
+          
           return "Desculpe, tive um problema ao processar sua pergunta agora. Você pode perguntar sobre o funcionamento básico do app!";
         }
       }),
