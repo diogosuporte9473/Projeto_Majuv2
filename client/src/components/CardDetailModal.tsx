@@ -524,13 +524,13 @@ export default function CardDetailModal({
               {/* Quick Actions & Labels */}
               <div className="flex flex-col md:flex-row justify-between items-start gap-4 pb-5 border-b border-[#333]/40">
                 <div className="flex flex-wrap gap-4">
-                  {labels && labels.length > 0 && (
-                    <div className="space-y-4">
-                      <h4 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                        <Tag className="w-3 h-3" /> Etiquetas
-                      </h4>
-                      <div className="flex flex-wrap gap-2.5">
-                        {labels.map((label: any) => (
+                  <div className="space-y-4">
+                    <h4 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                      <Tag className="w-3 h-3" /> Etiquetas
+                    </h4>
+                    <div className="flex flex-wrap gap-2.5">
+                      {labels && labels.length > 0 ? (
+                        labels.map((label: any) => (
                           <div 
                             key={label.id} 
                             className="px-4 py-1.5 rounded-md text-[11px] font-bold text-white shadow-sm ring-1 ring-white/10 hover:brightness-110 transition-all cursor-default" 
@@ -538,62 +538,65 @@ export default function CardDetailModal({
                           >
                             {label.label}
                           </div>
-                        ))}
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon" className="w-8 h-8 rounded-md bg-[#2a2a2a] hover:bg-[#333] transition-colors border border-[#333]">
-                              <Plus className="w-4 h-4 text-gray-400" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-4 shadow-2xl">
-                            <div className="space-y-4">
-                              <h3 className="text-sm font-bold text-gray-200">Gerenciar Etiquetas</h3>
-                              <div className="flex flex-wrap gap-2">
-                                {labels?.map((label: any) => (
-                                  <div
-                                    key={label.id}
-                                    className="flex items-center gap-2 px-2.5 py-1 rounded text-white text-[10px] font-bold group ring-1 ring-white/10"
-                                    style={{ backgroundColor: label.color }}
-                                  >
-                                    {label.label}
-                                    <button onClick={() => handleRemoveLabel(label.id)} className="hover:bg-black/20 rounded p-0.5 transition-colors">
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                              <Separator className="bg-[#333]" />
-                              <div className="space-y-3">
-                                <input
-                                  type="text"
-                                  value={newLabel}
-                                  onChange={(e) => setNewLabel(e.target.value)}
-                                  placeholder="Nome da etiqueta..."
-                                  className="w-full bg-[#2a2a2a] border border-[#333] rounded px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-accent"
-                                />
-                                <div className="flex items-center justify-between gap-3">
-                                  <input
-                                    type="color"
-                                    value={newLabelColor}
-                                    onChange={(e) => setNewLabelColor(e.target.value)}
-                                    className="w-10 h-10 rounded-lg bg-transparent border-none cursor-pointer p-0"
-                                  />
-                                  <Button onClick={handleAddLabel} size="sm" className="bg-accent text-white h-9 px-4 text-xs font-bold">
-                                    Adicionar
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
+                        ))
+                      ) : (
+                        <span className="text-[10px] text-gray-500 italic">Nenhuma etiqueta</span>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                </div>>
 
                 <div className="space-y-4">
                   <h4 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Adicionar ao cartão</h4>
                   <div className="flex flex-wrap gap-3">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="bg-[#2a2a2a] border border-[#333] hover:bg-[#333] text-xs h-10 px-5 font-bold rounded-xl transition-all">
+                          <Tag className="w-4 h-4 mr-2.5 text-purple-400" /> Etiquetas
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-4 shadow-2xl">
+                        <div className="space-y-4">
+                          <h3 className="text-sm font-bold text-gray-200">Gerenciar Etiquetas</h3>
+                          <div className="flex flex-wrap gap-2">
+                            {labels?.map((label: any) => (
+                              <div
+                                key={label.id}
+                                className="flex items-center gap-2 px-2.5 py-1 rounded text-white text-[10px] font-bold group ring-1 ring-white/10"
+                                style={{ backgroundColor: label.color }}
+                              >
+                                {label.label}
+                                <button onClick={() => handleRemoveLabel(label.id)} className="hover:bg-black/20 rounded p-0.5 transition-colors">
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <Separator className="bg-[#333]" />
+                          <div className="space-y-3">
+                            <input
+                              type="text"
+                              value={newLabel}
+                              onChange={(e) => setNewLabel(e.target.value)}
+                              placeholder="Nome da etiqueta..."
+                              className="w-full bg-[#2a2a2a] border border-[#333] rounded px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-accent"
+                            />
+                            <div className="flex items-center justify-between gap-3">
+                              <input
+                                type="color"
+                                value={newLabelColor}
+                                onChange={(e) => setNewLabelColor(e.target.value)}
+                                className="w-10 h-10 rounded-lg bg-transparent border-none cursor-pointer p-0"
+                              />
+                              <Button onClick={handleAddLabel} size="sm" className="bg-accent text-white h-9 px-4 text-xs font-bold">
+                                Adicionar
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+
                     <Popover open={isCreatingChecklist} onOpenChange={setIsCreatingChecklist}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="bg-[#2a2a2a] border border-[#333] hover:bg-[#333] text-xs h-10 px-5 font-bold rounded-xl transition-all">
