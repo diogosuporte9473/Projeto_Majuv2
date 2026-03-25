@@ -96,6 +96,17 @@ export default function BoardView() {
 
   const [isEditingBoardName, setIsEditingBoardName] = useState(false);
   const [editedBoardName, setEditedBoardName] = useState("");
+  const [showActivityModal, setShowActivityModal] = useState(false);
+
+  useEffect(() => {
+    (window as any).showBoardActivity = () => setShowActivityModal(true);
+    return () => { delete (window as any).showBoardActivity; };
+  }, []);
+
+  const { data: boardActivity } = trpc.audit.list.useQuery({
+    search: board?.name,
+    limit: 10,
+  }, { enabled: !!board?.name && showActivityModal } as any);
 
   useEffect(() => {
     if (board) {
@@ -231,6 +242,13 @@ export default function BoardView() {
   return (
     <TrelloDashboardLayout>
       <div className="h-full flex flex-col">
+        <BoardActivityModal 
+          isOpen={showActivityModal} 
+          onClose={() => setShowActivityModal(false)} 
+          boardName={board.name}
+          logs={boardActivity?.logs || []}
+          isLoading={logsLoading}
+        />
         <div className="p-6 flex justify-between items-start flex-shrink-0">
           <div className="flex-1 min-w-0">
             {isEditingBoardName ? (
@@ -259,6 +277,15 @@ export default function BoardView() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              onClick={() => (window as any).showBoardActivity?.()} 
+              variant="ghost" 
+              size="icon" 
+              className="text-muted-foreground hover:text-accent transition-all hover:bg-accent/10" 
+              title="Últimas Atividades"
+            >
+              <History className="w-4 h-4" />
+            </Button>
             <Button onClick={() => setShowArchivedModal(true)} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" title="Itens Arquivados">
               <Archive className="w-4 h-4" />
             </Button>
@@ -657,6 +684,89 @@ function ArchivedCardsModal({ isOpen, onClose, boardId }: { isOpen: boolean, onC
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BoardActivityModal({ isOpen, onClose, boardName, logs, isLoading }: { isOpen: boolean, onClose: () => void, boardName: string, logs: any[], isLoading: boolean }) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent 
+        aria-describedby={undefined}
+        className="max-w-2xl bg-[#1a1a1a] border-[#333] text-white"
+      >
+        <DialogHeader>
+          <div className="flex items-center justify-between pr-8">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <History className="w-5 h-5 text-accent" />
+              Atividades do Quadro
+            </DialogTitle>
+            <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-accent/10 text-accent rounded border border-accent/20">
+              {boardName}
+            </span>
+          </div>
+          <DialogDescription className="text-gray-500 text-xs mt-1">
+            Histórico recente de ações realizadas neste quadro.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 pt-6 max-h-[65vh] overflow-y-auto custom-scrollbar pr-2">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <Loader2 className="w-10 h-10 animate-spin text-accent/50" />
+              <p className="text-xs text-gray-500 font-medium animate-pulse uppercase tracking-widest">Carregando atividades...</p>
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-[#222] flex items-center justify-center border border-[#333]">
+                <Clock className="w-8 h-8 text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-400 uppercase tracking-tight">Nenhuma atividade recente</p>
+                <p className="text-[10px] text-gray-600 uppercase font-black tracking-widest mt-1">Os logs aparecerão aqui conforme as ações ocorrerem.</p>
+              </div>
+            </div>
+          ) : (
+            logs.map((log: any) => (
+              <div key={log.id} className="flex gap-4 p-4 rounded-2xl bg-[#222]/50 border border-[#333] hover:border-accent/20 transition-all group">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-xs font-black uppercase tracking-tighter shadow-inner group-hover:bg-accent group-hover:text-white transition-all duration-300">
+                    {log.users?.name?.substring(0, 2) || "S"}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-black text-gray-200 group-hover:text-white transition-colors">
+                      {log.users?.name || "Sistema"}
+                    </p>
+                    <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest whitespace-nowrap bg-[#1a1a1a] px-2 py-0.5 rounded border border-[#333]">
+                      {formatDistanceToNow(new Date(log.created_at), { addSuffix: true, locale: ptBR })}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={cn(
+                      "px-1.5 py-0.5 rounded-[4px] text-[9px] font-black uppercase tracking-[0.1em] border",
+                      log.action === 'create' && "bg-green-500/10 text-green-500 border-green-500/20",
+                      log.action === 'update' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                      log.action === 'delete' && "bg-red-500/10 text-red-500 border-red-500/20",
+                      log.action === 'archive' && "bg-orange-500/10 text-orange-500 border-orange-500/20",
+                      log.action === 'restore' && "bg-purple-500/10 text-purple-500 border-purple-500/20",
+                    )}>
+                      {log.action}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter truncate">
+                      {log.entity_type}: {log.entity_name}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 italic line-clamp-2 leading-relaxed font-medium border-l-2 border-[#333] pl-3 py-1 group-hover:border-accent/40 group-hover:text-gray-400 transition-all">
+                    {log.details}
+                  </p>
                 </div>
               </div>
             ))
