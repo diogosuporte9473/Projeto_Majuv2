@@ -408,7 +408,7 @@ export default function CardDetailModal({
           "overflow-y-auto bg-[#1a1a1a] text-white border-[#333] p-0 transition-all duration-500 ease-in-out flex flex-col",
           isMaximized 
             ? "max-w-[95vw] w-[min(1400px,95vw)] min-w-[1000px] h-[94vh] rounded-2xl shadow-2xl" 
-            : "max-w-[1100px] w-[min(1100px,92vw)] min-w-[768px] h-[88vh] rounded-xl shadow-xl"
+            : "max-w-[1100px] w-[min(1100px,92vw)] min-w-[850px] h-[88vh] rounded-xl shadow-xl"
         )}
       >
         <div className="sr-only">
@@ -480,26 +480,26 @@ export default function CardDetailModal({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsMaximized(!isMaximized)}
                 className={cn(
-                  "hover:bg-accent/10 h-10 w-10 rounded-xl transition-all duration-300",
+                  "hover:bg-accent/10 h-9 w-9 rounded-lg transition-all duration-300",
                   isMaximized ? "text-accent bg-accent/5" : "text-gray-400"
                 )}
                 title={isMaximized ? "Recolher" : "Expandir"}
               >
-                {isMaximized ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                {isMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
               </Button>
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={onClose}
-                className="hover:bg-red-500/10 hover:text-red-400 text-gray-400 h-10 w-10 rounded-xl transition-colors"
+                className="hover:bg-red-500/10 hover:text-red-400 text-gray-400 h-9 w-9 rounded-lg transition-colors"
               >
-                <X size={20} />
+                <X size={18} />
               </Button>
             </div>
           </div>
@@ -511,14 +511,14 @@ export default function CardDetailModal({
           isMaximized ? "p-6 px-10" : "p-5 px-6"
         )}>
           <div className={cn(
-            "grid gap-8",
-            isMaximized ? "grid-cols-4" : "grid-cols-1 lg:grid-cols-4"
+            "grid gap-6",
+            isMaximized ? "grid-cols-12" : "grid-cols-1 lg:grid-cols-12"
           )}>
             
             {/* Left Column (Main Content) */}
             <div className={cn(
               "space-y-8 transition-all duration-500",
-              isMaximized ? "col-span-3" : "col-span-1 lg:col-span-3"
+              isMaximized ? "col-span-9" : "col-span-1 lg:col-span-9"
             )}>
               
               {/* Quick Actions & Labels */}
@@ -1256,7 +1256,7 @@ export default function CardDetailModal({
             {/* Right Sidebar Column */}
             <div className={cn(
               "space-y-6 transition-all duration-500",
-              isMaximized ? "col-span-1" : "col-span-1 lg:col-span-1"
+              isMaximized ? "col-span-3" : "col-span-1 lg:col-span-3"
             )}>
               <div className="bg-[#1e1e1e]/80 p-5 rounded-2xl border border-[#333]/60 h-fit shadow-xl backdrop-blur-sm space-y-6">
                 <div className="space-y-6">
@@ -1268,26 +1268,26 @@ export default function CardDetailModal({
                       variant="ghost" 
                       size="sm" 
                       onClick={() => setIsMirrorDialogOpen(true)}
-                      className="bg-[#2a2a2a] hover:bg-[#333] text-gray-200 justify-start h-12 px-6 rounded-2xl text-xs font-black transition-all border border-[#333]/50 hover:border-accent/30 shadow-sm"
+                      className="bg-[#2a2a2a] hover:bg-[#333] text-gray-200 justify-start h-11 px-4 rounded-xl text-[10px] font-black transition-all border border-[#333]/50 hover:border-accent/30 shadow-sm w-full"
                     >
-                      <Copy className="w-4 h-4 mr-4 text-accent" /> Espelhar Cartão
+                      <Copy className="w-3.5 h-3.5 mr-3 text-accent flex-shrink-0" /> <span className="truncate">Espelhar Cartão</span>
                     </Button>
                     <Button 
                       variant="ghost" 
                       size="sm" 
                       onClick={handleArchiveCard}
-                      className="bg-[#2a2a2a] hover:bg-amber-950/20 hover:text-amber-400 text-gray-200 justify-start h-12 px-6 rounded-2xl text-xs font-black transition-all border border-[#333]/50 hover:border-amber-400/30 shadow-sm"
+                      className="bg-[#2a2a2a] hover:bg-amber-950/20 hover:text-amber-400 text-gray-200 justify-start h-11 px-4 rounded-xl text-[10px] font-black transition-all border border-[#333]/50 hover:border-amber-400/30 shadow-sm w-full"
                     >
-                      <Archive className="w-4 h-4 mr-4 text-amber-500" /> Arquivar Cartão
+                      <Archive className="w-3.5 h-3.5 mr-3 text-amber-500 flex-shrink-0" /> <span className="truncate">Arquivar Cartão</span>
                     </Button>
                     {currentUser?.role === 'admin' && (
                       <Button 
                         variant="ghost" 
                         size="sm" 
                         onClick={handleDeleteCard}
-                        className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 justify-start h-12 px-6 rounded-2xl text-xs font-black transition-all"
+                        className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 justify-start h-11 px-4 rounded-xl text-[10px] font-black transition-all w-full"
                       >
-                        <Trash className="w-4 h-4 mr-4" /> Excluir Permanentemente
+                        <Trash className="w-3.5 h-3.5 mr-3 flex-shrink-0" /> <span className="truncate">Excluir Permanentemente</span>
                       </Button>
                     )}
                   </div>
@@ -1300,8 +1300,8 @@ export default function CardDetailModal({
                     <h4 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em]">Conexões Ativas</h4>
                     <div className="space-y-3">
                       {mirrors.map((m: any) => (
-                        <div key={m.boardId} className="flex items-center gap-4 text-[11px] text-accent font-black bg-accent/10 px-5 py-4 rounded-2xl border border-accent/20 shadow-sm shadow-accent/5">
-                          <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                        <div key={m.boardId} className="flex items-center gap-3 text-[10px] text-accent font-black bg-accent/10 px-4 py-3 rounded-xl border border-accent/20 shadow-sm shadow-accent/5 w-full overflow-hidden">
+                          <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse flex-shrink-0" />
                           <span className="truncate">{m.boardName}</span>
                         </div>
                       ))}
@@ -1310,14 +1310,14 @@ export default function CardDetailModal({
                 )}
 
                 {/* Info Card (Visible in sidebar) */}
-                <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.05] space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Responsável</span>
-                    <span className="text-[10px] font-black text-gray-300">Nenhum</span>
+                <div className="bg-white/[0.02] p-3 rounded-xl border border-white/[0.05] space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest flex-shrink-0">Responsável</span>
+                    <span className="text-[9px] font-black text-gray-300 truncate">Nenhum</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Criado em</span>
-                    <span className="text-[10px] font-black text-gray-300">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest flex-shrink-0">Criado em</span>
+                    <span className="text-[9px] font-black text-gray-300 truncate">
                       {card?.created_at ? format(new Date(card.created_at), "dd/MM/yyyy") : "-"}
                     </span>
                   </div>
