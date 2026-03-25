@@ -26,6 +26,7 @@ import { format, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 interface CardDetailModalProps {
   isOpen: boolean;
@@ -321,21 +322,43 @@ export default function CardDetailModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const toastId = toast.loading(`Fazendo upload de ${file.name}...`);
+
     try {
-      // Aqui integraria com Supabase Storage, mas para agora salvamos o metadado
-      // Simulação de upload
+      // 1. Gerar um caminho único para o arquivo
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `cards/${cardId}/${fileName}`;
+
+      // 2. Fazer o upload para o bucket 'attachments'
+      const { data, error: uploadError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // 3. Obter a URL pública do arquivo
+      const { data: { publicUrl } } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(filePath);
+
+      // 4. Salvar os metadados no banco de dados via tRPC
       await addAttachmentMutation.mutateAsync({
         cardId,
         filename: file.name,
-        fileUrl: "#", // URL temporária
-        fileKey: `cards/${cardId}/${file.name}`,
+        fileUrl: publicUrl,
+        fileKey: filePath,
         mimeType: file.type,
         fileSize: file.size,
       });
+
       await utils.cardDetails.getAttachments.invalidate({ cardId });
-      toast.success("Arquivo anexado (Simulado)");
-    } catch (error) {
-      toast.error("Erro ao anexar arquivo");
+      toast.success("Arquivo anexado com sucesso", { id: toastId });
+    } catch (error: any) {
+      console.error("Erro no upload:", error);
+      toast.error(`Erro ao anexar arquivo: ${error.message || 'Erro desconhecido'}`, { id: toastId });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
