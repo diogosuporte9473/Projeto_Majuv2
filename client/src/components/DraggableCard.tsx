@@ -81,7 +81,7 @@ export function DraggableCard({
             }
           }}
           className={cn(
-            "p-3 bg-[#1e1e1e] border-[#333] cursor-pointer hover:border-accent/40 hover:bg-[#252525] transition-all shadow-sm hover:shadow-lg rounded-xl flex flex-col gap-2.5",
+            "p-3 bg-[#3D3D3D] border-[#333] cursor-pointer hover:border-accent/40 hover:bg-[#252525] transition-all shadow-sm hover:shadow-lg rounded-xl flex flex-col gap-2.5",
             isDragging && "ring-2 ring-accent shadow-2xl scale-[1.02]"
           )}
         >
