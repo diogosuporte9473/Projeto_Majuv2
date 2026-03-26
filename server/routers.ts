@@ -1,4 +1,4 @@
-// ====================== IMPORTS ======================
+// ====================== IMPORTS (coloque no topo do arquivo) ======================
 import { COOKIE_NAME } from "../shared/const.js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -25,10 +25,10 @@ import { publicProcedure, router, protectedProcedure } from "./_core/trpc.js";
 import { getSessionCookieOptions } from "./_core/cookies.js";
 import { invokeLLM } from "./_core/llm.js";
 
-// ====================== AUDIT + OUTROS ROUTERS ======================
-// (mantenha todo o código de auditRouter, boardMirrorSettingsRouter, createAuditLog, etc.)
+// ====================== SEUS ROUTERS AUXILIARES (mantenha como estavam) ======================
+// auditRouter, boardMirrorSettingsRouter, createAuditLog, JWT_SECRET, etc.
 
-// ====================== ROOT ROUTER (IMPORTANTE: NÃO CHAME DE appRouter) ======================
+// ====================== ROOT ROUTER (NOME ALTERADO PARA EVITAR CONFLITO) ======================
 
 export const rootRouter = router({
   system: systemRouter,
@@ -38,21 +38,20 @@ export const rootRouter = router({
   auth: router({
     me: publicProcedure.query(async ({ ctx }) => {
       if (!ctx.user) return null;
-      const { password, ...rest } = ctx.user;
-      return rest;
+      const { password, ...user } = ctx.user;
+      return user;
     }),
 
     login: publicProcedure
       .input(z.object({ username: z.string(), password: z.string() }))
       .mutation(async ({ input, ctx }) => {
-        // seu código completo de login aqui
-        // ... (mantenha o que você já tinha)
+        // ← Cole aqui todo o seu código de login (Supabase + fallback)
       }),
 
     register: publicProcedure
       .input(z.object({ username: z.string(), password: z.string(), name: z.string().optional() }))
       .mutation(async ({ input, ctx }) => {
-        // seu código de register
+        // ← Cole aqui todo o seu código de register
       }),
 
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -62,23 +61,42 @@ export const rootRouter = router({
     }),
   }),
 
-  admin: router({ /* todo seu admin router */ }),
+  admin: router({
+    // ← Cole aqui todo o conteúdo do admin (users + boards)
+  }),
 
-  boards: router({ /* todo seu boards router */ }),
+  boards: router({
+    // ← Cole aqui todo o conteúdo do boards
+  }),
 
-  lists: router({ /* lists */ }),
+  lists: router({
+    // ← lists
+  }),
 
-  cards: router({ /* cards */ }),
+  cards: router({
+    // ← cards
+  }),
 
-  settings: router({ /* settings */ }),
+  settings: router({
+    // ← settings (getPreferences, updatePreferences, updateProfile)
+  }),
 
-  cardDetails: router({ /* cardDetails com todos os sub-procedimentos */ }),
+  cardDetails: router({
+    // ← todo o cardDetails (getLabels, addLabel, checklists, comments, attachments, etc.)
+  }),
 
-  stats: router({ /* stats */ }),
+  stats: router({
+    // ← stats
+  }),
 
-  checklistTemplates: router({ /* checklistTemplates */ }),
+  checklistTemplates: router({
+    // ← checklistTemplates
+  }),
 
-  ai: router({ /* ai */ }),
+  ai: router({
+    // ← ai chat
+  }),
 });
 
-export type AppRouter = typeof rootRouter;   // ← mantenha o tipo como AppRouter
+// Tipo exportado (usado no frontend)
+export type AppRouter = typeof rootRouter;
