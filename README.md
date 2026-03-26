@@ -10,6 +10,25 @@ Um gerenciador de tarefas dinâmico e colaborativo, inspirado no Trello, constru
 - **Realtime**: Supabase Realtime para atualizações instantâneas
 - **IA**: Assistente inteligente integrado para sugestões de projetos
 
+## 🔐 Variáveis de ambiente (Vercel / GitHub)
+Para o deploy na Vercel funcionar com Supabase, configure as variáveis abaixo no painel da Vercel (Production e Preview).
+
+- No frontend (build-time, Vite):
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+- No backend (runtime, Vercel Functions):
+  - `SUPABASE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY` (usada no servidor para bypass quando necessário)
+  - `DATABASE_URL` (Drizzle/Postgres)
+  - `JWT_SECRET`
+- Opcional (se o app usar recursos de IA/integracoes):
+  - `BUILT_IN_FORGE_API_URL`
+  - `BUILT_IN_FORGE_API_KEY`
+  - `OAUTH_SERVER_URL`
+  - `OWNER_OPEN_ID`
+
+> Não comite o arquivo `.env` no GitHub (ele deve ficar como `.env.example`).
+
 ## 👨‍💻 Créditos
 
 Este aplicativo foi desenvolvido por **Diogo Martins**.
