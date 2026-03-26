@@ -51,6 +51,7 @@ export default function CardDetailModal({
 }: CardDetailModalProps) {
   const { user: currentUser } = useAuth();
   const utils = trpc.useUtils();
+  const isAdmin = currentUser?.role === "admin";
 
   // Queries
   const { data: card, isLoading: cardLoading } = trpc.cards.getDetails.useQuery({ id: cardId });
@@ -62,11 +63,13 @@ export default function CardDetailModal({
   const { data: projectDates } = trpc.cardDetails.getProjectDates.useQuery({ cardId });
   const { data: mirrors } = trpc.cardDetails.getCardMirrors.useQuery({ cardId });
   const { data: templates } = trpc.checklistTemplates.list.useQuery();
-  const { data: allUsers } = trpc.admin.users.list.useQuery();
-  const { data: boardMembers } = trpc.boards.getMembers.useQuery(
-    { boardId: card?.list_id ? 0 : 0 }, // Placeholder, idealmente precisaria do boardId
-    { enabled: !!card?.list_id } as any
+  const { data: allUsers } = trpc.admin.users.list.useQuery(
+    undefined,
+    { enabled: isAdmin && isOpen } as any
   );
+  // Evita chamadas `boards.getMembers` com `boardId=0`, que geram FORBIDDEN e podem causar loops.
+  // Por enquanto, para o popover de responsável, usamos somente `allUsers` (admin).
+  const boardMembers: any[] | undefined = undefined;
 
   // Mutations
   const addLabelMutation = trpc.cardDetails.addLabel.useMutation();
@@ -132,13 +135,25 @@ export default function CardDetailModal({
     setEditedTitle(cardTitle);
   }, [cardTitle]);
 
+  const onChecklistChangeRef = React.useRef(onChecklistChange);
+  React.useEffect(() => {
+    onChecklistChangeRef.current = onChecklistChange;
+  }, [onChecklistChange]);
+
+  const lastChecklistStatsRef = React.useRef<{ completed: number; total: number } | null>(null);
+
   useEffect(() => {
-    if (checklists) {
-      const total = checklists.length;
-      const completed = checklists.filter((i: any) => i.completed).length;
-      onChecklistChange?.(completed, total);
-    }
-  }, [checklists, onChecklistChange]);
+    if (!checklists) return;
+
+    const total = checklists.length;
+    const completed = checklists.filter((i: any) => i.completed).length;
+
+    const last = lastChecklistStatsRef.current;
+    if (last && last.completed === completed && last.total === total) return;
+
+    lastChecklistStatsRef.current = { completed, total };
+    onChecklistChangeRef.current?.(completed, total);
+  }, [checklists]);
 
   // Handlers
   const handleUpdateTitle = async () => {

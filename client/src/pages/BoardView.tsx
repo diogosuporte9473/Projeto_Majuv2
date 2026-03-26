@@ -55,6 +55,7 @@ export default function BoardView() {
   const [, params] = useRoute("/board/:id");
   const boardId = params?.id ? parseInt(params.id) : null;
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   
   // Ativa sincronização em tempo real para este quadro
   useRealtimeSync(boardId || undefined);
@@ -399,6 +400,7 @@ export default function BoardView() {
             isOpen={showShareModal} 
             onClose={() => setShowShareModal(false)} 
             boardId={boardId} 
+            isAdmin={isAdmin}
           />
         )}
 
@@ -540,7 +542,17 @@ function MirrorSettingsModal({ isOpen, onClose, boardId }: { isOpen: boolean; on
   );
 }
 
-function ShareModal({ isOpen, onClose, boardId }: { isOpen: boolean; onClose: () => void; boardId: number }) {
+function ShareModal({
+  isOpen,
+  onClose,
+  boardId,
+  isAdmin,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  boardId: number;
+  isAdmin: boolean;
+}) {
   const utils = trpc.useUtils();
   // Evita chamadas proibidas quando o modal não está aberto.
   // Sem isso, `boards.getMembers`/`admin.users.list` podem disparar mesmo com `isOpen=false`
@@ -551,7 +563,7 @@ function ShareModal({ isOpen, onClose, boardId }: { isOpen: boolean; onClose: ()
   );
   const { data: allUsers } = trpc.admin.users.list.useQuery(
     undefined,
-    { enabled: isOpen } as any
+    { enabled: isOpen && isAdmin } as any
   );
   const addMemberMutation = trpc.admin.boards.addMember.useMutation();
   const removeMemberMutation = trpc.admin.boards.removeMember.useMutation();
@@ -598,15 +610,23 @@ function ShareModal({ isOpen, onClose, boardId }: { isOpen: boolean; onClose: ()
               {members?.map((m: any) => (
                 <div key={m.userId} className="flex items-center justify-between p-2 rounded bg-muted">
                   <span className="text-sm font-medium">{m.userName || `Usuário ${m.userId}`}</span>
-                  <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(m.userId)} className="text-red-500 hover:bg-red-500/10">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveMember(m.userId)}
+                      className="text-red-500 hover:bg-red-500/10"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
           </div>
 
-          <div>
+          {isAdmin && (
+            <div>
             <h4 className="text-sm font-semibold mb-3">Adicionar Novos Membros</h4>
             <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
               {nonMembers.map((u: any) => (
@@ -622,6 +642,7 @@ function ShareModal({ isOpen, onClose, boardId }: { isOpen: boolean; onClose: ()
               ))}
             </div>
           </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
