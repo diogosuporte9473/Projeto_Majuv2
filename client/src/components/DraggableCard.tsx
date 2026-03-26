@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Clock, CalendarDays, AlignLeft, CheckSquare, Paperclip, User } from "lucide-react";
 import { format, isBefore, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -28,7 +28,6 @@ interface DraggableCardProps {
   checklistCount?: number;
   completedChecklistCount?: number;
   attachmentCount?: number;
-  onChecklistChange?: (completed: number, total: number) => void;
 }
 
 export function DraggableCard({
@@ -41,30 +40,11 @@ export function DraggableCard({
   listName,
   assignedToName,
   labels = [],
-  checklistCount: initialChecklistCount = 0,
-  completedChecklistCount: initialCompletedCount = 0,
+  checklistCount = 0,
+  completedChecklistCount = 0,
   attachmentCount = 0,
-  onChecklistChange,
 }: DraggableCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [counts, setCounts] = useState({
-    completed: initialCompletedCount,
-    total: initialChecklistCount
-  });
-
-  // Sincronizar quando as props mudarem (ex: refresh do tRPC)
-  useEffect(() => {
-    setCounts({
-      completed: initialCompletedCount,
-      total: initialChecklistCount
-    });
-  }, [initialCompletedCount, initialChecklistCount]);
-
-  const handleLocalChecklistChange = (completed: number, total: number) => {
-    setCounts({ completed, total });
-    onChecklistChange?.(completed, total);
-  };
-
   const {
     attributes,
     listeners,
@@ -162,13 +142,13 @@ export function DraggableCard({
               {/* Status Icons */}
               <div className="flex items-center gap-2 text-gray-500">
                 {description && <span title="Tem descrição"><AlignLeft size={11} /></span>}
-                {counts.total > 0 && (
+                {checklistCount > 0 && (
                   <div className={cn(
                     "flex items-center gap-0.5 text-[10px] font-bold",
-                    counts.completed === counts.total ? "text-green-500" : "text-gray-500"
+                    completedChecklistCount === checklistCount ? "text-green-500" : "text-gray-500"
                   )} title="Checklist">
                     <CheckSquare size={11} />
-                    <span>{counts.completed}/{counts.total}</span>
+                    <span>{completedChecklistCount}/{checklistCount}</span>
                   </div>
                 )}
                 {attachmentCount > 0 && (
@@ -200,7 +180,6 @@ export function DraggableCard({
           cardTitle={title}
           cardDescription={description}
           listName={listName}
-          onChecklistChange={handleLocalChecklistChange}
         />
       )}
     </>

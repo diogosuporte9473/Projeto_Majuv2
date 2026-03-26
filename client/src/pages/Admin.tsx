@@ -39,7 +39,6 @@ export default function Admin() {
   );
 
   // Query de Logs
-  // @ts-ignore
   const { data: auditData, isLoading: logsLoading } = trpc.audit.list.useQuery({
     page: logPage,
     search: logSearch || undefined,

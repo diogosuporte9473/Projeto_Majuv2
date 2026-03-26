@@ -13,15 +13,13 @@ import {
   AlignLeft, LayoutGrid, Clock, Copy, Archive, Trash, 
   MessageSquare, Paperclip, Send, MoreVertical, Maximize2, Minimize2, 
   CalendarDays, User as UserIcon, Edit2, FileText, ImageIcon,
-  Check, ChevronsUpDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format, isBefore } from "date-fns";
@@ -37,7 +35,6 @@ interface CardDetailModalProps {
   cardTitle: string;
   cardDescription?: string;
   listName?: string;
-  onChecklistChange?: (completed: number, total: number) => void;
 }
 
 export default function CardDetailModal({
@@ -47,7 +44,6 @@ export default function CardDetailModal({
   cardTitle,
   cardDescription,
   listName,
-  onChecklistChange,
 }: CardDetailModalProps) {
   const { user: currentUser } = useAuth();
   const utils = trpc.useUtils();
@@ -62,11 +58,6 @@ export default function CardDetailModal({
   const { data: projectDates } = trpc.cardDetails.getProjectDates.useQuery({ cardId });
   const { data: mirrors } = trpc.cardDetails.getCardMirrors.useQuery({ cardId });
   const { data: templates } = trpc.checklistTemplates.list.useQuery();
-  const { data: allUsers } = trpc.admin.users.list.useQuery();
-  const { data: boardMembers } = trpc.boards.getMembers.useQuery(
-    { boardId: card?.list_id ? 0 : 0 }, // Placeholder, idealmente precisaria do boardId
-    { enabled: !!card?.list_id } as any
-  );
 
   // Mutations
   const addLabelMutation = trpc.cardDetails.addLabel.useMutation();
@@ -117,6 +108,7 @@ export default function CardDetailModal({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
   const { data: userBoards } = trpc.boards.list.useQuery();
+  const { data: allUsers } = trpc.admin.users.list.useQuery();
   const { data: targetLists } = trpc.lists.getByBoard.useQuery(
     { boardId: parseInt(selectedBoardId) },
     { enabled: !!selectedBoardId }
@@ -131,14 +123,6 @@ export default function CardDetailModal({
   useEffect(() => {
     setEditedTitle(cardTitle);
   }, [cardTitle]);
-
-  useEffect(() => {
-    if (checklists) {
-      const total = checklists.length;
-      const completed = checklists.filter((i: any) => i.completed).length;
-      onChecklistChange?.(completed, total);
-    }
-  }, [checklists, onChecklistChange]);
 
   // Handlers
   const handleUpdateTitle = async () => {
@@ -306,14 +290,7 @@ export default function CardDetailModal({
 
   const handleUpdateChecklistItem = async (id: number, data: { completed?: boolean, title?: string, dueDate?: Date | null, assignedUserId?: number | null }) => {
     try {
-      // Atualização otimista ou direta
-      await updateChecklistMutation.mutateAsync({ 
-        id, 
-        completed: data.completed,
-        title: data.title,
-        dueDate: data.dueDate,
-        assignedUserId: data.assignedUserId 
-      });
+      await updateChecklistMutation.mutateAsync({ id, ...data });
       await utils.cardDetails.getChecklists.invalidate({ cardId });
     } catch (error) {
       toast.error("Erro ao atualizar item");
@@ -493,70 +470,6 @@ export default function CardDetailModal({
                 <p className="text-sm text-gray-400 flex items-center gap-2">
                   na lista <span className="font-semibold text-gray-200 underline decoration-gray-600 underline-offset-4">{listName}</span>
                 </p>
-
-                {/* Seção de Responsável do Card */}
-                <div className="flex items-center gap-3 mt-3">
-                  <div className="flex -space-x-2">
-                    <Avatar className="h-8 w-8 border-2 border-[#1e1e1e] ring-1 ring-white/5">
-                      <AvatarFallback className="bg-accent/10 text-accent text-xs font-black">
-                        {card?.assignedToName ? card.assignedToName.charAt(0).toUpperCase() : <UserIcon size={14} />}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none mb-1">Responsável</span>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="text-xs font-bold text-gray-200 hover:text-accent transition-colors flex items-center gap-1.5 group">
-                          {card?.assignedToName || "Atribuir responsável"}
-                          <Plus size={12} className="opacity-50 group-hover:opacity-100" />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-64 bg-[#1a1a1a] border-[#333] p-0 shadow-2xl overflow-hidden" align="start">
-                        <Command className="bg-transparent">
-                          <CommandInput placeholder="Buscar usuário..." className="border-none focus:ring-0 text-xs" />
-                          <CommandList className="max-h-[200px] custom-scrollbar">
-                            <CommandEmpty className="py-4 text-center text-xs text-gray-500">Nenhum usuário encontrado.</CommandEmpty>
-                            <CommandGroup>
-                              <CommandItem
-                                onSelect={() => {
-                                  updateAssignedToMutation.mutate({ cardId, userId: null });
-                                  utils.cards.getDetails.invalidate({ id: cardId });
-                                  toast.success("Responsável removido");
-                                }}
-                                className="flex items-center gap-2 p-2.5 hover:bg-white/5 cursor-pointer text-xs"
-                              >
-                                <div className="w-6 h-6 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20">
-                                  <X size={12} className="text-red-400" />
-                                </div>
-                                <span className="font-bold text-red-400">Remover responsável</span>
-                              </CommandItem>
-                              {(allUsers || boardMembers || []).map((u: any) => (
-                                <CommandItem
-                                  key={u.id || u.userId}
-                                  onSelect={() => {
-                                    updateAssignedToMutation.mutate({ cardId, userId: u.id || u.userId });
-                                    utils.cards.getDetails.invalidate({ id: cardId });
-                                    toast.success(`Atribuído a ${u.name || u.userName}`);
-                                  }}
-                                  className="flex items-center gap-2 p-2.5 hover:bg-white/5 cursor-pointer text-xs"
-                                >
-                                  <Avatar className="h-6 w-6">
-                                    <AvatarFallback className="bg-accent/20 text-accent text-[10px] font-black uppercase">
-                                      {(u.name || u.userName || "?").charAt(0)}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span className="font-medium text-gray-200">{u.name || u.userName}</span>
-                                  {(u.id || u.userId) === card?.assigned_to && <Check size={12} className="ml-auto text-accent" />}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
 
                 <div className="flex flex-wrap items-center gap-2.5 py-1">
                   {card?.startDate && (
@@ -1121,45 +1034,40 @@ export default function CardDetailModal({
                                               )}
                                             </button>
                                           </PopoverTrigger>
-                                          <PopoverContent className="w-72 bg-[#1a1a1a] border-[#333] p-0 shadow-2xl rounded-xl overflow-hidden" align="end">
-                                            <Command className="bg-transparent">
-                                              <CommandInput placeholder="Buscar usuário..." className="border-none focus:ring-0 text-xs" />
-                                              <CommandList className="max-h-[200px] custom-scrollbar">
-                                                <CommandEmpty className="py-4 text-center text-xs text-gray-500">Nenhum usuário encontrado.</CommandEmpty>
-                                                <CommandGroup>
-                                                  <CommandItem
-                                                    onSelect={() => {
-                                                      handleUpdateChecklistItem(item.id, { assignedUserId: null });
-                                                      toast.success("Responsável removido do item");
-                                                    }}
-                                                    className="flex items-center gap-2 p-2.5 hover:bg-white/5 cursor-pointer text-xs"
-                                                  >
-                                                    <div className="w-6 h-6 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20">
-                                                      <X size={12} className="text-red-400" />
-                                                    </div>
-                                                    <span className="font-bold text-red-400">Remover do item</span>
-                                                  </CommandItem>
-                                                  {(allUsers || boardMembers || []).map((u: any) => (
-                                                    <CommandItem
-                                                      key={u.id || u.userId}
-                                                      onSelect={() => {
-                                                        handleUpdateChecklistItem(item.id, { assignedUserId: u.id || u.userId });
-                                                        toast.success(`Item atribuído a ${u.name || u.userName}`);
-                                                      }}
-                                                      className="flex items-center gap-2 p-2.5 hover:bg-white/5 cursor-pointer text-xs"
-                                                    >
-                                                      <Avatar className="h-6 w-6">
-                                                        <AvatarFallback className="bg-accent/20 text-accent text-[10px] font-black uppercase">
-                                                          {(u.name || u.userName || "?").charAt(0)}
-                                                        </AvatarFallback>
-                                                      </Avatar>
-                                                      <span className="font-medium text-gray-200">{u.name || u.userName}</span>
-                                                      {(u.id || u.userId) === item.assignedUserId && <Check size={12} className="ml-auto text-accent" />}
-                                                    </CommandItem>
-                                                  ))}
-                                                </CommandGroup>
-                                              </CommandList>
-                                            </Command>
+                                          <PopoverContent className="w-72 bg-[#1a1a1a] border-[#333] p-2 shadow-2xl rounded-xl">
+                                            <div className="max-h-72 overflow-y-auto custom-scrollbar">
+                                              <div className="p-2 border-b border-[#333] mb-2">
+                                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Delegar Tarefa</p>
+                                              </div>
+                                              {allUsers?.map((u: any) => (
+                                                <button
+                                                  key={u.id}
+                                                  onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: u.id })}
+                                                  className={cn(
+                                                    "w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all",
+                                                    item.assignedUserId === u.id ? "bg-accent/15 text-accent" : "text-gray-300 hover:bg-white/5"
+                                                  )}
+                                                >
+                                                  <Avatar className="w-8 h-8">
+                                                    <AvatarFallback className="bg-[#2a2a2a] text-xs font-bold">
+                                                      {u.name?.charAt(0).toUpperCase()}
+                                                    </AvatarFallback>
+                                                  </Avatar>
+                                                  <div className="flex flex-col min-w-0">
+                                                    <span className="text-xs font-bold truncate">{u.name}</span>
+                                                    <span className="text-[10px] text-gray-500 truncate">@{u.username}</span>
+                                                  </div>
+                                                </button>
+                                              ))}
+                                              {item.assignedUserId && (
+                                                <button
+                                                  onClick={() => handleUpdateChecklistItem(item.id, { assignedUserId: null })}
+                                                  className="w-full text-center p-2.5 text-[10px] text-red-400 hover:bg-red-400/10 mt-2 rounded-lg transition-colors font-bold"
+                                                >
+                                                  Remover Responsável
+                                                </button>
+                                              )}
+                                            </div>
                                           </PopoverContent>
                                         </Popover>
 
@@ -1172,7 +1080,7 @@ export default function CardDetailModal({
                                               <CalendarDays className="w-4.5 h-4.5" />
                                             </button>
                                           </PopoverTrigger>
-                                          <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-[#333] shadow-2xl rounded-xl overflow-hidden" align="end">
+                                          <PopoverContent className="w-auto p-0 bg-[#1a1a1a] border-[#333] shadow-2xl rounded-xl overflow-hidden">
                                             <div className="p-4 space-y-4">
                                               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Prazo da Subtarefa</p>
                                               <input
