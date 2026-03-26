@@ -13,6 +13,7 @@ import {
   AlignLeft, LayoutGrid, Clock, Copy, Archive, Trash, 
   MessageSquare, Paperclip, Send, MoreVertical, Maximize2, Minimize2, 
   CalendarDays, User as UserIcon, Edit2, FileText, ImageIcon,
+  Check, ChevronsUpDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -21,7 +22,6 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, User as UserIcon, Calendar as CalendarDays } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format, isBefore } from "date-fns";
@@ -62,7 +62,7 @@ export default function CardDetailModal({
   const { data: projectDates } = trpc.cardDetails.getProjectDates.useQuery({ cardId });
   const { data: mirrors } = trpc.cardDetails.getCardMirrors.useQuery({ cardId });
   const { data: templates } = trpc.checklistTemplates.list.useQuery();
-  const { data: allUsers } = trpc.admin.users.list.useQuery(undefined, { enabled: currentUser?.role === 'admin' } as any);
+  const { data: allUsers } = trpc.admin.users.list.useQuery();
   const { data: boardMembers } = trpc.boards.getMembers.useQuery(
     { boardId: card?.list_id ? 0 : 0 }, // Placeholder, idealmente precisaria do boardId
     { enabled: !!card?.list_id } as any
@@ -117,7 +117,6 @@ export default function CardDetailModal({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
   const { data: userBoards } = trpc.boards.list.useQuery();
-  const { data: allUsers } = trpc.admin.users.list.useQuery();
   const { data: targetLists } = trpc.lists.getByBoard.useQuery(
     { boardId: parseInt(selectedBoardId) },
     { enabled: !!selectedBoardId }

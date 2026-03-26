@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Clock, CalendarDays, AlignLeft, CheckSquare, Paperclip, User } from "lucide-react";
 import { format, isBefore, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
