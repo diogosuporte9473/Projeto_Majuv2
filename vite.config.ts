@@ -32,9 +32,6 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: true,
     chunkSizeWarningLimit: 10000,
-    commonjsOptions: {
-      include: [/node_modules/],
-    },
   },
   server: {
     host: true,
