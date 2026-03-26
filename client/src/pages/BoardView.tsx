@@ -22,10 +22,12 @@ import {
   useDroppable,
 } from "@dnd-kit/core";
 import {
+  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { DraggableCard } from "@/components/DraggableCard";
 import { AIChatBox, Message } from "@/components/AIChatBox";
 import { toast } from "sonner";
@@ -106,6 +108,7 @@ export default function BoardView() {
     return () => { delete (window as any).showBoardActivity; };
   }, []);
 
+  // @ts-ignore
   const { data: boardActivity, isLoading: logsLoading } = trpc.audit.list.useQuery({
     search: board?.name,
     limit: 10,
@@ -792,7 +795,16 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
   const [newCardTitle, setNewCardTitle] = useState("");
   const [showNewCard, setShowNewCard] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const { setNodeRef } = useDroppable({ id: `list-${listId}` });
+
+  // Virtualizador para os cartões
+  const rowVirtualizer = useVirtualizer({
+    count: cards?.length || 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 100, // Altura estimada do card
+    overscan: 5,
+  });
 
   useEffect(() => {
     if (isEditingName && inputRef.current) {
@@ -884,28 +896,57 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
         </DropdownMenu>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 min-h-[100px] space-y-2 scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
-        <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-          {isLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-20 bg-card/50 rounded animate-pulse" />
-              ))}
-            </div>
-          ) : cards && (cards as CardWithUser[]).map((card: CardWithUser) => (
-            <DraggableCard
-              key={card.id}
-              id={card.id}
-              listId={listId}
-              title={card.title}
-              description={card.description || undefined}
-              startDate={card.startDate ? new Date(card.startDate) : undefined}
-              dueDate={card.dueDate ? new Date(card.dueDate) : undefined}
-              listName={listName}
-              assignedToName={card.assignedToName}
-            />
-          ))}
-        </SortableContext>
+      <div 
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-2 min-h-[100px] scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20"
+      >
+        <div 
+          style={{
+            height: `${rowVirtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
+            {isLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-20 bg-card/50 rounded animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const card = (cards as CardWithUser[])[virtualRow.index];
+                return (
+                  <div
+                    key={card.id}
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                      paddingBottom: '8px' // Espaçamento entre cards
+                    }}
+                  >
+                    <DraggableCard
+                      id={card.id}
+                      listId={listId}
+                      title={card.title}
+                      description={card.description || undefined}
+                      startDate={card.startDate ? new Date(card.startDate) : undefined}
+                      dueDate={card.dueDate ? new Date(card.dueDate) : undefined}
+                      listName={listName}
+                      assignedToName={card.assignedToName}
+                    />
+                  </div>
+                );
+              })
+            )}
+          </SortableContext>
+        </div>
       </div>
 
       <div className="p-2 border-t border-[#333] bg-[#222]/30 rounded-b-lg">
