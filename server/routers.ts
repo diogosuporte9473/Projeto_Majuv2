@@ -46,116 +46,11 @@ import { ENV } from "./_core/env.js";
 
 import { supabase } from "./_core/supabase.js";
 
-/**
- * Função utilitária para registrar logs de auditoria
- */
-async function createAuditLog({
-  userId,
-  action,
-  entityType,
-  entityId,
-  entityName,
-  details
-}: {
-  userId: number;
-  action: 'create' | 'update' | 'archive' | 'delete' | 'restore';
-  entityType: 'board' | 'card' | 'user';
-  entityId: number;
-  entityName: string;
-  details?: string;
-}) {
-  try {
-    await supabase.from("audit_logs").insert({
-      user_id: userId,
-      action,
-      entity_type: entityType,
-      entity_id: entityId,
-      entity_name: entityName,
-      details: details || ""
-    });
-  } catch (err) {
-    console.error("[AuditLog] Failed to create log:", err);
-  }
-}
-
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key");
-
-const auditRouter = router({
-  list: protectedProcedure
-    .input(z.object({
-      userId: z.number().optional(),
-      action: z.string().optional(),
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
-      search: z.string().optional(),
-      page: z.number().default(1),
-      limit: z.number().default(20),
-    }))
-    .query(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem ver logs" });
-      }
-
-      let query = supabase
-        .from("audit_logs")
-        .select("*, users(name, username)", { count: "exact" });
-
-      if (input.userId) query = query.eq("user_id", input.userId);
-      if (input.action) query = query.eq("action", input.action);
-      if (input.startDate) query = query.gte("created_at", input.startDate);
-      if (input.endDate) query = query.lte("created_at", input.endDate);
-      if (input.search) query = query.ilike("entity_name", `%${input.search}%`);
-
-      const from = (input.page - 1) * input.limit;
-      const to = from + input.limit - 1;
-
-      const { data, error, count } = await query
-        .order("created_at", { ascending: false })
-        .range(from, to);
-
-      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-
-      return {
-        logs: data || [],
-        total: count || 0,
-        pages: Math.ceil((count || 0) / input.limit)
-      };
-    }),
-});
-
-const boardMirrorSettingsRouter = router({
-  get: protectedProcedure
-    .input(z.object({ boardId: z.number() }))
-    .query(async ({ input }) => {
-      const { data, error } = await supabase
-        .from("board_mirror_settings")
-        .select("*")
-        .eq("board_id", input.boardId)
-        .maybeSingle();
-      return data;
-    }),
-  update: protectedProcedure
-    .input(z.object({
-      boardId: z.number(),
-      settings: z.any()
-    }))
-    .mutation(async ({ input }) => {
-      const { error } = await supabase
-        .from("board_mirror_settings")
-        .upsert({
-          board_id: input.boardId,
-          ...input.settings
-        }, { onConflict: 'board_id' });
-      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-      return { success: true };
-    }),
-});
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
-  audit: auditRouter,
-  boardMirrorSettings: boardMirrorSettingsRouter,
   auth: router({
     me: publicProcedure.query(async (opts) => {
       try {
@@ -360,16 +255,6 @@ export const appRouter = router({
           });
         }
 
-        // Registrar log
-        await createAuditLog({
-          userId: ctx.user.id,
-          action: 'create',
-          entityType: 'board',
-          entityId: board.id,
-          entityName: input.name,
-          details: `Quadro criado: ${input.name}`
-        });
-
         // Criar lista "Caixa de Entrada" automaticamente
         const { error: listError } = await supabase
           .from("lists")
@@ -411,16 +296,6 @@ export const appRouter = router({
         const { error } = await supabase.from("boards").update(updateData).eq("id", input.id);
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
-        // Registrar log de atualização
-        await createAuditLog({
-          userId: ctx.user.id,
-          action: 'update',
-          entityType: 'board',
-          entityId: input.id,
-          entityName: board.name,
-          details: `Quadro atualizado: ${Object.keys(updateData).join(", ")}`
-        });
-
         return { success: true };
       }),
     delete: protectedProcedure
@@ -436,16 +311,6 @@ export const appRouter = router({
 
         const { error } = await supabase.from("boards").delete().eq("id", input.id);
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-
-        // Registrar log de exclusão
-        await createAuditLog({
-          userId: ctx.user.id,
-          action: 'delete',
-          entityType: 'board',
-          entityId: input.id,
-          entityName: board.name,
-          details: `Quadro excluído permanentemente: ${board.name}`
-        });
 
         return { success: true };
       }),
@@ -663,16 +528,6 @@ export const appRouter = router({
             });
           }
 
-          // Registrar log
-          await createAuditLog({
-            userId: ctx.user.id,
-            action: 'create',
-            entityType: 'card',
-            entityId: data.id,
-            entityName: input.title,
-            details: `Cartão criado: ${input.title}`
-          });
-
           return { id: data.id };
         } catch (err: any) {
           console.error("[Database] Unexpected error during card creation:", err);
@@ -727,19 +582,6 @@ export const appRouter = router({
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: `Erro ao atualizar cartão: ${error.message}`,
-          });
-        }
-
-        // Registrar log de atualização
-        const { data: card } = await supabase.from("cards").select("title").eq("id", input.id).single();
-        if (card) {
-          await createAuditLog({
-            userId: ctx.user.id,
-            action: 'update',
-            entityType: 'card',
-            entityId: input.id,
-            entityName: card.title,
-            details: `Cartão atualizado: ${Object.keys(updateData).join(", ")}`
           });
         }
 
@@ -1117,27 +959,13 @@ export const appRouter = router({
 
     archiveCard: protectedProcedure
       .input(z.object({ id: z.number(), archived: z.boolean() }))
-      .mutation(async ({ ctx, input }) => {
+      .mutation(async ({ input }) => {
         const { error } = await supabase
           .from("cards")
-          .update({ archived: input.archived, updated_at: new Date().toISOString() })
+          .update({ archived: input.archived })
           .eq("id", input.id);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-
-        // Registrar log de arquivamento/restauração
-        const { data: card } = await supabase.from("cards").select("title").eq("id", input.id).single();
-        if (card) {
-          await createAuditLog({
-            userId: ctx.user.id,
-            action: input.archived ? 'archive' : 'restore',
-            entityType: 'card',
-            entityId: input.id,
-            entityName: card.title,
-            details: input.archived ? `Cartão arquivado: ${card.title}` : `Cartão restaurado: ${card.title}`
-          });
-        }
-
         return { success: true };
       }),
 
@@ -2253,5 +2081,6 @@ export const appRouter = router({
       }),
   }),
 });
+
 
 export type AppRouter = typeof appRouter;
