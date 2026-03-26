@@ -542,8 +542,17 @@ function MirrorSettingsModal({ isOpen, onClose, boardId }: { isOpen: boolean; on
 
 function ShareModal({ isOpen, onClose, boardId }: { isOpen: boolean; onClose: () => void; boardId: number }) {
   const utils = trpc.useUtils();
-  const { data: members } = trpc.boards.getMembers.useQuery({ boardId });
-  const { data: allUsers } = trpc.admin.users.list.useQuery();
+  // Evita chamadas proibidas quando o modal não está aberto.
+  // Sem isso, `boards.getMembers`/`admin.users.list` podem disparar mesmo com `isOpen=false`
+  // e gerar loops de render (além de erros FORBIDDEN).
+  const { data: members } = trpc.boards.getMembers.useQuery(
+    { boardId },
+    { enabled: isOpen } as any
+  );
+  const { data: allUsers } = trpc.admin.users.list.useQuery(
+    undefined,
+    { enabled: isOpen } as any
+  );
   const addMemberMutation = trpc.admin.boards.addMember.useMutation();
   const removeMemberMutation = trpc.admin.boards.removeMember.useMutation();
 
