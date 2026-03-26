@@ -5,8 +5,11 @@ import { trpc } from "@/lib/trpc";
 import TrelloDashboardLayout from "@/components/TrelloDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Loader2, MessageSquare, X, UserPlus, Users, Shield, Trash2, MoreHorizontal, Edit2, Archive, Settings2, AlignLeft, Tag, CheckSquare, Clock, LayoutGrid, Paperclip } from "lucide-react";
+import { Plus, Loader2, MessageSquare, X, UserPlus, Users, Shield, Trash2, MoreHorizontal, Edit2, Archive, Settings2, AlignLeft, Tag, CheckSquare, Clock, LayoutGrid, Paperclip, History as HistoryIcon } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import {
   DndContext,
   DragEndEvent,
@@ -284,7 +287,7 @@ export default function BoardView() {
               className="text-muted-foreground hover:text-accent transition-all hover:bg-accent/10" 
               title="Últimas Atividades"
             >
-              <History className="w-4 h-4" />
+              <HistoryIcon className="w-4 h-4" />
             </Button>
             <Button onClick={() => setShowArchivedModal(true)} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" title="Itens Arquivados">
               <Archive className="w-4 h-4" />
@@ -704,7 +707,7 @@ function BoardActivityModal({ isOpen, onClose, boardName, logs, isLoading }: { i
         <DialogHeader>
           <div className="flex items-center justify-between pr-8">
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <History className="w-5 h-5 text-accent" />
+              <HistoryIcon className="w-5 h-5 text-accent" />
               Atividades do Quadro
             </DialogTitle>
             <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-accent/10 text-accent rounded border border-accent/20">
@@ -733,7 +736,7 @@ function BoardActivityModal({ isOpen, onClose, boardName, logs, isLoading }: { i
               </div>
             </div>
           ) : (
-            logs.map((log: any) => (
+            logs?.map((log: any) => (
               <div key={log.id} className="flex gap-4 p-4 rounded-2xl bg-[#222]/50 border border-[#333] hover:border-accent/20 transition-all group">
                 <div className="flex-shrink-0">
                   <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent text-xs font-black uppercase tracking-tighter shadow-inner group-hover:bg-accent group-hover:text-white transition-all duration-300">

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Shield, BarChart2, History, Search, Filter, Download, User as UserIcon, Calendar as CalendarIcon, ArrowLeft, ArrowRight } from "lucide-react";
+import { Plus, Trash2, Shield, BarChart2, History as HistoryIcon, Search, Filter, Download, User as UserIcon, Calendar as CalendarIcon, ArrowLeft, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -128,7 +128,7 @@ export default function Admin() {
     if (!auditData?.logs) return;
 
     const headers = ["Data", "Usuário", "Ação", "Entidade", "ID Entidade", "Detalhes"];
-    const rows = auditData.logs.map(log => [
+    const rows = auditData.logs.map((log: any) => [
       format(new Date(log.created_at), "dd/MM/yyyy HH:mm:ss"),
       log.users?.name || log.users?.username || "Sistema",
       log.action.toUpperCase(),
@@ -171,7 +171,7 @@ export default function Admin() {
             <TabsTrigger value="permissions">Permissões</TabsTrigger>
             <TabsTrigger value="stats">Estatísticas</TabsTrigger>
             <TabsTrigger value="logs" className="flex items-center gap-2">
-              <History className="w-4 h-4" /> Logs
+              <HistoryIcon className="w-4 h-4" /> Logs
             </TabsTrigger>
           </TabsList>
 
