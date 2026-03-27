@@ -1272,6 +1272,48 @@ export const appRouter = router({
           .single();
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        
+        // Sincronizar criação de grupo de checklist para cards espelhados
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("original_card_id,mirror_card_id")
+            .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors
+              .flatMap((m: any) => [m.original_card_id, m.mirror_card_id])
+              .filter((cardId: any) => cardId !== input.cardId);
+
+            for (const targetCardId of relatedCardIds) {
+              // Evita duplicar grupo (mesmo título) no card espelhado
+              const { data: existing } = await supabase
+                .from("card_checklist_groups")
+                .select("id")
+                .eq("card_id", targetCardId)
+                .eq("title", input.title);
+
+              if (existing && existing.length > 0) continue;
+
+              const { data: targetGroups } = await supabase
+                .from("card_checklist_groups")
+                .select("position")
+                .eq("card_id", targetCardId);
+
+              const targetNextPosition = (targetGroups?.length || 0);
+
+              await supabase.from("card_checklist_groups").insert({
+                card_id: targetCardId,
+                title: input.title,
+                position: targetNextPosition,
+              });
+            }
+          }
+        } catch (syncError) {
+          console.error("[Mirror Sync] Checklist group add sync failed:", syncError);
+          // não interrompe a criação do grupo original
+        }
+
         return { id: data.id };
       }),
     updateChecklistGroup: protectedProcedure
@@ -1327,6 +1369,71 @@ export const appRouter = router({
           });
         }
 
+        // Sincronizar criação de item de checklist para cards espelhados
+        // Observação: o mapeamento do grupo no espelho é feito por `title`.
+        try {
+          if (input.groupId) {
+            const { data: currentGroup } = await supabase
+              .from("card_checklist_groups")
+              .select("title")
+              .eq("id", input.groupId)
+              .single();
+
+            if (currentGroup?.title) {
+              const { data: mirrors } = await supabase
+                .from("mirrored_cards")
+                .select("original_card_id,mirror_card_id")
+                .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+              if (mirrors && mirrors.length > 0) {
+                const relatedCardIds = mirrors
+                  .flatMap((m: any) => [m.original_card_id, m.mirror_card_id])
+                  .filter((cardId: any) => cardId !== input.cardId);
+
+                for (const targetCardId of relatedCardIds) {
+                  const { data: targetGroups } = await supabase
+                    .from("card_checklist_groups")
+                    .select("id")
+                    .eq("card_id", targetCardId)
+                    .eq("title", currentGroup.title);
+
+                  if (!targetGroups || targetGroups.length === 0) continue;
+
+                  for (const targetGroup of targetGroups) {
+                    // Evita duplicar item (mesmo título) no grupo espelhado
+                    const { data: existingItems } = await supabase
+                      .from("card_checklists")
+                      .select("id")
+                      .eq("group_id", targetGroup.id)
+                      .eq("title", input.title);
+
+                    if (existingItems && existingItems.length > 0) continue;
+
+                    const { data: targetItems } = await supabase
+                      .from("card_checklists")
+                      .select("position")
+                      .eq("group_id", targetGroup.id);
+
+                    const targetNextPosition = (targetItems?.length || 0);
+                    const finalPosition = input.position ?? targetNextPosition;
+
+                    await supabase.from("card_checklists").insert({
+                      card_id: targetCardId,
+                      group_id: targetGroup.id,
+                      title: input.title,
+                      position: finalPosition,
+                      completed: false,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        } catch (syncError) {
+          console.error("[Mirror Sync] Checklist item add sync failed:", syncError);
+          // não interrompe a criação do item original
+        }
+
         return { id: data.id };
       }),
     updateChecklistItem: protectedProcedure
@@ -1337,7 +1444,7 @@ export const appRouter = router({
         dueDate: z.date().nullish(),
         assignedUserId: z.number().nullish()
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const updateData: any = {};
         if (input.completed !== undefined) updateData.completed = input.completed;
         if (input.title !== undefined) updateData.title = input.title;
@@ -1358,6 +1465,27 @@ export const appRouter = router({
             code: "INTERNAL_SERVER_ERROR",
             message: `Erro ao atualizar checklist: ${error.message}`,
           });
+        }
+
+        // Registrar atividade/log quando houver mudança do responsável do item
+        // (usa o `assignedUserId` como "dono" do log, para refletir no feed/atividades do usuário)
+        if (input.assignedUserId !== undefined) {
+          try {
+            const targetUserId = input.assignedUserId ?? ctx.user.id;
+            await createAuditLog({
+              userId: targetUserId,
+              action: "update",
+              entityType: "card",
+              entityId: updatedItem.card_id,
+              entityName: updatedItem.title,
+              details:
+                input.assignedUserId === null
+                  ? `Checklist: responsável removido (${updatedItem.title})`
+                  : `Checklist: atribuído para user_id=${input.assignedUserId} (${updatedItem.title})`,
+            });
+          } catch (logError) {
+            console.error("[Checklist Activity] Failed to create audit log:", logError);
+          }
         }
 
         // 2. Sincronizar com cards espelhados (se houver)
@@ -1694,6 +1822,22 @@ export const appRouter = router({
 
         if (cardError || !originalCard) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Cartão original não encontrado" });
+        }
+
+        // Evita espelhar novamente o mesmo cartão no mesmo board de destino
+        const { data: existingMirrors } = await supabase
+          .from("mirrored_cards")
+          .select("mirror_card_id")
+          .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`)
+          .eq("mirror_board_id", input.targetBoardId)
+          .limit(1);
+
+        if (existingMirrors && existingMirrors.length > 0) {
+          return {
+            success: true,
+            alreadyExisted: true,
+            mirrorCardId: existingMirrors[0].mirror_card_id,
+          };
         }
 
         const { data: originalList, error: listError } = await supabase
