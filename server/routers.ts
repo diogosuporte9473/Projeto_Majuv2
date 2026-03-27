@@ -884,22 +884,25 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Database not available",
-          });
+        const updateData: Record<string, string> = {};
+        if (input.name !== undefined) updateData.name = input.name;
+        if (input.username !== undefined) updateData.username = input.username;
+
+        if (Object.keys(updateData).length === 0) {
+          return { success: true };
         }
 
-        const updateData: any = {};
-        if (input.name) updateData.name = input.name;
-        if (input.username) updateData.username = input.username;
+        const { error } = await supabase
+          .from("users")
+          .update(updateData)
+          .eq("id", ctx.user.id);
 
-        await db
-          .update(users)
-          .set(updateData)
-          .where(eq(users.id, ctx.user.id));
+        if (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: error.message,
+          });
+        }
 
         return { success: true };
       }),
