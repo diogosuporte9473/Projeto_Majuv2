@@ -92,9 +92,8 @@ const auditRouter = router({
       limit: z.number().default(20),
     }))
     .query(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem ver logs" });
-      }
+      // O modal de "Atividades do Quadro" aparece para usuários autenticados.
+      // Não restringimos a admin aqui (filtro por board pode ser adicionado depois se desejar).
 
       let query = supabase
         .from("audit_logs")
@@ -2024,15 +2023,21 @@ export const appRouter = router({
       const db = await getDb();
       if (!db) return { totalBoards: 0, totalCards: 0, totalUsers: 0 };
       
-      const [boardsCount] = await db.select({ count: z.any() as any }).from(boards);
-      const [cardsCount] = await db.select({ count: z.any() as any }).from(cards);
-      const [usersCount] = await db.select({ count: z.any() as any }).from(users);
+      try {
+        // Evita crash/loop em ambientes onde o Drizzle/tenant pode falhar.
+        const [boardsCount] = await db.select({ count: z.any() as any }).from(boards);
+        const [cardsCount] = await db.select({ count: z.any() as any }).from(cards);
+        const [usersCount] = await db.select({ count: z.any() as any }).from(users);
       
-      return {
-        totalBoards: Number(boardsCount?.count || 0),
-        totalCards: Number(cardsCount?.count || 0),
-        totalUsers: Number(usersCount?.count || 0),
-      };
+        return {
+          totalBoards: Number(boardsCount?.count || 0),
+          totalCards: Number(cardsCount?.count || 0),
+          totalUsers: Number(usersCount?.count || 0),
+        };
+      } catch (err) {
+        console.error("[Stats] getGeneral failed, using zeros:", err);
+        return { totalBoards: 0, totalCards: 0, totalUsers: 0 };
+      }
     }),
   }),
 
