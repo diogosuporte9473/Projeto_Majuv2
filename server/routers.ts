@@ -811,11 +811,24 @@ export const appRouter = router({
         };
       }
 
-      const prefs = await db
-        .select()
-        .from(userPreferences)
-        .where(eq(userPreferences.userId, ctx.user.id))
-        .limit(1);
+      let prefs: Array<(typeof userPreferences.$inferSelect)> = [];
+      try {
+        prefs = await db
+          .select()
+          .from(userPreferences)
+          .where(eq(userPreferences.userId, ctx.user.id))
+          .limit(1);
+      } catch (err) {
+        // Em alguns ambientes (ex: pooler/tenant), o Postgres pode falhar.
+        // Preferimos fallback para não quebrar o app inteiro.
+        console.error("[Settings] getPreferences failed, using defaults:", err);
+        return {
+          emailOnCardAssigned: true,
+          emailOnCardUpdated: true,
+          emailOnMirroredCard: true,
+          emailOnDueDate: true,
+        };
+      }
 
       if (prefs.length === 0) {
         return {
@@ -1120,7 +1133,9 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const { error } = await supabase
           .from("cards")
-          .update({ archived: input.archived, updated_at: new Date().toISOString() })
+          // Alguns bancos não têm `updated_at` (schema cache do PostgREST).
+          // Atualizamos somente o campo necessário para evitar erro 42703/PGRST.
+          .update({ archived: input.archived })
           .eq("id", input.id);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
