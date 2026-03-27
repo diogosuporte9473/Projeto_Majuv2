@@ -305,19 +305,53 @@ export async function getListCards(listId: number) {
       .eq("list_id", listId)
       .eq("archived", false);
       // Removido .order("position") temporariamente para evitar erro 42703 se a coluna não existir
-
     if (error) throw error;
 
-    return (data || []).map((card: any) => ({
-      ...card,
-      listId: card.list_id,
-      dueDate: card.due_date,
-      assignedTo: card.assigned_to,
-      assignedToName: card.assignedToUser?.name || null,
-      createdBy: card.created_by,
-      createdAt: card.created_at || card.createdAt || new Date().toISOString(),
-      updatedAt: card.updated_at || card.updatedAt || new Date().toISOString()
-    }));
+    const cardsRaw = data || [];
+
+    if (cardsRaw.length === 0) {
+      return [];
+    }
+
+    // Coleta todos os IDs de cartão desta lista para buscar contagens em lote
+    const cardIds = cardsRaw.map((c: any) => c.id);
+
+    const [checklistsRes, attachmentsRes] = await Promise.all([
+      supabase
+        .from("card_checklists")
+        .select("card_id, completed")
+        .in("card_id", cardIds),
+      supabase
+        .from("card_attachments")
+        .select("card_id")
+        .in("card_id", cardIds),
+    ]);
+
+    const checklistItems = checklistsRes.data || [];
+    const attachmentItems = attachmentsRes.data || [];
+
+    return cardsRaw.map((card: any) => {
+      const cardChecklistItems = checklistItems.filter((i: any) => i.card_id === card.id);
+      const cardAttachments = attachmentItems.filter((a: any) => a.card_id === card.id);
+
+      const checklistCount = cardChecklistItems.length;
+      const completedChecklistCount = cardChecklistItems.filter((i: any) => i.completed).length;
+      const attachmentCount = cardAttachments.length;
+
+      return {
+        ...card,
+        listId: card.list_id,
+        dueDate: card.due_date,
+        assignedTo: card.assigned_to,
+        assignedToName: card.assignedToUser?.name || null,
+        createdBy: card.created_by,
+        createdAt: card.created_at || card.createdAt || new Date().toISOString(),
+        updatedAt: card.updated_at || card.updatedAt || new Date().toISOString(),
+        checklistCount,
+        completedChecklistCount,
+        attachmentCount,
+      };
+    });
   } catch (error) {
     console.error("[Database] getListCards failed:", error);
     return [];
