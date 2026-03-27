@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Plus, LogOut, Settings, Users } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface TrelloDashboardLayoutProps {
   children: React.ReactNode;
@@ -13,6 +14,7 @@ interface TrelloDashboardLayoutProps {
 
 export default function TrelloDashboardLayout({ children }: TrelloDashboardLayoutProps) {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   
   // Ativa sincronização global para a barra lateral (boards)
   useRealtimeSync();
@@ -50,7 +52,7 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
               Maju Tasks
             </h1>
           </Link>
-          <p className="text-sm text-primary-foreground/70 mt-1">Task Manager</p>
+          <p className="text-sm text-primary-foreground/70 mt-1">{t("layout.taskManager")}</p>
         </div>
 
         <div className="p-4 border-b border-primary-foreground/10">
@@ -61,7 +63,7 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm truncate">{user?.name || "User"}</p>
+              <p className="font-semibold text-sm truncate">{user?.name || t("layout.userFallback")}</p>
               <p className="text-xs text-primary-foreground/70 truncate">{user?.username}</p>
             </div>
           </div>
@@ -70,7 +72,7 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
         <nav className="flex-1 overflow-y-auto p-4">
           <div className="mb-6">
             <p className="text-xs font-semibold text-primary-foreground/50 uppercase tracking-wider mb-3">
-              Your Boards
+              {t("layout.yourBoards")}
             </p>
             
             {isLoading ? (
@@ -94,7 +96,7 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-primary-foreground/60">No boards yet</p>
+              <p className="text-xs text-primary-foreground/60">{t("layout.noBoardsYet")}</p>
             )}
           </div>
 
@@ -104,14 +106,14 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
             size="sm"
           >
             <Plus className="w-4 h-4 mr-2" />
-            New Board
+            {t("layout.newBoard")}
           </Button>
 
           {showNewBoard && (
             <Card className="p-3 mb-4 bg-primary-foreground/5 border-accent">
               <input
                 type="text"
-                placeholder="Board name"
+                placeholder={t("layout.boardName")}
                 value={newBoardName}
                 onChange={(e) => setNewBoardName(e.target.value)}
                 className="w-full px-2 py-2 rounded bg-primary-foreground/10 text-primary-foreground placeholder-primary-foreground/50 text-sm mb-2 border border-primary-foreground/20"
@@ -126,7 +128,7 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
                   size="sm"
                   className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 text-xs"
                 >
-                  Create
+                  {t("common.create")}
                 </Button>
                 <Button
                   onClick={() => setShowNewBoard(false)}
@@ -134,7 +136,7 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
                   size="sm"
                   className="flex-1 text-xs border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </div>
             </Card>
@@ -145,12 +147,12 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
           {user?.role === 'admin' && (
             <Link href="/admin" className="flex items-center gap-2 p-2 rounded hover:bg-primary-foreground/10 transition-colors text-sm">
               <Users className="w-4 h-4" />
-              Admin
+              {t("layout.admin")}
             </Link>
           )}
           <Link href="/settings" className="flex items-center gap-2 p-2 rounded hover:bg-primary-foreground/10 transition-colors text-sm">
             <Settings className="w-4 h-4" />
-            Settings
+            {t("layout.settings")}
           </Link>
           <Button
             onClick={logout}
@@ -159,7 +161,7 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
             className="w-full justify-start border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10"
           >
             <LogOut className="w-4 h-4 mr-2" />
-            Logout
+            {t("layout.logout")}
           </Button>
         </div>
       </aside>

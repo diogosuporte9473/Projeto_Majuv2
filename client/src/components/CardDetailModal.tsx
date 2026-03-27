@@ -29,6 +29,7 @@ import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CardDetailModalProps {
   isOpen: boolean;
@@ -55,6 +56,8 @@ export default function CardDetailModal({
   const { user: currentUser } = useAuth();
   const utils = trpc.useUtils();
   const isAdmin = currentUser?.role === "admin";
+  const { language } = useLanguage();
+  const isEnglish = language === "en";
 
   // Queries
   const { data: card, isLoading: cardLoading } = trpc.cards.getDetails.useQuery({ id: cardId });
@@ -441,9 +444,9 @@ export default function CardDetailModal({
     try {
       await archiveCardMutation.mutateAsync({ id: cardId, archived: true });
       onClose();
-      toast.success("Cartão arquivado");
+      toast.success(isEnglish ? "Card archived" : "Cartão arquivado");
     } catch (error) {
-      toast.error("Erro ao arquivar cartão");
+      toast.error(isEnglish ? "Error archiving card" : "Erro ao arquivar cartão");
     }
   };
 
@@ -452,24 +455,29 @@ export default function CardDetailModal({
     try {
       await deleteCardMutation.mutateAsync({ id: cardId });
       onClose();
-      toast.success("Cartão excluído");
+      toast.success(isEnglish ? "Card deleted" : "Cartão excluído");
     } catch (error) {
-      toast.error("Erro ao excluir cartão");
+      toast.error(isEnglish ? "Error deleting card" : "Erro ao excluir cartão");
     }
   };
 
   const handleCreateMirror = async () => {
     if (!selectedListId || !selectedBoardId) return;
     try {
-      await createMirrorMutation.mutateAsync({
+      type CreateMirrorResult = { success: boolean; alreadyExisted?: boolean; mirrorCardId?: number };
+      const result = (await createMirrorMutation.mutateAsync({
         cardId,
         targetListId: parseInt(selectedListId),
         targetBoardId: parseInt(selectedBoardId),
-      });
+      })) as CreateMirrorResult;
       setIsMirrorDialogOpen(false);
-      toast.success("Cartão espelhado com sucesso");
+      if (result.alreadyExisted) {
+        toast.info("Este cartão já está espelhado para o quadro selecionado.");
+      } else {
+        toast.success(isEnglish ? "Card mirrored successfully" : "Cartão espelhado com sucesso");
+      }
     } catch (error) {
-      toast.error("Erro ao espelhar cartão");
+      toast.error(isEnglish ? "Error mirroring card" : "Erro ao espelhar cartão");
     }
   };
 
@@ -1105,7 +1113,9 @@ export default function CardDetailModal({
                             {groupItems.map((item: any) => {
                               const isItemOverdue = item.due_date && isBefore(new Date(item.due_date), new Date()) && !item.completed;
                               const assignedUserSource = ((boardMembers as any[]) || allUsers || []) as any[];
-                              const assignedUser = assignedUserSource.find((u: any) => (u.id || u.userId) === item.assignedUserId);
+                              // Compatível com payload em snake_case (assigned_user_id) e camelCase (assignedUserId)
+                              const assignedUserId = item.assignedUserId ?? item.assigned_user_id;
+                              const assignedUser = assignedUserSource.find((u: any) => (u.id || u.userId) === assignedUserId);
                               
                               return (
                                 <div 
@@ -1187,7 +1197,7 @@ export default function CardDetailModal({
                                                         </AvatarFallback>
                                                       </Avatar>
                                                       <span className="font-medium text-gray-200">{u.name || u.userName}</span>
-                                                      {(u.id || u.userId) === item.assignedUserId && <Check size={12} className="ml-auto text-accent" />}
+                                                      {(u.id || u.userId) === assignedUserId && <Check size={12} className="ml-auto text-accent" />}
                                                     </CommandItem>
                                                   ))}
                                                 </CommandGroup>
@@ -1473,7 +1483,7 @@ export default function CardDetailModal({
                       onClick={() => setIsMirrorDialogOpen(true)}
                       className="bg-[#2a2a2a] hover:bg-[#333] text-gray-200 justify-start h-11 px-4 rounded-xl text-[10px] font-black transition-all border border-[#333]/50 hover:border-accent/30 shadow-sm w-full"
                     >
-                      <Copy className="w-3.5 h-3.5 mr-3 text-accent flex-shrink-0" /> <span className="truncate">Espelhar Cartão</span>
+                      <Copy className="w-3.5 h-3.5 mr-3 text-accent flex-shrink-0" /> <span className="truncate">{isEnglish ? "Mirror Card" : "Espelhar Cartão"}</span>
                     </Button>
                     <Button 
                       variant="ghost" 
@@ -1481,7 +1491,7 @@ export default function CardDetailModal({
                       onClick={handleArchiveCard}
                       className="bg-[#2a2a2a] hover:bg-amber-950/20 hover:text-amber-400 text-gray-200 justify-start h-11 px-4 rounded-xl text-[10px] font-black transition-all border border-[#333]/50 hover:border-amber-400/30 shadow-sm w-full"
                     >
-                      <Archive className="w-3.5 h-3.5 mr-3 text-amber-500 flex-shrink-0" /> <span className="truncate">Arquivar Cartão</span>
+                      <Archive className="w-3.5 h-3.5 mr-3 text-amber-500 flex-shrink-0" /> <span className="truncate">{isEnglish ? "Archive Card" : "Arquivar Cartão"}</span>
                     </Button>
                     {currentUser?.role === 'admin' && (
                       <Button 
@@ -1490,7 +1500,7 @@ export default function CardDetailModal({
                         onClick={handleDeleteCard}
                         className="hover:bg-red-950/30 text-red-400/70 hover:text-red-400 justify-start h-11 px-4 rounded-xl text-[10px] font-black transition-all w-full"
                       >
-                        <Trash className="w-3.5 h-3.5 mr-3 flex-shrink-0" /> <span className="truncate">Excluir Permanentemente</span>
+                        <Trash className="w-3.5 h-3.5 mr-3 flex-shrink-0" /> <span className="truncate">{isEnglish ? "Delete Permanently" : "Excluir Permanentemente"}</span>
                       </Button>
                     )}
                   </div>

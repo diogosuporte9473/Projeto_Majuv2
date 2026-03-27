@@ -6,9 +6,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function Home() {
   const { user, loading, isAuthenticated, refresh } = useAuth();
+  const { t } = useLanguage();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -62,7 +64,7 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Carregando sessão...</p>
+          <p className="text-muted-foreground">{t("home.loadingSession")}</p>
         </div>
       </div>
     );
@@ -74,25 +76,25 @@ export default function Home() {
         <div className="bg-white text-foreground p-8 rounded-xl shadow-2xl w-full max-w-md">
           <h1 className="text-3xl font-bold mb-2 text-center text-primary">Maju Task Manager</h1>
           <p className="text-muted-foreground mb-8 text-center">
-            {isSignUp ? "Create your account" : "Sign in to manage your tasks"}
+            {isSignUp ? t("home.authSubtitleSignup") : t("home.authSubtitleSignin")}
           </p>
           
           <form onSubmit={handleAuth} className="space-y-4">
             {isSignUp && (
               <div>
-                <label className="text-sm font-medium">Nome</label>
+                <label className="text-sm font-medium">{t("home.name")}</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full p-2 border rounded-md"
-                  placeholder="Seu nome"
+                  placeholder={t("home.yourName")}
                   required
                 />
               </div>
             )}
             <div>
-              <label className="text-sm font-medium">Usuário (Email)</label>
+              <label className="text-sm font-medium">{t("home.userEmail")}</label>
               <input
                 type="text"
                 value={username}
@@ -103,7 +105,7 @@ export default function Home() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Senha</label>
+              <label className="text-sm font-medium">{t("home.password")}</label>
               <input
                 type="password"
                 value={password}
@@ -118,7 +120,7 @@ export default function Home() {
               className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-2"
             >
               {authLoading ? <Loader2 className="animate-spin mr-2" /> : null}
-              {isSignUp ? "Sign Up" : "Sign In"}
+              {isSignUp ? t("home.signUp") : t("home.signIn")}
             </Button>
           </form>
 
@@ -127,7 +129,7 @@ export default function Home() {
               onClick={() => setIsSignUp(!isSignUp)}
               className="text-primary hover:underline text-sm"
             >
-              {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
+              {isSignUp ? t("home.haveAccount") : t("home.noAccount")}
             </button>
           </div>
         </div>
@@ -140,9 +142,9 @@ export default function Home() {
       <div className="p-8">
         <div className="max-w-6xl mx-auto">
           <div className="mb-12">
-            <h1 className="text-4xl font-extrabold text-foreground mb-3">Bem-vindo, {user?.name}! 👋</h1>
+            <h1 className="text-4xl font-extrabold text-foreground mb-3">{t("home.welcome")}, {user?.name}! 👋</h1>
             <p className="text-xl text-muted-foreground">
-              Seu centro de produtividade pessoal. Comece a organizar suas tarefas hoje.
+              {t("home.centerSubtitle")}
             </p>
           </div>
           
@@ -151,9 +153,9 @@ export default function Home() {
               <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
                 <Layout className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-xl font-bold mb-3 text-foreground">Quadros Dinâmicos</h3>
+              <h3 className="text-xl font-bold mb-3 text-foreground">{t("home.dynamicBoards")}</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Crie quadros para diferentes projetos e organize suas tarefas em listas personalizáveis.
+                {t("home.dynamicBoardsDesc")}
               </p>
             </div>
 
@@ -161,9 +163,9 @@ export default function Home() {
               <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-accent/20 transition-colors">
                 <CheckSquare className="w-6 h-6 text-accent" />
               </div>
-              <h3 className="text-xl font-bold mb-3 text-foreground">Checklists & Etiquetas</h3>
+              <h3 className="text-xl font-bold mb-3 text-foreground">{t("home.checklistsLabels")}</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Adicione detalhes minuciosos aos seus cartões com checklists e etiquetas coloridas para fácil identificação.
+                {t("home.checklistsLabelsDesc")}
               </p>
             </div>
 
@@ -171,9 +173,9 @@ export default function Home() {
               <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-green-500/20 transition-colors">
                 <Sparkles className="w-6 h-6 text-green-500" />
               </div>
-              <h3 className="text-xl font-bold mb-3 text-foreground">Assistente IA</h3>
+              <h3 className="text-xl font-bold mb-3 text-foreground">{t("home.aiAssistant")}</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Use nossa inteligência artificial integrada para sugerir passos de projeto e organizar seu fluxo de trabalho.
+                {t("home.aiAssistantDesc")}
               </p>
             </div>
           </div>
@@ -181,17 +183,17 @@ export default function Home() {
           <div className="mt-16 p-8 bg-gradient-to-r from-primary to-primary/80 rounded-3xl text-primary-foreground shadow-xl">
             <div className="flex flex-col md:flex-row items-center justify-between gap-8">
               <div className="flex-1">
-                <h2 className="text-3xl font-bold mb-4">Pronto para começar?</h2>
+                <h2 className="text-3xl font-bold mb-4">{t("home.readyToStart")}</h2>
                 <p className="text-primary-foreground/80 text-lg">
-                  Crie seu primeiro quadro agora e experimente uma nova forma de gerenciar projetos.
+                  {t("home.readyToStartDesc")}
                 </p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex flex-col items-center">
-                   <p className="text-sm font-medium mb-2 opacity-80 italic">Dica: Use o botão de chat na visualização do quadro para falar com a Maju AI!</p>
+                   <p className="text-sm font-medium mb-2 opacity-80 italic">{t("home.aiTip")}</p>
                    <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full border border-white/20">
                      <MessageSquare className="w-4 h-4" />
-                     <span className="text-sm font-semibold">Assistente IA Ativo</span>
+                     <span className="text-sm font-semibold">{t("home.aiActive")}</span>
                    </div>
                 </div>
               </div>

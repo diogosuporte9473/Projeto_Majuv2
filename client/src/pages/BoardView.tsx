@@ -10,6 +10,7 @@ import { useState, useRef, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   DndContext,
   DragEndEvent,
@@ -59,6 +60,8 @@ export default function BoardView() {
   const boardId = params?.id ? parseInt(params.id) : null;
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const { language } = useLanguage();
+  const isEnglish = language === "en";
   
   // Ativa sincronização em tempo real para este quadro
   useRealtimeSync(boardId || undefined);
@@ -137,10 +140,10 @@ export default function BoardView() {
         name: editedBoardName,
       });
       setIsEditingBoardName(false);
-      toast.success("Quadro renomeado");
+      toast.success(isEnglish ? "Board renamed" : "Quadro renomeado");
       utils.boards.get.invalidate({ id: boardId });
     } catch (error) {
-      toast.error("Erro ao renomear quadro");
+      toast.error(isEnglish ? "Error renaming board" : "Erro ao renomear quadro");
     }
   };
 
@@ -221,10 +224,10 @@ export default function BoardView() {
             newListId,
             newPosition: 0,
           });
-          toast.success("Cartão movido");
+          toast.success(isEnglish ? "Card moved" : "Cartão movido");
           utils.cards.getByList.invalidate();
         } catch (error) {
-          toast.error("Erro ao mover cartão");
+          toast.error(isEnglish ? "Error moving card" : "Erro ao mover cartão");
         }
       }
     }
@@ -364,7 +367,7 @@ export default function BoardView() {
                       size="sm"
                       className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
                     >
-                      Criar Lista
+                      {isEnglish ? "Create List" : "Criar Lista"}
                     </Button>
                     <Button
                       onClick={() => setShowNewList(false)}
@@ -372,7 +375,7 @@ export default function BoardView() {
                       size="sm"
                       className="flex-1"
                     >
-                      Cancelar
+                      {isEnglish ? "Cancel" : "Cancelar"}
                     </Button>
                   </div>
                 </div>
@@ -384,7 +387,7 @@ export default function BoardView() {
                     className="w-full justify-start bg-background/50 border-dashed border-2 hover:bg-background hover:border-accent text-muted-foreground hover:text-foreground h-12 transition-all"
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Adicionar outra lista
+                    {isEnglish ? "Add another list" : "Adicionar outra lista"}
                   </Button>
                 </div>
               )}
@@ -393,7 +396,9 @@ export default function BoardView() {
             <DragOverlay>
               {activeId && activeId.startsWith("card-") ? (
                 <div className="bg-card rounded p-3 border border-border shadow-2xl rotate-3 cursor-grabbing w-64">
-                  <p className="font-medium text-sm text-foreground">Movendo cartão...</p>
+                  <p className="font-medium text-sm text-foreground">
+                    {isEnglish ? "Moving card..." : "Movendo cartão..."}
+                  </p>
                 </div>
               ) : null}
             </DragOverlay>
@@ -825,6 +830,8 @@ function ListColumn({ listId, listName, boardId }: { listId: number; listName: s
   const deleteListMutation = trpc.lists.delete.useMutation();
   const updateListMutation = trpc.lists.update.useMutation();
   const createCardMutation = trpc.cards.create.useMutation();
+  const { language } = useLanguage();
+  const isEnglish = language === "en";
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(listName);
@@ -1003,10 +1010,10 @@ function ListColumn({ listId, listName, boardId }: { listId: number; listName: s
             />
             <div className="flex gap-2">
               <Button onClick={handleCreateCard} size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                Adicionar
+                {isEnglish ? "Add" : "Adicionar"}
               </Button>
               <Button onClick={() => setShowNewCard(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                Cancelar
+                {isEnglish ? "Cancel" : "Cancelar"}
               </Button>
             </div>
           </div>
@@ -1018,7 +1025,7 @@ function ListColumn({ listId, listName, boardId }: { listId: number; listName: s
             className="w-full justify-start text-gray-400 hover:text-white hover:bg-white/5 h-10"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Adicionar um cartão
+            {isEnglish ? "Add a card" : "Adicionar um cartão"}
           </Button>
         )}
       </div>

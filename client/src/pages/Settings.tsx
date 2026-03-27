@@ -415,6 +415,8 @@ function ProfileSettings({ user }: { user: any }) {
 function NotificationSettings() {
   const { data: preferences, isLoading } = trpc.settings.getPreferences.useQuery(undefined);
   const updatePrefsMutation = trpc.settings.updatePreferences.useMutation();
+  const { language } = useLanguage();
+  const isEnglish = language === "en";
 
   const [emailOnCardAssigned, setEmailOnCardAssigned] = useState(true);
   const [emailOnCardUpdated, setEmailOnCardUpdated] = useState(true);
@@ -438,9 +440,11 @@ function NotificationSettings() {
         emailOnMirroredCard,
         emailOnDueDate,
       });
-      toast.success("Preferências atualizadas com sucesso!");
+      toast.success(
+        isEnglish ? "Preferences updated successfully!" : "Preferências atualizadas com sucesso!"
+      );
     } catch (error) {
-      toast.error("Erro ao atualizar preferências");
+      toast.error(isEnglish ? "Error updating preferences" : "Erro ao atualizar preferências");
       console.error(error);
     }
   };
@@ -458,14 +462,18 @@ function NotificationSettings() {
       <div className="space-y-6">
         <div>
           <h3 className="text-lg font-semibold text-foreground mb-4">
-            Preferências de Notificações
+            {isEnglish ? "Notification Preferences" : "Preferências de Notificações"}
           </h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted border border-border">
               <div>
-                <p className="font-medium text-foreground">Cartão Atribuído</p>
+                <p className="font-medium text-foreground">
+                  {isEnglish ? "Assigned Card" : "Cartão Atribuído"}
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  Receba email quando um cartão for atribuído a você
+                  {isEnglish
+                    ? "Receive an email when a card is assigned to you"
+                    : "Receba email quando um cartão for atribuído a você"}
                 </p>
               </div>
               <Switch
@@ -476,9 +484,11 @@ function NotificationSettings() {
 
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted border border-border">
               <div>
-                <p className="font-medium text-foreground">Cartão Atualizado</p>
+                <p className="font-medium text-foreground">
+                  {isEnglish ? "Card Updated" : "Cartão Atualizado"}
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  Receba email quando um cartão for atualizado
+                  {isEnglish ? "Receive an email when a card is updated" : "Receba email quando um cartão for atualizado"}
                 </p>
               </div>
               <Switch
@@ -489,9 +499,11 @@ function NotificationSettings() {
 
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted border border-border">
               <div>
-                <p className="font-medium text-foreground">Cartão Espelhado</p>
+                <p className="font-medium text-foreground">
+                  {isEnglish ? "Mirrored Card" : "Cartão Espelhado"}
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  Receba email quando um cartão for espelhado
+                  {isEnglish ? "Receive an email when a card is mirrored" : "Receba email quando um cartão for espelhado"}
                 </p>
               </div>
               <Switch
@@ -502,9 +514,11 @@ function NotificationSettings() {
 
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted border border-border">
               <div>
-                <p className="font-medium text-foreground">Data de Vencimento</p>
+                <p className="font-medium text-foreground">
+                  {isEnglish ? "Due Date" : "Data de Vencimento"}
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  Receba alerta quando a data de vencimento estiver próxima
+                  {isEnglish ? "Receive an alert when the due date is close" : "Receba alerta quando a data de vencimento estiver próxima"}
                 </p>
               </div>
               <Switch
@@ -524,10 +538,10 @@ function NotificationSettings() {
             {updatePrefsMutation.isPending ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Salvando...
+                {isEnglish ? "Saving..." : "Salvando..."}
               </>
             ) : (
-              "Salvar Preferências"
+              isEnglish ? "Save Preferences" : "Salvar Preferências"
             )}
           </Button>
         </div>
