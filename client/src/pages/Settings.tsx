@@ -10,6 +10,7 @@ import { Loader2, User, Bell, Users, Plus, Trash2, Edit2, Shield, UserCheck } fr
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useLanguage, type AppLanguage } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Dialog,
   DialogContent,
@@ -290,8 +291,10 @@ function UserManagement() {
 
 function ProfileSettings({ user }: { user: any }) {
   const [name, setName] = useState(user.name || "");
+  const utils = trpc.useUtils();
   const updateProfileMutation = trpc.settings.updateProfile.useMutation();
   const { language, setLanguage } = useLanguage();
+  const { theme, setTheme } = useTheme();
   const isEnglish = language === "en";
 
   const getSafeMemberSince = () => {
@@ -314,6 +317,7 @@ function ProfileSettings({ user }: { user: any }) {
       await updateProfileMutation.mutateAsync({
         name: name.trim(),
       });
+      await utils.auth.me.invalidate();
       toast.success(isEnglish ? "Profile updated successfully!" : "Perfil atualizado com sucesso!");
     } catch (error) {
       toast.error(isEnglish ? "Error updating profile" : "Erro ao atualizar perfil");
@@ -388,6 +392,39 @@ function ProfileSettings({ user }: { user: any }) {
                   : "Aplicado globalmente e salvo para suas próximas sessões."}
               </p>
             </div>
+
+            {setTheme && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  {isEnglish ? "Appearance" : "Aparência"}
+                </label>
+                <Select
+                  value={theme}
+                  onValueChange={(value) =>
+                    setTheme(value === "dark" ? "dark" : "light")
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={isEnglish ? "Select theme" : "Selecione o tema"}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="light">
+                      {isEnglish ? "Light (default)" : "Claro (padrão)"}
+                    </SelectItem>
+                    <SelectItem value="dark">
+                      {isEnglish ? "Dark (comfortable contrast)" : "Escuro (contraste confortável)"}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {isEnglish
+                    ? "Dark mode uses soft neutrals with your brand purple and lime accents — easy on the eyes for long sessions."
+                    : "O modo escuro usa tons neutros suaves com o roxo e o verde-limão da marca — confortável para uso prolongado."}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
