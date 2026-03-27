@@ -18,6 +18,8 @@ interface Label {
 interface DraggableCardProps {
   id: number;
   listId: number;
+   // Opcional: usado para buscar membros do quadro no modal de detalhes
+  boardId?: number;
   title: string;
   description?: string;
   startDate?: Date;
@@ -34,6 +36,7 @@ interface DraggableCardProps {
 export function DraggableCard({
   id,
   listId,
+  boardId,
   title,
   description,
   startDate,
@@ -200,6 +203,7 @@ export function DraggableCard({
           cardTitle={title}
           cardDescription={description}
           listName={listName}
+          boardId={boardId}
           onChecklistChange={handleLocalChecklistChange}
         />
       )}

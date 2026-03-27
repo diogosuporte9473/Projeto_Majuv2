@@ -49,6 +49,9 @@ import {
 
 interface CardWithUser extends DBCard {
   assignedToName?: string | null;
+  checklistCount?: number;
+  completedChecklistCount?: number;
+  attachmentCount?: number;
 }
 
 export default function BoardView() {
@@ -337,7 +340,7 @@ export default function BoardView() {
           >
             <div className="flex gap-4 h-full items-start">
               {lists && (lists as DBList[]).map((list: DBList) => (
-                <ListColumn key={list.id} listId={list.id} listName={list.name} />
+                <ListColumn key={list.id} listId={list.id} listName={list.name} boardId={board.id} />
               ))}
 
               {showNewList ? (
@@ -813,7 +816,7 @@ function BoardActivityModal({ isOpen, onClose, boardName, logs, isLoading }: { i
   );
 }
 
-function ListColumn({ listId, listName }: { listId: number; listName: string }) {
+function ListColumn({ listId, listName, boardId }: { listId: number; listName: string; boardId: number }) {
   const { data: cards, isLoading } = trpc.cards.getByList.useQuery({ listId });
   const utils = trpc.useUtils();
   const deleteListMutation = trpc.lists.delete.useMutation();
@@ -964,12 +967,16 @@ function ListColumn({ listId, listName }: { listId: number; listName: string }) 
                     <DraggableCard
                       id={card.id}
                       listId={listId}
+                      boardId={boardId}
                       title={card.title}
                       description={card.description || undefined}
                       startDate={card.startDate ? new Date(card.startDate) : undefined}
                       dueDate={card.dueDate ? new Date(card.dueDate) : undefined}
                       listName={listName}
                       assignedToName={card.assignedToName}
+                      checklistCount={card.checklistCount}
+                      completedChecklistCount={card.completedChecklistCount}
+                      attachmentCount={card.attachmentCount}
                     />
                   </div>
                 );

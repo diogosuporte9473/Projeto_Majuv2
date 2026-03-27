@@ -37,6 +37,8 @@ interface CardDetailModalProps {
   cardTitle: string;
   cardDescription?: string;
   listName?: string;
+  // Opcional: usado para carregar membros do quadro para atribuição
+  boardId?: number;
   onChecklistChange?: (completed: number, total: number) => void;
 }
 
@@ -47,6 +49,7 @@ export default function CardDetailModal({
   cardTitle,
   cardDescription,
   listName,
+  boardId,
   onChecklistChange,
 }: CardDetailModalProps) {
   const { user: currentUser } = useAuth();
@@ -67,9 +70,11 @@ export default function CardDetailModal({
     undefined,
     { enabled: isAdmin && isOpen } as any
   );
-  // Evita chamadas `boards.getMembers` com `boardId=0`, que geram FORBIDDEN e podem causar loops.
-  // Por enquanto, para o popover de responsável, usamos somente `allUsers` (admin).
-  const boardMembers: any[] | undefined = undefined;
+  // Para não-admins (ou quando preferir restringir ao quadro), buscamos membros do quadro.
+  const { data: boardMembers } = trpc.boards.getMembers.useQuery(
+    { boardId: boardId ?? 0 },
+    { enabled: !!boardId && isOpen } as any
+  );
 
   // Mutations
   const addLabelMutation = trpc.cardDetails.addLabel.useMutation();
@@ -145,8 +150,16 @@ export default function CardDetailModal({
   useEffect(() => {
     if (!checklists) return;
 
-    const total = checklists.length;
-    const completed = checklists.filter((i: any) => i.completed).length;
+    // Calcula progresso real considerando todos os itens de todos os grupos
+    const { total, completed } = (checklists as Array<{ items?: Array<{ completed: boolean }> }>).reduce(
+      (acc, group) => {
+        const items = group.items || [];
+        acc.total += items.length;
+        acc.completed += items.filter((item) => item.completed).length;
+        return acc;
+      },
+      { total: 0, completed: 0 }
+    );
 
     const last = lastChecklistStatsRef.current;
     if (last && last.completed === completed && last.total === total) return;
@@ -535,8 +548,10 @@ export default function CardDetailModal({
                             <CommandGroup>
                               <CommandItem
                                 onSelect={() => {
+                                  // Atualiza responsável do cartão para "nenhum" e força refetch das listas
                                   updateAssignedToMutation.mutate({ cardId, userId: null });
                                   utils.cards.getDetails.invalidate({ id: cardId });
+                                  (utils as any).cards.getByList.invalidate();
                                   toast.success("Responsável removido");
                                 }}
                                 className="flex items-center gap-2 p-2.5 hover:bg-white/5 cursor-pointer text-xs"
@@ -546,12 +561,14 @@ export default function CardDetailModal({
                                 </div>
                                 <span className="font-bold text-red-400">Remover responsável</span>
                               </CommandItem>
-                              {(allUsers || boardMembers || []).map((u: any) => (
+                              {((boardMembers as any[]) || allUsers || []).map((u: any) => (
                                 <CommandItem
                                   key={u.id || u.userId}
                                   onSelect={() => {
+                                    // Atualiza responsável do cartão e força refetch das listas
                                     updateAssignedToMutation.mutate({ cardId, userId: u.id || u.userId });
                                     utils.cards.getDetails.invalidate({ id: cardId });
+                                    (utils as any).cards.getByList.invalidate();
                                     toast.success(`Atribuído a ${u.name || u.userName}`);
                                   }}
                                   className="flex items-center gap-2 p-2.5 hover:bg-white/5 cursor-pointer text-xs"
@@ -1087,7 +1104,8 @@ export default function CardDetailModal({
                           <div className="grid gap-3">
                             {groupItems.map((item: any) => {
                               const isItemOverdue = item.due_date && isBefore(new Date(item.due_date), new Date()) && !item.completed;
-                              const assignedUser = allUsers?.find((u: any) => u.id === item.assignedUserId);
+                              const assignedUserSource = ((boardMembers as any[]) || allUsers || []) as any[];
+                              const assignedUser = assignedUserSource.find((u: any) => (u.id || u.userId) === item.assignedUserId);
                               
                               return (
                                 <div 
@@ -1154,7 +1172,7 @@ export default function CardDetailModal({
                                                     </div>
                                                     <span className="font-bold text-red-400">Remover do item</span>
                                                   </CommandItem>
-                                                  {(allUsers || boardMembers || []).map((u: any) => (
+                                                  {((boardMembers as any[]) || allUsers || []).map((u: any) => (
                                                     <CommandItem
                                                       key={u.id || u.userId}
                                                       onSelect={() => {
@@ -1498,7 +1516,9 @@ export default function CardDetailModal({
                 <div className="bg-white/[0.02] p-3 rounded-xl border border-white/[0.05] space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest flex-shrink-0">Responsável</span>
-                    <span className="text-[9px] font-black text-gray-300 truncate">Nenhum</span>
+                    <span className="text-[9px] font-black text-gray-300 truncate">
+                      {card?.assignedToName || "Nenhum"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest flex-shrink-0">Criado em</span>
