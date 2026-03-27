@@ -362,7 +362,8 @@ export async function getCardById(cardId: number) {
   try {
     const { data, error } = await supabase
       .from("cards")
-      .select("*")
+      // Inclui join para obter o nome do responsável no `cards.getDetails`
+      .select("*, assignedToUser:users!assigned_to(name)")
       .eq("id", cardId)
       .maybeSingle();
 
@@ -381,6 +382,7 @@ export async function getCardById(cardId: number) {
       listId: data.list_id,
       dueDate: data.due_date,
       assignedTo: data.assigned_to,
+      assignedToName: (data as any).assignedToUser?.name || null,
       createdBy: data.created_by,
       createdAt: data.created_at,
       updatedAt: data.updated_at
