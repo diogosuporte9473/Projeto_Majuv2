@@ -181,6 +181,8 @@ export default function BoardView() {
         boardId,
         name: newListName,
       });
+      // Garante atualização imediata das colunas sem precisar refresh manual.
+      await utils.lists.getByBoard.invalidate({ boardId });
       setNewListName("");
       setShowNewList(false);
     } catch (error) {

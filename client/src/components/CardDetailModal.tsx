@@ -492,8 +492,8 @@ export default function CardDetailModal({
         </div>
 
         {/* Header */}
-        <DialogHeader className="p-4 px-6 border-b border-[#333]/60 bg-[#1e1e1e] flex-shrink-0">
-          <div className="flex items-start justify-between gap-4">
+        <DialogHeader className="p-3 px-5 border-b border-[#333]/60 bg-[#1e1e1e] flex-shrink-0">
+          <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               {isEditingTitle ? (
                 <div className="flex items-center gap-2 mb-1">
@@ -509,7 +509,7 @@ export default function CardDetailModal({
                 </div>
               ) : (
                 <DialogTitle 
-                  className="text-xl font-bold leading-tight break-words cursor-pointer hover:text-accent transition-colors flex items-center gap-2 group"
+                  className="text-lg font-bold leading-tight break-words cursor-pointer hover:text-accent transition-colors flex items-center gap-2 group"
                   onClick={() => setIsEditingTitle(true)}
                 >
                   {cardTitle}
@@ -517,25 +517,25 @@ export default function CardDetailModal({
                 </DialogTitle>
               )}
               
-              <div className="flex flex-col gap-1.5 mt-1.5">
-                <p className="text-sm text-gray-400 flex items-center gap-2">
+              <div className="flex flex-col gap-1 mt-1">
+                <p className="text-xs text-gray-400 flex items-center gap-1.5">
                   na lista <span className="font-semibold text-gray-200 underline decoration-gray-600 underline-offset-4">{listName}</span>
                 </p>
 
                 {/* Seção de Responsável do Card */}
-                <div className="flex items-center gap-3 mt-3">
+                <div className="flex items-center gap-2.5 mt-1.5">
                   <div className="flex -space-x-2">
-                    <Avatar className="h-8 w-8 border-2 border-[#1e1e1e] ring-1 ring-white/5">
+                    <Avatar className="h-7 w-7 border-2 border-[#1e1e1e] ring-1 ring-white/5">
                       <AvatarFallback className="bg-accent/10 text-accent text-xs font-black">
                         {card?.assignedToName ? card.assignedToName.charAt(0).toUpperCase() : <UserIcon size={14} />}
                       </AvatarFallback>
                     </Avatar>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-none mb-1">Responsável</span>
+                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest leading-none mb-0.5">Responsável</span>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <button className="text-xs font-bold text-gray-200 hover:text-accent transition-colors flex items-center gap-1.5 group">
+                        <button className="text-[11px] font-bold text-gray-200 hover:text-accent transition-colors flex items-center gap-1.5 group">
                           {card?.assignedToName || "Atribuir responsável"}
                           <Plus size={12} className="opacity-50 group-hover:opacity-100" />
                         </button>
@@ -590,7 +590,7 @@ export default function CardDetailModal({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5 py-1">
+                <div className="flex flex-wrap items-center gap-2 py-0.5">
                   {card?.startDate && (
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/5 border border-blue-500/10">
                       <Calendar className="w-3 h-3 text-blue-400" />

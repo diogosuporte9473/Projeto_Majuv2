@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, User, Bell, Users, Plus, Trash2, Edit2, Shield, UserCheck } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { useLanguage, type AppLanguage } from "@/contexts/LanguageContext";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +21,8 @@ import {
 export default function Settings() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
+  const { language } = useLanguage();
+  const isEnglish = language === "en";
 
   if (!user) {
     return (
@@ -36,24 +40,28 @@ export default function Settings() {
     <TrelloDashboardLayout>
       <div className="p-8 max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Configurações</h1>
-          <p className="text-muted-foreground">Gerencie seu perfil e preferências</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">
+            {isEnglish ? "Settings" : "Configurações"}
+          </h1>
+          <p className="text-muted-foreground">
+            {isEnglish ? "Manage your profile and preferences" : "Gerencie seu perfil e preferências"}
+          </p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'} mb-8`}>
             <TabsTrigger value="profile" className="flex items-center gap-2">
               <User className="w-4 h-4" />
-              Perfil
+              {isEnglish ? "Profile" : "Perfil"}
             </TabsTrigger>
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="w-4 h-4" />
-              Notificações
+              {isEnglish ? "Notifications" : "Notificações"}
             </TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                Usuários
+                {isEnglish ? "Users" : "Usuários"}
               </TabsTrigger>
             )}
           </TabsList>
@@ -283,6 +291,18 @@ function UserManagement() {
 function ProfileSettings({ user }: { user: any }) {
   const [name, setName] = useState(user.name || "");
   const updateProfileMutation = trpc.settings.updateProfile.useMutation();
+  const { language, setLanguage } = useLanguage();
+  const isEnglish = language === "en";
+
+  const getSafeMemberSince = () => {
+    const rawDate = user.createdAt ?? user.created_at;
+    if (!rawDate) return "-";
+
+    const parsed = new Date(rawDate);
+    if (Number.isNaN(parsed.getTime())) return "-";
+
+    return parsed.toLocaleDateString(language === "en" ? "en-US" : "pt-BR");
+  };
 
   const handleUpdateProfile = async () => {
     if (!name.trim()) {
@@ -294,9 +314,9 @@ function ProfileSettings({ user }: { user: any }) {
       await updateProfileMutation.mutateAsync({
         name: name.trim(),
       });
-      toast.success("Perfil atualizado com sucesso!");
+      toast.success(isEnglish ? "Profile updated successfully!" : "Perfil atualizado com sucesso!");
     } catch (error) {
-      toast.error("Erro ao atualizar perfil");
+      toast.error(isEnglish ? "Error updating profile" : "Erro ao atualizar perfil");
       console.error(error);
     }
   };
@@ -306,47 +326,67 @@ function ProfileSettings({ user }: { user: any }) {
       <div className="space-y-6">
         <div>
           <h3 className="text-lg font-semibold text-foreground mb-4">
-            Informações Pessoais
+            {isEnglish ? "Personal Information" : "Informações Pessoais"}
           </h3>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Nome Completo
+                {isEnglish ? "Full Name" : "Nome Completo"}
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Seu nome"
+                placeholder={isEnglish ? "Your name" : "Seu nome"}
                 className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Método de Login
+                {isEnglish ? "Login Method" : "Método de Login"}
               </label>
               <div className="px-4 py-2 rounded-lg bg-muted border border-border text-foreground capitalize">
-                {user.loginMethod || "Não especificado"}
+                {user.loginMethod || (isEnglish ? "Not specified" : "Não especificado")}
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Função
+                {isEnglish ? "Role" : "Função"}
               </label>
               <div className="px-4 py-2 rounded-lg bg-muted border border-border text-foreground capitalize">
-                {user.role === "admin" ? "Administrador" : "Usuário"}
+                {user.role === "admin" ? (isEnglish ? "Administrator" : "Administrador") : (isEnglish ? "User" : "Usuário")}
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Membro desde
+                {isEnglish ? "Member since" : "Membro desde"}
               </label>
               <div className="px-4 py-2 rounded-lg bg-muted border border-border text-foreground">
-                {new Date(user.createdAt).toLocaleDateString("pt-BR")}
+                {getSafeMemberSince()}
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                {isEnglish ? "Language" : "Idioma"}
+              </label>
+              <Select value={language} onValueChange={(value) => setLanguage(value as AppLanguage)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={isEnglish ? "Select language" : "Selecione o idioma"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-2">
+                {isEnglish
+                  ? "Applied globally and saved for your next sessions."
+                  : "Aplicado globalmente e salvo para suas próximas sessões."}
+              </p>
             </div>
           </div>
         </div>
@@ -360,10 +400,10 @@ function ProfileSettings({ user }: { user: any }) {
             {updateProfileMutation.isPending ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Salvando...
+                {isEnglish ? "Saving..." : "Salvando..."}
               </>
             ) : (
-              "Salvar Alterações"
+              isEnglish ? "Save Changes" : "Salvar Alterações"
             )}
           </Button>
         </div>
