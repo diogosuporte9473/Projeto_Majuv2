@@ -114,7 +114,8 @@ export default function BoardView() {
 
   // @ts-ignore
   const { data: boardActivity, isLoading: logsLoading } = trpc.audit.list.useQuery({
-    search: board?.name,
+    // Não filtra por nome do quadro: os logs usam `entity_name` (ex: título do card),
+    // então filtrar por `board.name` costuma retornar vazio mesmo com logs gravados.
     limit: 10,
   }, { enabled: !!board?.name && showActivityModal } as any);
 
