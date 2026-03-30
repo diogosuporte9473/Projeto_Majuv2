@@ -116,6 +116,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
 export async function getUserByUsername(username: string) {
   try {
+    console.log(`[Database] getUserByUsername: ${username}`);
     const { data, error } = await supabase
       .from("users")
       .select("*")
@@ -127,6 +128,7 @@ export async function getUserByUsername(username: string) {
     }
 
     if (data) {
+      console.log(`[Database] Found user in Supabase: ${data.username}`);
       return {
         ...data,
         createdAt: data.created_at,
@@ -136,9 +138,18 @@ export async function getUserByUsername(username: string) {
     }
 
     // Fallback para Drizzle se não encontrado no Supabase ou se houver erro
+    console.log(`[Database] User ${username} not in Supabase users table, trying Drizzle...`);
     const db = await getDb();
-    if (!db) return undefined;
+    if (!db) {
+      console.error("[Database] Drizzle connection not available");
+      return undefined;
+    }
     const results = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    if (results[0]) {
+      console.log(`[Database] Found user in Drizzle: ${results[0].username}`);
+    } else {
+      console.warn(`[Database] User ${username} not found in Drizzle either`);
+    }
     return results[0] || undefined;
   } catch (error) {
     console.error("[Database] getUserByUsername failed:", error);

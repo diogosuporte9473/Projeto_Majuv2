@@ -39,28 +39,34 @@ class SDKServer {
 
       if (payload) {
         // 2. Identificar o usuário
-        // Se for token do Supabase, o 'sub' é um UUID. Se for interno, é o ID (int).
         const sub = payload.sub;
         let user: User | null = null;
 
+        console.log(`[Auth] Payload sub: ${sub}, email: ${payload.email}`);
+
         if (sub) {
+          // 2.1 Tenta buscar pelo ID numérico primeiro (comportamento antigo/interno)
           if (/^\d+$/.test(sub)) {
-            // ID numérico (token interno)
             user = await db.getUserById(parseInt(sub));
-          } else {
-            // UUID ou string (token do Supabase)
-            // Tenta buscar por email ou username que venha no token
+          } 
+          
+          // 2.2 Se não encontrou ou sub não é numérico, busca por email ou username
+          if (!user) {
             const email = payload.email;
             const username = payload.user_metadata?.username || email?.split('@')[0];
             
             if (username) {
+              console.log(`[Auth] Searching by username: ${username}`);
               user = await db.getUserByUsername(username);
             }
           }
         }
 
         if (user) {
+          console.log(`[Auth] User authenticated: ${user.username} (ID: ${user.id})`);
           return user;
+        } else {
+          console.warn(`[Auth] User not found in database for sub: ${sub}`);
         }
       }
 
