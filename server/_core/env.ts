@@ -12,4 +12,5 @@ export const ENV = {
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
   // Chave server-side (recomendado para bypassar RLS quando necessário)
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  supabaseJwksUrl: process.env.SUPABASE_JWKS_URL ?? "https://xnymtzblrotxgyzpgnoc.supabase.co/auth/v1/.well-known/jwks.json",
 };
