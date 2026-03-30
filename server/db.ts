@@ -124,21 +124,22 @@ export async function getUserByUsername(username: string) {
 
     if (error) {
       console.error("[Database] Error fetching user via REST:", error);
-      // Fallback para Drizzle apenas se necessário
-      const db = await getDb();
-      if (!db) return undefined;
-      const results = await db.select().from(users).where(eq(users.username, username)).limit(1);
-      return results[0] || undefined;
     }
 
-    if (!data) return undefined;
+    if (data) {
+      return {
+        ...data,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        lastSignedIn: data.last_signed_in
+      } as any;
+    }
 
-    return {
-      ...data,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      lastSignedIn: data.last_signed_in
-    } as any;
+    // Fallback para Drizzle se não encontrado no Supabase ou se houver erro
+    const db = await getDb();
+    if (!db) return undefined;
+    const results = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    return results[0] || undefined;
   } catch (error) {
     console.error("[Database] getUserByUsername failed:", error);
     return undefined;
@@ -155,21 +156,22 @@ export async function getUserById(id: number) {
 
     if (error) {
       console.error("[Database] Error fetching user by ID via REST:", error);
-      // Fallback para Drizzle
-      const db = await getDb();
-      if (!db) return undefined;
-      const results = await db.select().from(users).where(eq(users.id, id)).limit(1);
-      return results[0] || undefined;
     }
 
-    if (!data) return undefined;
+    if (data) {
+      return {
+        ...data,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        lastSignedIn: data.last_signed_in
+      } as any;
+    }
 
-    return {
-      ...data,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      lastSignedIn: data.last_signed_in
-    } as any;
+    // Fallback para Drizzle
+    const db = await getDb();
+    if (!db) return undefined;
+    const results = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return results[0] || undefined;
   } catch (error) {
     console.error("[Database] getUserById failed:", error);
     return undefined;
