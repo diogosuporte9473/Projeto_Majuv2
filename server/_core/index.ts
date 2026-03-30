@@ -127,11 +127,24 @@ export async function createApp() {
     if (!ENV.isProduction) return next();
 
     const origin = req.headers.origin;
+    const host = req.headers.host;
+    
+    // Permitir se o origin for igual ao host (same-origin)
+    if (origin && host && origin.includes(host)) {
+      return next();
+    }
+
+    // Permitir domínios da Vercel automaticamente se estivermos na Vercel
+    if (origin?.endsWith(".vercel.app")) {
+      return next();
+    }
+
     if (!origin || !allowedOrigins.has(origin)) {
+      console.warn(`[Security] 403 Forbidden: Invalid request origin "${origin}". Host: "${host}"`);
       return res.status(403).json({
         error: {
           code: "FORBIDDEN",
-          message: "Invalid request origin",
+          message: `Invalid request origin: ${origin || "missing"}. If this is a legitimate request, add this origin to CORS_ORIGIN environment variable.`,
         },
       });
     }
