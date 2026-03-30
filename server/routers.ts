@@ -78,7 +78,11 @@ async function createAuditLog({
   }
 }
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key");
+const rawJwtSecret = ENV.cookieSecret.trim();
+if (rawJwtSecret.length < 32) {
+  throw new Error("JWT_SECRET must be set with at least 32 characters");
+}
+const JWT_SECRET = new TextEncoder().encode(rawJwtSecret);
 
 const auditRouter = router({
   list: protectedProcedure

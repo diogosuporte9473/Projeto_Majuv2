@@ -3,8 +3,13 @@ import type { User } from "../../drizzle/schema.js";
 import * as db from "../db.js";
 import { COOKIE_NAME } from "../../shared/const.js";
 import { jwtVerify } from "jose";
+import { ENV } from "./env.js";
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key");
+const rawJwtSecret = ENV.cookieSecret.trim();
+if (rawJwtSecret.length < 32) {
+  throw new Error("JWT_SECRET must be set with at least 32 characters");
+}
+const JWT_SECRET = new TextEncoder().encode(rawJwtSecret);
 
 class SDKServer {
   async authenticateRequest(req: any): Promise<User> {
