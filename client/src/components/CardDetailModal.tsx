@@ -69,10 +69,7 @@ export default function CardDetailModal({
   const { data: projectDates } = trpc.cardDetails.getProjectDates.useQuery({ cardId });
   const { data: mirrors } = trpc.cardDetails.getCardMirrors.useQuery({ cardId });
   const { data: templates } = trpc.checklistTemplates.list.useQuery();
-  const { data: allUsers } = trpc.admin.users.list.useQuery(
-    undefined,
-    { enabled: isAdmin && isOpen } as any
-  );
+  const { data: allUsers } = trpc.cardDetails.getCardUsers.useQuery({ cardId });
   // Para não-admins (ou quando preferir restringir ao quadro), buscamos membros do quadro.
   const { data: boardMembers } = trpc.boards.getMembers.useQuery(
     { boardId: boardId ?? 0 },
@@ -100,6 +97,8 @@ export default function CardDetailModal({
   const createMirrorMutation = trpc.cardDetails.createMirror.useMutation();
   const archiveCardMutation = trpc.cardDetails.archiveCard.useMutation();
   const deleteCardMutation = trpc.cards.delete.useMutation();
+  const cloneCardMutation = trpc.cardDetails.cloneCard.useMutation();
+  const moveCardMutation = trpc.cardDetails.moveCard.useMutation();
   const addCommentMutation = trpc.cardDetails.addComment.useMutation();
   const deleteCommentMutation = trpc.cardDetails.deleteComment.useMutation();
   const addAttachmentMutation = trpc.cardDetails.addAttachment.useMutation();
@@ -456,6 +455,27 @@ export default function CardDetailModal({
     }
   };
 
+  const handleCloneCard = async () => {
+    try {
+      await cloneCardMutation.mutateAsync({ cardId });
+      toast.success("Cartão clonado com sucesso!");
+      await utils.cards.getByList.invalidate();
+    } catch (error) {
+      toast.error("Erro ao clonar cartão");
+    }
+  };
+
+  const handleMoveCard = async (targetListId: number) => {
+    try {
+      await moveCardMutation.mutateAsync({ cardId, targetListId });
+      toast.success("Cartão movido com sucesso!");
+      onClose();
+      await utils.cards.getByList.invalidate();
+    } catch (error) {
+      toast.error("Erro ao mover cartão");
+    }
+  };
+
   const handleArchiveCard = async () => {
     try {
       await archiveCardMutation.mutateAsync({ id: cardId, archived: true });
@@ -647,28 +667,81 @@ export default function CardDetailModal({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleUpdateStatus(card?.status === "completed" ? "open" : "completed")}
-                className={cn(
-                  "h-9 px-4 rounded-lg font-black uppercase tracking-widest text-[10px] transition-all",
-                  card?.status === "completed" 
-                    ? "bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20" 
-                    : "bg-accent/10 text-accent border-accent/20 hover:bg-accent/20"
-                )}
-              >
-                {card?.status === "completed" ? (
-                  <><Check size={14} className="mr-2" /> Concluído</>
-                ) : (
-                  "Concluir Cartão"
-                )}
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setIsMaximized(!isMaximized)}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleUpdateStatus(card?.status === "completed" ? "open" : "completed")}
+                  className={cn(
+                    "h-9 px-4 rounded-lg font-black uppercase tracking-widest text-[10px] transition-all",
+                    card?.status === "completed" 
+                      ? "bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20" 
+                      : "bg-accent/10 text-accent border-accent/20 hover:bg-accent/20"
+                  )}
+                >
+                  {card?.status === "completed" ? (
+                    <><Check size={14} className="mr-2" /> Concluído</>
+                  ) : (
+                    "Concluir Cartão"
+                  )}
+                </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="hover:bg-accent/10 h-9 w-9 rounded-lg text-gray-400">
+                      <MoreHorizontal size={18} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 bg-[#1a1a1a] border-[#333]">
+                    <DropdownMenuItem onClick={handleCloneCard} className="flex items-center gap-2.5 p-2.5 hover:bg-white/5 cursor-pointer text-xs font-bold text-gray-200">
+                      <Copy size={14} className="text-blue-400" /> Clonar Cartão
+                    </DropdownMenuItem>
+                    
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="flex items-center gap-2.5 p-2.5 hover:bg-white/5 cursor-pointer text-xs font-bold text-gray-200">
+                        <MoveHorizontal size={14} className="text-amber-400" /> Mover para outro quadro
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent className="w-56 bg-[#1a1a1a] border-[#333] p-1">
+                          {allBoards?.map((b: any) => (
+                            <DropdownMenuSub key={b.id}>
+                              <DropdownMenuSubTrigger className="flex items-center gap-2.5 p-2.5 hover:bg-white/5 cursor-pointer text-[11px] font-bold text-gray-300">
+                                {b.name}
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuPortal>
+                                <DropdownMenuSubContent className="w-56 bg-[#1a1a1a] border-[#333] p-1">
+                                  {b.lists?.map((l: any) => (
+                                    <DropdownMenuItem 
+                                      key={l.id} 
+                                      onClick={() => handleMoveCard(l.id)}
+                                      className="flex items-center gap-2.5 p-2.5 hover:bg-white/5 cursor-pointer text-[10px] font-bold text-gray-400"
+                                    >
+                                      {l.name}
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuSubContent>
+                              </DropdownMenuPortal>
+                            </DropdownMenuSub>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+
+                    <DropdownMenuSeparator className="bg-[#333]" />
+                    
+                    <DropdownMenuItem onClick={handleArchiveCard} className="flex items-center gap-2.5 p-2.5 hover:bg-white/5 cursor-pointer text-xs font-bold text-amber-400">
+                      <Archive size={14} /> Arquivar Cartão
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDeleteCard} className="flex items-center gap-2.5 p-2.5 hover:bg-red-500/10 cursor-pointer text-xs font-bold text-red-400">
+                      <Trash2 size={14} /> Excluir Cartão
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setIsMaximized(!isMaximized)}
                 className={cn(
                   "hover:bg-accent/10 h-9 w-9 rounded-lg transition-all duration-300",
                   isMaximized ? "text-accent bg-accent/5" : "text-gray-400"
@@ -1145,7 +1218,7 @@ export default function CardDetailModal({
                           <div className="grid gap-3">
                             {groupItems.map((item: any) => {
                               const isItemOverdue = item.due_date && isBefore(new Date(item.due_date), new Date()) && !item.completed;
-                              const assignedUserSource = ((boardMembers as any[]) || allUsers || []) as any[];
+                              const assignedUserSource = (allUsers || boardMembers || []) as any[];
                               // Compatível com payload em snake_case (assigned_user_id) e camelCase (assignedUserId)
                               const assignedUserId = item.assignedUserId ?? item.assigned_user_id;
                               const assignedUser = assignedUserSource.find((u: any) => (u.id || u.userId) === assignedUserId);
@@ -1215,7 +1288,7 @@ export default function CardDetailModal({
                                                     </div>
                                                     <span className="font-bold text-red-400">Remover do item</span>
                                                   </CommandItem>
-                                                  {((boardMembers as any[]) || allUsers || []).map((u: any) => (
+                                                  {((allUsers || boardMembers || []) as any[]).map((u: any) => (
                                                     <CommandItem
                                                       key={u.id || u.userId}
                                                       onSelect={() => {
