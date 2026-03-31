@@ -7,6 +7,8 @@ import { Plus, LogOut, Settings, Users } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useBranding } from "@/contexts/BrandingContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface TrelloDashboardLayoutProps {
   children: React.ReactNode;
@@ -15,6 +17,8 @@ interface TrelloDashboardLayoutProps {
 export default function TrelloDashboardLayout({ children }: TrelloDashboardLayoutProps) {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
+  const { appName, appLogo } = useBranding();
+  const { theme } = useTheme();
   
   // Ativa sincronização global para a barra lateral (boards)
   useRealtimeSync();
@@ -45,12 +49,18 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
       <aside className="w-64 bg-primary text-primary-foreground border-r border-border flex flex-col">
         <div className="p-6 border-b border-primary-foreground/10">
           <Link href="/">
-            <h1 className="text-2xl font-bold flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
-                <span className="text-primary font-bold">M</span>
-              </div>
-              Maju Tasks
-            </h1>
+            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity overflow-hidden">
+              {appLogo ? (
+                <img src={appLogo} alt={appName} className="h-10 w-auto object-contain" />
+              ) : (
+                <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-primary font-bold">{appName.charAt(0)}</span>
+                </div>
+              )}
+              <h1 className="text-xl font-bold truncate">
+                {appName}
+              </h1>
+            </div>
           </Link>
           <p className="text-sm text-primary-foreground/70 mt-1">{t("layout.taskManager")}</p>
         </div>
@@ -84,10 +94,10 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
             ) : boards && boards.length > 0 ? (
               <div className="space-y-2">
                 {boards.map((board) => (
-                  <Link key={board.id} href={`/board/${board.id}`} className="block p-3 rounded-lg hover:bg-primary-foreground/10 transition-colors text-sm font-medium">
+                  <Link key={board.id} href={`/board/${board.id}`} className="block p-3 rounded-lg hover:bg-primary-foreground/10 transition-colors text-sm font-medium" style={{ color: 'var(--sidebar-board-text)' }}>
                     <div className="flex items-center gap-2">
                       <div
-                        className="w-3 h-3 rounded-full"
+                        className="w-3 h-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: board.color }}
                       />
                       <span className="truncate">{board.name}</span>

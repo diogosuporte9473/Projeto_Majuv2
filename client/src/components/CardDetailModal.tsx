@@ -13,7 +13,7 @@ import {
   AlignLeft, LayoutGrid, Clock, Copy, Archive, Trash, 
   MessageSquare, Paperclip, Send, MoreVertical, Maximize2, Minimize2, 
   CalendarDays, User as UserIcon, Edit2, FileText, ImageIcon,
-  Check, ChevronsUpDown
+  Check, ChevronsUpDown, MoreHorizontal, MoveHorizontal
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -23,7 +23,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Progress } from "@/components/ui/progress";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
+  DropdownMenuSubContent,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
 import { format, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -703,7 +713,7 @@ export default function CardDetailModal({
                       </DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent className="w-56 bg-[#1a1a1a] border-[#333] p-1">
-                          {allBoards?.map((b: any) => (
+                          {userBoards?.map((b: any) => (
                             <DropdownMenuSub key={b.id}>
                               <DropdownMenuSubTrigger className="flex items-center gap-2.5 p-2.5 hover:bg-white/5 cursor-pointer text-[11px] font-bold text-gray-300">
                                 {b.name}

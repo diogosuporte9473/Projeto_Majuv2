@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useLanguage, type AppLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useBranding } from "@/contexts/BrandingContext";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +41,7 @@ export default function Settings() {
   return (
     <TrelloDashboardLayout>
       <div className="p-8 max-w-4xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-8 text-center sm:text-left">
           <h1 className="text-3xl font-bold text-foreground mb-2">
             {isEnglish ? "Settings" : "Configurações"}
           </h1>
@@ -50,20 +51,26 @@ export default function Settings() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'} mb-8`}>
-            <TabsTrigger value="profile" className="flex items-center gap-2">
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-4' : 'grid-cols-2'} mb-8 h-auto flex-wrap gap-2 sm:gap-0 bg-transparent sm:bg-muted`}>
+            <TabsTrigger value="profile" className="flex items-center gap-2 py-3">
               <User className="w-4 h-4" />
               {isEnglish ? "Profile" : "Perfil"}
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <TabsTrigger value="notifications" className="flex items-center gap-2 py-3">
               <Bell className="w-4 h-4" />
               {isEnglish ? "Notifications" : "Notificações"}
             </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="users" className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                {isEnglish ? "Users" : "Usuários"}
-              </TabsTrigger>
+              <>
+                <TabsTrigger value="branding" className="flex items-center gap-2 py-3">
+                  <Shield className="w-4 h-4" />
+                  {isEnglish ? "Branding" : "Personalização"}
+                </TabsTrigger>
+                <TabsTrigger value="users" className="flex items-center gap-2 py-3">
+                  <Users className="w-4 h-4" />
+                  {isEnglish ? "Users" : "Usuários"}
+                </TabsTrigger>
+              </>
             )}
           </TabsList>
 
@@ -76,13 +83,125 @@ export default function Settings() {
           </TabsContent>
 
           {isAdmin && (
-            <TabsContent value="users">
-              <UserManagement />
-            </TabsContent>
+            <>
+              <TabsContent value="branding">
+                <BrandingSettings />
+              </TabsContent>
+              <TabsContent value="users">
+                <UserManagement />
+              </TabsContent>
+            </>
           )}
         </Tabs>
       </div>
     </TrelloDashboardLayout>
+  );
+}
+
+function BrandingSettings() {
+  const { appName, appLogo, setAppName, setAppLogo } = useBranding();
+  const { language } = useLanguage();
+  const isEnglish = language === "en";
+
+  const [localName, setLocalName] = useState(appName);
+  const [localLogo, setLocalLogo] = useState(appLogo);
+
+  const handleSave = () => {
+    setAppName(localName);
+    setAppLogo(localLogo);
+    toast.success(isEnglish ? "Branding updated successfully!" : "Personalização atualizada com sucesso!");
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLocalLogo(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <Card className="p-6 border border-border">
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground mb-4">
+            {isEnglish ? "Branding and Customization" : "Aparência e Marca"}
+          </h3>
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                {isEnglish ? "Application Name" : "Nome da Aplicação"}
+              </label>
+              <input
+                type="text"
+                value={localName}
+                onChange={(e) => setLocalName(e.target.value)}
+                placeholder="Maju Tasks"
+                className="w-full px-4 py-2 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                {isEnglish ? "This name will appear in the header and title of the application." : "Este nome aparecerá no cabeçalho e título da aplicação."}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                {isEnglish ? "Application Logo" : "Logo da Aplicação"}
+              </label>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center overflow-hidden border border-border">
+                  {localLogo ? (
+                    <img src={localLogo} alt="Preview" className="w-full h-full object-contain" />
+                  ) : (
+                    <span className="text-2xl font-bold text-muted-foreground">M</span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    id="logo-upload"
+                  />
+                  <label
+                    htmlFor="logo-upload"
+                    className="cursor-pointer px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors text-center"
+                  >
+                    {isEnglish ? "Upload Logo" : "Upload de Logo"}
+                  </label>
+                  {localLogo && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLocalLogo(null)}
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                    >
+                      {isEnglish ? "Remove Logo" : "Remover Logo"}
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                {isEnglish ? "Supported formats: PNG, JPG, SVG. Recommended height: 40px." : "Formatos suportados: PNG, JPG, SVG. Altura recomendada: 40px."}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-4 border-t border-border">
+          <Button
+            onClick={handleSave}
+            className="bg-accent text-accent-foreground hover:bg-accent/90"
+          >
+            {isEnglish ? "Save Changes" : "Salvar Alterações"}
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }
 
