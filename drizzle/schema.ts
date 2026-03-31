@@ -269,3 +269,14 @@ export const checklistTemplates = pgTable("checklist_templates", {
 
 export type ChecklistTemplate = typeof checklistTemplates.$inferSelect;
 export type InsertChecklistTemplate = typeof checklistTemplates.$inferInsert;
+
+// App Settings - Configurações globais da aplicação (Branding)
+export const appSettings = pgTable("app_settings", {
+  id: serial("id").primaryKey(),
+  appName: text("app_name").default("Maju Tasks").notNull(),
+  appLogoUrl: text("app_logo_url"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type AppSetting = typeof appSettings.$inferSelect;
+export type InsertAppSetting = typeof appSettings.$inferInsert;
