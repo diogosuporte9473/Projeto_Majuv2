@@ -42,7 +42,7 @@ class SDKServer {
             if (/^\d+$/.test(sub)) {
               user = await db.getUserById(parseInt(sub));
             } else {
-              const username = payload.user_metadata?.username || (payload.email as string)?.split('@')[0];
+              const username = (payload.user_metadata as any)?.username || (payload.email as string)?.split('@')[0];
               if (username) user = await db.getUserByUsername(username);
             }
 
