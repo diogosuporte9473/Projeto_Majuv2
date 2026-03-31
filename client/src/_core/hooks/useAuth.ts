@@ -54,19 +54,6 @@ export function useAuth(options?: UseAuthOptions) {
   ]);
 
   useEffect(() => {
-    if (meQuery.data) {
-      try {
-        localStorage.setItem(
-          "manus-runtime-user-info",
-          JSON.stringify(meQuery.data)
-        );
-      } catch (e) {
-        console.warn("[Auth] Failed to save user info to localStorage", e);
-      }
-    }
-  }, [meQuery.data]);
-
-  useEffect(() => {
     if (!redirectOnUnauthenticated) return;
     if (meQuery.isLoading || logoutMutation.isPending) return;
     if (state.user) return;
