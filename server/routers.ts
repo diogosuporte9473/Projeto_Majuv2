@@ -226,7 +226,7 @@ export const appRouter = router({
         }
 
         // EM VEZ DE GERAR TOKEN MANUAL, USAR O TOKEN DO SUPABASE
-        const sessionToken = data.session?.access_token;
+        const sessionToken = authData.session?.access_token;
         if (!sessionToken) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No access token returned from Supabase" });
         }
@@ -234,7 +234,7 @@ export const appRouter = router({
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, {
           ...cookieOptions,
-          maxAge: (data.session?.expires_in || 3600) * 1000,
+          maxAge: (authData.session?.expires_in || 3600) * 1000,
         });
 
         return user;
