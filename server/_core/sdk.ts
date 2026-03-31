@@ -2,81 +2,63 @@ import { ForbiddenError } from "../../shared/_core/errors.js";
 import type { User } from "../../drizzle/schema.js";
 import * as db from "../db.js";
 import { COOKIE_NAME } from "../../shared/const.js";
-import { jwtVerify, createRemoteJWKSet } from "jose";
+import { jwtVerify } from "jose";
 import { ENV } from "./env.js";
+import { supabase } from "./supabase.js";
 
 const rawJwtSecret = (ENV.cookieSecret || "").trim();
 const JWT_SECRET = rawJwtSecret.length >= 32 ? new TextEncoder().encode(rawJwtSecret) : null;
-const JWKS = createRemoteJWKSet(new URL(ENV.supabaseJwksUrl));
 
 class SDKServer {
   async authenticateRequest(req: any): Promise<User> {
-    // 1. Try Cookie Auth (JWT)
     const token = req.cookies?.[COOKIE_NAME];
     
     if (token) {
-      let payload: any = null;
-      let error: any = null;
+      // 1. TENTATIVA PRIMÁRIA: Supabase Auth Service (Fonte da Verdade)
+      // O SDK lida corretamente com HS256 usando o JWT_SECRET configurado internamente.
+      const { data: { user: sbUser }, error: sbError } = await supabase.auth.getUser(token);
 
-      // 1.1 Tenta verificar como token do Supabase (JWKS)
-      try {
-        const result = await jwtVerify(token, JWKS);
-        payload = result.payload;
-      } catch (e) {
-        error = e;
-      }
-
-      // 1.2 Se falhar e tivermos uma chave interna, tenta verificar como token interno (HS256)
-      if (!payload && JWT_SECRET) {
-        try {
-          const result = await jwtVerify(token, JWT_SECRET);
-          payload = result.payload;
-          error = null; // Limpa erro anterior se funcionar com a chave interna
-        } catch (e) {
-          error = e;
-        }
-      }
-
-      if (payload) {
-        // 2. Identificar o usuário
-        const sub = payload.sub;
-        let user: User | null = null;
-
-        console.log(`[Auth] Payload sub: ${sub}, email: ${payload.email}`);
-
-        if (sub) {
-          // 2.1 Tenta buscar pelo ID numérico primeiro (comportamento antigo/interno)
-          if (/^\d+$/.test(sub)) {
-            user = await db.getUserById(parseInt(sub));
-          } 
-          
-          // 2.2 Se não encontrou ou sub não é numérico, busca por email ou username
-          if (!user) {
-            const email = payload.email;
-            const username = payload.user_metadata?.username || email?.split('@')[0];
-            
-            if (username) {
-              console.log(`[Auth] Searching by username: ${username}`);
-              user = await db.getUserByUsername(username);
-            }
+      if (!sbError && sbUser) {
+        const email = sbUser.email;
+        const username = sbUser.user_metadata?.username || email?.split('@')[0];
+        
+        if (username) {
+          const user = await db.getUserByUsername(username);
+          if (user) {
+            console.log(`[Auth] User authenticated via Supabase: ${user.username}`);
+            return user;
           }
         }
+      }
 
-        if (user) {
-          console.log(`[Auth] User authenticated: ${user.username} (ID: ${user.id})`);
-          return user;
-        } else {
-          console.warn(`[Auth] User not found in database for sub: ${sub}`);
+      // 2. FALLBACK: Verificação Manual (Para usuários antigos ou tokens internos)
+      if (JWT_SECRET) {
+        try {
+          const { payload } = await jwtVerify(token, JWT_SECRET);
+          const sub = payload.sub;
+          
+          if (sub) {
+            let user: User | null = null;
+            if (/^\d+$/.test(sub)) {
+              user = await db.getUserById(parseInt(sub));
+            } else {
+              const username = payload.user_metadata?.username || (payload.email as string)?.split('@')[0];
+              if (username) user = await db.getUserByUsername(username);
+            }
+
+            if (user) {
+              console.log(`[Auth] User authenticated via Manual JWT: ${user.username}`);
+              return user;
+            }
+          }
+        } catch (manualError) {
+          // Apenas loga aviso, pois o erro final será lançado no final da função
+          console.warn("[Auth] Manual JWT fallback failed or expired");
         }
       }
 
-      if (error) {
-        if (error.code === "ERR_JWT_EXPIRED" || error.code === "ERR_JWS_INVALID" || error.code === "ERR_JWT_CLAIM_INVALID") {
-          console.warn("[Auth] Invalid, expired or claim-mismatched JWT token");
-        } else {
-          console.error("[Auth] JWT verification error:", error);
-          throw error;
-        }
+      if (sbError) {
+        console.error("[Auth] Supabase verification error:", sbError.message);
       }
     }
 

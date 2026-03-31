@@ -15,11 +15,12 @@ export async function createContext(
 
   try {
     user = await sdk.authenticateRequest(opts.req);
-  } catch (error) {
-    // Authentication is optional for public procedures.
-    // Mas vamos logar se for algo diferente de "Invalid session" para debugar erro 500
-    if (error instanceof Error && error.message !== "Invalid session") {
-      console.error("[Context] Auth error:", error);
+  } catch (error: any) {
+    // A autenticação é opcional para procedimentos públicos.
+    // Silencia erros de "sessão inválida" para evitar spam nos logs, 
+    // mas loga erros críticos (como falha na conexão com o banco).
+    if (error?.message !== "Invalid session") {
+      console.error("[Context] Unexpected Auth Error:", error);
     }
     user = null;
   }
