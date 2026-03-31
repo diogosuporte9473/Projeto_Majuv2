@@ -988,7 +988,7 @@ export const appRouter = router({
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
-        // Sincronizar com espelhos
+        // Sincronizar com espelhos e Trigger Realtime
         try {
           const { data: mirrors } = await supabase
             .from("mirrored_cards")
@@ -1005,8 +1005,12 @@ export const appRouter = router({
                 label: input.label,
                 color: input.color || "#4b4897",
               });
+              // Trigger realtime update no card espelhado
+              await supabase.from("cards").update({ updated_at: new Date().toISOString() }).eq("id", cardId);
             }
           }
+          // Trigger realtime update no card original
+          await supabase.from("cards").update({ updated_at: new Date().toISOString() }).eq("id", input.cardId);
         } catch (e) {
           console.error("[Mirror Sync] Label add sync failed:", e);
         }
@@ -1022,7 +1026,7 @@ export const appRouter = router({
         const { error } = await supabase.from("card_labels").delete().eq("id", input.id);
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
-        // Sincronizar com espelhos
+        // Sincronizar com espelhos e Trigger Realtime
         if (labelToDelete) {
           try {
             const { data: mirrors } = await supabase
@@ -1039,7 +1043,14 @@ export const appRouter = router({
                 .delete()
                 .in("card_id", relatedCardIds)
                 .eq("label", labelToDelete.label);
+
+              for (const targetId of relatedCardIds) {
+                // Trigger realtime update no card espelhado
+                await supabase.from("cards").update({ updated_at: new Date().toISOString() }).eq("id", targetId);
+              }
             }
+            // Trigger realtime update no card original
+            await supabase.from("cards").update({ updated_at: new Date().toISOString() }).eq("id", labelToDelete.card_id);
           } catch (e) {
             console.error("[Mirror Sync] Label delete sync failed:", e);
           }
@@ -1053,7 +1064,7 @@ export const appRouter = router({
         try {
           const { error } = await supabase
             .from("cards")
-            .update({ description: input.description })
+            .update({ description: input.description, updated_at: new Date().toISOString() })
             .eq("id", input.cardId);
 
           if (error) {
@@ -1077,7 +1088,7 @@ export const appRouter = router({
 
               await supabase
                 .from("cards")
-                .update({ description: input.description })
+                .update({ description: input.description, updated_at: new Date().toISOString() })
                 .in("id", relatedCardIds);
             }
           } catch (e) {
@@ -1099,7 +1110,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const { error } = await supabase
           .from("cards")
-          .update({ due_date: input.dueDate ? input.dueDate.toISOString() : null })
+          .update({ due_date: input.dueDate ? input.dueDate.toISOString() : null, updated_at: new Date().toISOString() })
           .eq("id", input.cardId);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
@@ -1117,7 +1128,7 @@ export const appRouter = router({
 
             await supabase
               .from("cards")
-              .update({ due_date: input.dueDate ? input.dueDate.toISOString() : null })
+              .update({ due_date: input.dueDate ? input.dueDate.toISOString() : null, updated_at: new Date().toISOString() })
               .in("id", relatedCardIds);
           }
         } catch (e) {
@@ -1132,7 +1143,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const { error } = await supabase
           .from("cards")
-          .update({ start_date: input.startDate ? input.startDate.toISOString() : null })
+          .update({ start_date: input.startDate ? input.startDate.toISOString() : null, updated_at: new Date().toISOString() })
           .eq("id", input.cardId);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
@@ -1150,7 +1161,7 @@ export const appRouter = router({
 
             await supabase
               .from("cards")
-              .update({ start_date: input.startDate ? input.startDate.toISOString() : null })
+              .update({ start_date: input.startDate ? input.startDate.toISOString() : null, updated_at: new Date().toISOString() })
               .in("id", relatedCardIds);
           }
         } catch (e) {
@@ -1165,7 +1176,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const { error } = await supabase
           .from("cards")
-          .update({ assigned_to: input.userId })
+          .update({ assigned_to: input.userId, updated_at: new Date().toISOString() })
           .eq("id", input.cardId);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
@@ -1183,7 +1194,7 @@ export const appRouter = router({
 
             await supabase
               .from("cards")
-              .update({ assigned_to: input.userId })
+              .update({ assigned_to: input.userId, updated_at: new Date().toISOString() })
               .in("id", relatedCardIds);
           }
         } catch (e) {
@@ -1196,12 +1207,16 @@ export const appRouter = router({
     updateStatus: protectedProcedure
       .input(z.object({ cardId: z.number(), status: z.enum(["open", "completed"]) }))
       .mutation(async ({ input }) => {
+        // Atualiza o cartão principal
         const { error } = await supabase
           .from("cards")
-          .update({ status: input.status })
+          .update({ status: input.status, updated_at: new Date().toISOString() })
           .eq("id", input.cardId);
 
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        if (error) {
+          console.error("[Database] Status update failed:", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        }
 
         // Sincronizar com espelhos
         try {
@@ -1216,7 +1231,7 @@ export const appRouter = router({
 
             await supabase
               .from("cards")
-              .update({ status: input.status })
+              .update({ status: input.status, updated_at: new Date().toISOString() })
               .in("id", relatedCardIds);
           }
         } catch (e) {
@@ -1224,6 +1239,91 @@ export const appRouter = router({
         }
 
         return { success: true };
+      }),
+
+    cloneCard: protectedProcedure
+      .input(z.object({ cardId: z.number(), listId: z.number().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        // 1. Buscar dados do cartão original
+        const { data: original, error: fetchError } = await supabase
+          .from("cards")
+          .select("*")
+          .eq("id", input.cardId)
+          .single();
+
+        if (fetchError || !original) throw new TRPCError({ code: "NOT_FOUND", message: "Cartão original não encontrado" });
+
+        // 2. Criar novo cartão (clone)
+        const { data: clone, error: cloneError } = await supabase
+          .from("cards")
+          .insert({
+            title: `${original.title} (Cópia)`,
+            description: original.description,
+            list_id: input.listId || original.list_id,
+            position: original.position + 1,
+            start_date: original.start_date,
+            due_date: original.due_date,
+            assigned_to: original.assigned_to,
+            created_by: ctx.user.id,
+            status: original.status,
+          })
+          .select("id")
+          .single();
+
+        if (cloneError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao clonar cartão" });
+
+        // 3. Clonar Etiquetas
+        const { data: labels } = await supabase.from("card_labels").select("label, color").eq("card_id", input.cardId);
+        if (labels && labels.length > 0) {
+          await supabase.from("card_labels").insert(labels.map(l => ({ ...l, card_id: clone.id })));
+        }
+
+        // 4. Clonar Checklists
+        const { data: groups } = await supabase.from("card_checklist_groups").select("*").eq("card_id", input.cardId);
+        if (groups) {
+          for (const group of groups) {
+            const { data: newGroup } = await supabase.from("card_checklist_groups")
+              .insert({ card_id: clone.id, title: group.title, position: group.position })
+              .select("id").single();
+            
+            if (newGroup) {
+              const { data: items } = await supabase.from("card_checklists").select("*").eq("group_id", group.id);
+              if (items) {
+                await supabase.from("card_checklists").insert(items.map(i => ({
+                  card_id: clone.id,
+                  group_id: newGroup.id,
+                  title: i.title,
+                  completed: i.completed,
+                  position: i.position,
+                  assigned_user_id: i.assigned_user_id
+                })));
+              }
+            }
+          }
+        }
+
+        return { id: clone.id };
+      }),
+
+    moveCard: protectedProcedure
+      .input(z.object({ cardId: z.number(), targetListId: z.number() }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("cards")
+          .update({ list_id: input.targetListId, updated_at: new Date().toISOString() })
+          .eq("id", input.cardId);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao mover cartão" });
+        return { success: true };
+      }),
+
+    getCardUsers: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async () => {
+        // Retorna todos os usuários para permitir atribuição no checklist sem restrição de board
+        const { data, error } = await supabase.from("users").select("id, name, username");
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return data;
       }),
 
     getMirroredInfo: protectedProcedure
@@ -1541,7 +1641,13 @@ export const appRouter = router({
         return { success: true };
       }),
     addChecklist: protectedProcedure
-      .input(z.object({ cardId: z.number(), groupId: z.number().optional(), title: z.string(), position: z.number().optional() }))
+      .input(z.object({ 
+        cardId: z.number(), 
+        groupId: z.number().optional(), 
+        title: z.string(), 
+        position: z.number().optional(),
+        assignedUserId: z.number().nullish()
+      }))
       .mutation(async ({ input }) => {
         const query = supabase.from("card_checklists").select("position").eq("card_id", input.cardId);
         if (input.groupId) query.eq("group_id", input.groupId);
@@ -1557,6 +1663,7 @@ export const appRouter = router({
             title: input.title,
             position: input.position ?? nextPosition,
             completed: false,
+            assigned_user_id: input.assignedUserId
           })
           .select("id")
           .single();
@@ -1623,6 +1730,7 @@ export const appRouter = router({
                       title: input.title,
                       position: finalPosition,
                       completed: false,
+                      assigned_user_id: input.assignedUserId
                     });
                   }
                 }
@@ -1735,6 +1843,24 @@ export const appRouter = router({
         } catch (syncError) {
           console.error("[Mirror Sync] Failed to sync checklist item:", syncError);
           // Não lançamos erro aqui para não travar a atualização principal
+        }
+
+        // 3. Forçar atualização do card em tempo real para todos os espelhos
+        try {
+          await supabase.from("cards").update({ updated_at: new Date().toISOString() }).eq("id", updatedItem.card_id);
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("*")
+            .or(`original_card_id.eq.${updatedItem.card_id},mirror_card_id.eq.${updatedItem.card_id}`);
+          
+          if (mirrors) {
+            const ids = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id]).filter(id => id !== updatedItem.card_id);
+            if (ids.length > 0) {
+              await supabase.from("cards").update({ updated_at: new Date().toISOString() }).in("id", ids);
+            }
+          }
+        } catch (e) {
+          console.error("[Realtime Sync] Failed to trigger card update:", e);
         }
 
         return { success: true };
@@ -1907,7 +2033,7 @@ export const appRouter = router({
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
-        // Sincronizar com espelhos
+        // Sincronizar com espelhos e Trigger Realtime
         try {
           const { data: mirrors } = await supabase
             .from("mirrored_cards")
@@ -1927,8 +2053,13 @@ export const appRouter = router({
                   field_value: input.fieldValue,
                   field_type: input.fieldType || "text",
                 }, { onConflict: 'card_id,field_name' });
+              
+              // Trigger realtime update no card espelhado
+              await supabase.from("cards").update({ updated_at: new Date().toISOString() }).eq("id", cardId);
             }
           }
+          // Trigger realtime update no card original
+          await supabase.from("cards").update({ updated_at: new Date().toISOString() }).eq("id", input.cardId);
         } catch (e) {
           console.error("[Mirror Sync] Custom field sync failed:", e);
         }
