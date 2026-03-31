@@ -60,7 +60,7 @@ export default function CardDetailModal({
   const isEnglish = language === "en";
 
   // Queries
-  const { data: card, isLoading: cardLoading } = trpc.cards.getDetails.useQuery({ id: cardId });
+  const { data: card, isLoading: cardLoading } = trpc.cardDetails.getDetails.useQuery({ id: cardId });
   const { data: labels } = trpc.cardDetails.getLabels.useQuery({ cardId });
   const { data: checklists, isLoading: checklistsLoading } = trpc.cardDetails.getChecklists.useQuery({ cardId });
   const { data: comments } = trpc.cardDetails.getComments.useQuery({ cardId });
@@ -95,6 +95,7 @@ export default function CardDetailModal({
   const updateDueDateMutation = trpc.cardDetails.updateDueDate.useMutation();
   const updateStartDateMutation = trpc.cardDetails.updateStartDate.useMutation();
   const updateAssignedToMutation = trpc.cardDetails.updateAssignedTo.useMutation();
+  const updateStatusMutation = trpc.cardDetails.updateStatus.useMutation();
   const upsertCustomFieldMutation = trpc.cardDetails.upsertCustomField.useMutation();
   const createMirrorMutation = trpc.cardDetails.createMirror.useMutation();
   const archiveCardMutation = trpc.cardDetails.archiveCard.useMutation();
@@ -325,9 +326,24 @@ export default function CardDetailModal({
         cardId,
         description,
       });
+      await utils.cardDetails.getDetails.invalidate({ id: cardId });
       toast.success("Descrição atualizada");
     } catch (error) {
       toast.error("Erro ao atualizar descrição");
+    }
+  };
+
+  const handleUpdateStatus = async (newStatus: "open" | "completed") => {
+    try {
+      await updateStatusMutation.mutateAsync({
+        cardId,
+        status: newStatus,
+      });
+      await utils.cardDetails.getDetails.invalidate({ id: cardId });
+      await utils.cards.getByList.invalidate();
+      toast.success(newStatus === "completed" ? "Cartão concluído!" : "Cartão reaberto");
+    } catch (error) {
+      toast.error("Erro ao atualizar status do cartão");
     }
   };
 
@@ -632,6 +648,23 @@ export default function CardDetailModal({
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleUpdateStatus(card?.status === "completed" ? "open" : "completed")}
+                className={cn(
+                  "h-9 px-4 rounded-lg font-black uppercase tracking-widest text-[10px] transition-all",
+                  card?.status === "completed" 
+                    ? "bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20" 
+                    : "bg-accent/10 text-accent border-accent/20 hover:bg-accent/20"
+                )}
+              >
+                {card?.status === "completed" ? (
+                  <><Check size={14} className="mr-2" /> Concluído</>
+                ) : (
+                  "Concluir Cartão"
+                )}
+              </Button>
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -1523,18 +1556,50 @@ export default function CardDetailModal({
                 )}
 
                 {/* Info Card (Visible in sidebar) */}
-                <div className="bg-white/[0.02] p-3 rounded-xl border border-white/[0.05] space-y-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest flex-shrink-0">Responsável</span>
-                    <span className="text-[9px] font-black text-gray-300 truncate">
-                      {card?.assignedToName || "Nenhum"}
-                    </span>
+                <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.05] space-y-4">
+                  <div className="space-y-1.5">
+                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">Situação Atual</span>
+                    <div className={cn(
+                      "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter",
+                      card?.status === "completed" ? "bg-green-500/10 text-green-500" : "bg-blue-500/10 text-blue-400"
+                    )}>
+                      <div className={cn("w-1 h-1 rounded-full mr-2", card?.status === "completed" ? "bg-green-500" : "bg-blue-400")} />
+                      {card?.status === "completed" ? "Concluído" : "Aberto"}
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest flex-shrink-0">Criado em</span>
-                    <span className="text-[9px] font-black text-gray-300 truncate">
-                      {card?.created_at ? format(new Date(card.created_at), "dd/MM/yyyy") : "-"}
-                    </span>
+
+                  {card?.linkedBoards && card.linkedBoards.length > 0 && (
+                    <div className="space-y-2.5 pt-2 border-t border-white/[0.05]">
+                      <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">Quadros Vinculados</span>
+                      <div className="grid gap-2">
+                        {card.linkedBoards.map((b: any) => (
+                          <div key={b.id} className="flex items-center justify-between gap-2 group/link">
+                            <span className="text-[10px] font-black text-gray-300 truncate max-w-[120px]">{b.name}</span>
+                            <span className={cn(
+                              "text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter",
+                              b.type === "Matriz" ? "bg-purple-500/10 text-purple-400" : "bg-amber-500/10 text-amber-400"
+                            )}>
+                              {b.type}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-white/[0.05] space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest flex-shrink-0">Responsável</span>
+                      <span className="text-[9px] font-black text-gray-300 truncate">
+                        {card?.assignedToName || "Nenhum"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest flex-shrink-0">Criado em</span>
+                      <span className="text-[9px] font-black text-gray-300 truncate">
+                        {card?.created_at ? format(new Date(card.created_at), "dd/MM/yyyy") : "-"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
