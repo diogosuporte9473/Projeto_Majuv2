@@ -928,6 +928,46 @@ export const appRouter = router({
 
   // Labels, Checklists, Custom Fields and Project Dates
   cardDetails: router({
+    getDetails: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const { data: card, error } = await supabase
+          .from("cards")
+          .select(`
+            *,
+            list:list_id(id, name, board:board_id(id, name))
+          `)
+          .eq("id", input.id)
+          .single();
+
+        if (error) throw new TRPCError({ code: "NOT_FOUND", message: "Card not found" });
+
+        const { data: mirrors } = await supabase
+          .from("mirrored_cards")
+          .select(`
+            original_card_id,
+            mirror_card_id,
+            original_board:original_board_id(id, name),
+            mirror_board:mirror_board_id(id, name)
+          `)
+          .or(`original_card_id.eq.${input.id},mirror_card_id.eq.${input.id}`);
+
+        const linkedBoards = mirrors?.map((m: any) => {
+          const isOriginal = m.original_card_id === input.id;
+          const board = isOriginal ? m.mirror_board : m.original_board;
+          return {
+            id: board.id,
+            name: board.name,
+            type: isOriginal ? "Filial" : "Matriz"
+          };
+        }) || [];
+
+        return {
+          ...card,
+          linkedBoards
+        };
+      }),
+
     getLabels: protectedProcedure
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {
@@ -1129,7 +1169,100 @@ export const appRouter = router({
           .eq("id", input.cardId);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar com espelhos
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("*")
+            .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+              .filter(id => id !== input.cardId);
+
+            await supabase
+              .from("cards")
+              .update({ assigned_to: input.userId })
+              .in("id", relatedCardIds);
+          }
+        } catch (e) {
+          console.error("[Mirror Sync] AssignedTo sync failed:", e);
+        }
+
         return { success: true };
+      }),
+
+    updateStatus: protectedProcedure
+      .input(z.object({ cardId: z.number(), status: z.enum(["open", "completed"]) }))
+      .mutation(async ({ input }) => {
+        const { error } = await supabase
+          .from("cards")
+          .update({ status: input.status })
+          .eq("id", input.cardId);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar com espelhos
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("*")
+            .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+              .filter(id => id !== input.cardId);
+
+            await supabase
+              .from("cards")
+              .update({ status: input.status })
+              .in("id", relatedCardIds);
+          }
+        } catch (e) {
+          console.error("[Mirror Sync] Status sync failed:", e);
+        }
+
+        return { success: true };
+      }),
+
+    getMirroredInfo: protectedProcedure
+      .input(z.object({ cardId: z.number() }))
+      .query(async ({ input }) => {
+        const { data: mirrors, error } = await supabase
+          .from("mirrored_cards")
+          .select(`
+            original_card_id,
+            mirror_card_id,
+            original_board_id,
+            mirror_board_id,
+            original_board:original_board_id(id, name),
+            mirror_board:mirror_board_id(id, name)
+          `)
+          .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        const linkedBoards = mirrors.map((m: any) => {
+          const isOriginal = m.original_card_id === input.cardId;
+          const board = isOriginal ? m.mirror_board : m.original_board;
+          return {
+            id: board.id,
+            name: board.name,
+            type: isOriginal ? "Filial" : "Matriz"
+          };
+        });
+
+        const { data: card } = await supabase
+          .from("cards")
+          .select("status")
+          .eq("id", input.cardId)
+          .single();
+
+        return {
+          status: card?.status || "open",
+          linkedBoards
+        };
       }),
 
     archiveCard: protectedProcedure
@@ -1324,17 +1457,55 @@ export const appRouter = router({
     updateChecklistGroup: protectedProcedure
       .input(z.object({ id: z.number(), title: z.string() }))
       .mutation(async ({ input }) => {
+        // 1. Buscar info do grupo antes de atualizar para sincronizar
+        const { data: groupToUpdate } = await supabase
+          .from("card_checklist_groups")
+          .select("card_id, title")
+          .eq("id", input.id)
+          .single();
+
         const { error } = await supabase
           .from("card_checklist_groups")
           .update({ title: input.title })
           .eq("id", input.id);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // 2. Sincronizar com espelhos
+        if (groupToUpdate) {
+          try {
+            const { data: mirrors } = await supabase
+              .from("mirrored_cards")
+              .select("*")
+              .or(`original_card_id.eq.${groupToUpdate.card_id},mirror_card_id.eq.${groupToUpdate.card_id}`);
+
+            if (mirrors && mirrors.length > 0) {
+              const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+                .filter(id => id !== groupToUpdate.card_id);
+
+              await supabase
+                .from("card_checklist_groups")
+                .update({ title: input.title })
+                .in("card_id", relatedCardIds)
+                .eq("title", groupToUpdate.title);
+            }
+          } catch (e) {
+            console.error("[Mirror Sync] Checklist group update sync failed:", e);
+          }
+        }
+
         return { success: true };
       }),
     deleteChecklistGroup: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
+        // 1. Buscar info do grupo antes de deletar para sincronizar
+        const { data: groupToDelete } = await supabase
+          .from("card_checklist_groups")
+          .select("card_id, title")
+          .eq("id", input.id)
+          .single();
+
         await supabase.from("card_checklists").delete().eq("group_id", input.id);
         
         const { error } = await supabase
@@ -1343,6 +1514,30 @@ export const appRouter = router({
           .eq("id", input.id);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // 2. Sincronizar com espelhos
+        if (groupToDelete) {
+          try {
+            const { data: mirrors } = await supabase
+              .from("mirrored_cards")
+              .select("*")
+              .or(`original_card_id.eq.${groupToDelete.card_id},mirror_card_id.eq.${groupToDelete.card_id}`);
+
+            if (mirrors && mirrors.length > 0) {
+              const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+                .filter(id => id !== groupToDelete.card_id);
+
+              await supabase
+                .from("card_checklist_groups")
+                .delete()
+                .in("card_id", relatedCardIds)
+                .eq("title", groupToDelete.title);
+            }
+          } catch (e) {
+            console.error("[Mirror Sync] Checklist group delete sync failed:", e);
+          }
+        }
+
         return { success: true };
       }),
     addChecklist: protectedProcedure
@@ -1561,6 +1756,13 @@ export const appRouter = router({
     deleteChecklist: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
+        // 1. Buscar info do item antes de deletar para sincronizar
+        const { data: itemToDelete } = await supabase
+          .from("card_checklists")
+          .select("card_id, title, group_id")
+          .eq("id", input.id)
+          .single();
+
         const { error } = await supabase
           .from("card_checklists")
           .delete()
@@ -1572,6 +1774,47 @@ export const appRouter = router({
             code: "INTERNAL_SERVER_ERROR",
             message: `Erro ao remover checklist: ${error.message}`,
           });
+        }
+
+        // 2. Sincronizar com espelhos
+        if (itemToDelete) {
+          try {
+            const { data: mirrors } = await supabase
+              .from("mirrored_cards")
+              .select("*")
+              .or(`original_card_id.eq.${itemToDelete.card_id},mirror_card_id.eq.${itemToDelete.card_id}`);
+
+            if (mirrors && mirrors.length > 0) {
+              const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
+                .filter(id => id !== itemToDelete.card_id);
+
+              const { data: groupInfo } = await supabase
+                .from("card_checklist_groups")
+                .select("title")
+                .eq("id", itemToDelete.group_id)
+                .single();
+
+              if (groupInfo) {
+                for (const cardId of relatedCardIds) {
+                  const { data: targetGroups } = await supabase
+                    .from("card_checklist_groups")
+                    .select("id")
+                    .eq("card_id", cardId)
+                    .eq("title", groupInfo.title);
+
+                  if (targetGroups && targetGroups.length > 0) {
+                    await supabase
+                      .from("card_checklists")
+                      .delete()
+                      .in("group_id", targetGroups.map(g => g.id))
+                      .eq("title", itemToDelete.title);
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.error("[Mirror Sync] Checklist item delete sync failed:", e);
+          }
         }
 
         return { success: true };
