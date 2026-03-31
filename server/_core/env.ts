@@ -1,6 +1,6 @@
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
-  cookieSecret: process.env.JWT_SECRET ?? "",
+  cookieSecret: process.env.SUPABASE_JWT_SECRET ?? process.env.JWT_SECRET ?? "",
   // Priorizar DATABASE_URL manual para evitar conflito com Vercel Postgres (POSTGRES_URL)
   databaseUrl: process.env.DATABASE_URL ?? process.env.POSTGRES_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "https://dummy.oauth.url",
@@ -8,9 +8,9 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
-  supabaseUrl: process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
   // Chave server-side (recomendado para bypassar RLS quando necessário)
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  supabaseServiceRoleKey: process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   supabaseJwksUrl: process.env.SUPABASE_JWKS_URL ?? "https://xnymtzblrotxgyzpgnoc.supabase.co/auth/v1/.well-known/jwks.json",
 };
