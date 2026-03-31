@@ -225,17 +225,16 @@ export const appRouter = router({
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "User found in Auth but not in Database" });
         }
 
-        const token = await new SignJWT({})
-          .setProtectedHeader({ alg: "HS256" })
-          .setSubject(user.id.toString())
-          .setIssuedAt()
-          .setExpirationTime("30d")
-          .sign(JWT_SECRET);
+        // EM VEZ DE GERAR TOKEN MANUAL, USAR O TOKEN DO SUPABASE
+        const sessionToken = data.session?.access_token;
+        if (!sessionToken) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No access token returned from Supabase" });
+        }
 
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, token, {
+        ctx.res.cookie(COOKIE_NAME, sessionToken, {
           ...cookieOptions,
-          maxAge: 30 * 24 * 60 * 60 * 1000,
+          maxAge: (data.session?.expires_in || 3600) * 1000,
         });
 
         return user;
@@ -280,17 +279,15 @@ export const appRouter = router({
           role: "user",
         }).returning();
 
-        const token = await new SignJWT({})
-          .setProtectedHeader({ alg: "HS256" })
-          .setSubject(user.id.toString())
-          .setIssuedAt()
-          .setExpirationTime("30d")
-          .sign(JWT_SECRET);
+        const sessionToken = authData.session?.access_token;
+        if (!sessionToken) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Registration successful but no token returned" });
+        }
 
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, token, {
+        ctx.res.cookie(COOKIE_NAME, sessionToken, {
           ...cookieOptions,
-          maxAge: 30 * 24 * 60 * 60 * 1000,
+          maxAge: (authData.session?.expires_in || 3600) * 1000,
         });
 
         return user;
