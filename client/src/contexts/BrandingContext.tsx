@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { trpc } from "@/lib/trpc";
 
 interface BrandingContextType {
   appName: string;
@@ -10,26 +11,26 @@ interface BrandingContextType {
 const BrandingContext = createContext<BrandingContextType | undefined>(undefined);
 
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
-  const [appName, setAppNameState] = useState(() => {
-    return localStorage.getItem('maju_app_name') || 'Maju Tasks';
+  const { data: brandingData } = trpc.branding.get.useQuery(undefined, {
+    staleTime: Infinity, // Mantém os dados por muito tempo
   });
-  
-  const [appLogo, setAppLogoState] = useState(() => {
-    return localStorage.getItem('maju_app_logo') || null;
-  });
+
+  const [appName, setAppNameState] = useState('Maju Tasks');
+  const [appLogo, setAppLogoState] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (brandingData) {
+      setAppNameState(brandingData.appName);
+      setAppLogoState(brandingData.appLogoUrl);
+    }
+  }, [brandingData]);
 
   const setAppName = (name: string) => {
     setAppNameState(name);
-    localStorage.setItem('maju_app_name', name);
   };
 
   const setAppLogo = (logo: string | null) => {
     setAppLogoState(logo);
-    if (logo) {
-      localStorage.setItem('maju_app_logo', logo);
-    } else {
-      localStorage.removeItem('maju_app_logo');
-    }
   };
 
   useEffect(() => {

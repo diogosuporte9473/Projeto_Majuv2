@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useLanguage, type AppLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useBranding } from "@/contexts/BrandingContext";
+import { supabase } from "@/lib/supabase";
 import {
   Dialog,
   DialogContent,
@@ -102,25 +103,58 @@ function BrandingSettings() {
   const { appName, appLogo, setAppName, setAppLogo } = useBranding();
   const { language } = useLanguage();
   const isEnglish = language === "en";
+  const utils = trpc.useUtils();
+  const updateBrandingMutation = trpc.branding.update.useMutation();
 
   const [localName, setLocalName] = useState(appName);
   const [localLogo, setLocalLogo] = useState(appLogo);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleSave = () => {
-    setAppName(localName);
-    setAppLogo(localLogo);
-    toast.success(isEnglish ? "Branding updated successfully!" : "Personalização atualizada com sucesso!");
+  const handleSave = async () => {
+    try {
+      await updateBrandingMutation.mutateAsync({
+        appName: localName,
+        appLogoUrl: localLogo,
+      });
+      setAppName(localName);
+      setAppLogo(localLogo);
+      utils.branding.get.invalidate();
+      toast.success(isEnglish ? "Branding updated successfully!" : "Personalização atualizada com sucesso!");
+    } catch (error: any) {
+      toast.error(isEnglish ? "Error updating branding" : "Erro ao atualizar personalização");
+    }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setLocalLogo(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setIsUploading(true);
+    const toastId = toast.loading(isEnglish ? "Uploading logo..." : "Fazendo upload do logo...");
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `logo-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `branding/${fileName}`;
+
+      const { data, error: uploadError } = await supabase.storage
+        .from('branding')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('branding')
+        .getPublicUrl(filePath);
+
+      setLocalLogo(publicUrl);
+      toast.success(isEnglish ? "Logo uploaded!" : "Logo carregado!", { id: toastId });
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error(isEnglish ? "Error uploading logo" : "Erro ao carregar logo", { id: toastId });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (

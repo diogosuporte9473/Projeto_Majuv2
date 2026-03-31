@@ -94,7 +94,7 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
             ) : boards && boards.length > 0 ? (
               <div className="space-y-2">
                 {boards.map((board) => (
-                  <Link key={board.id} href={`/board/${board.id}`} className="block p-3 rounded-lg hover:bg-primary-foreground/10 transition-colors text-sm font-medium" style={{ color: 'var(--sidebar-board-text)' }}>
+                  <Link key={board.id} href={`/board/${board.id}`} className="block p-3 rounded-lg hover:bg-primary-foreground/10 transition-colors text-sm font-bold" style={{ color: 'var(--sidebar-board-text)' }}>
                     <div className="flex items-center gap-2">
                       <div
                         className="w-3 h-3 rounded-full flex-shrink-0"
