@@ -1252,7 +1252,7 @@ export const appRouter = router({
     updateStatus: protectedProcedure
       .input(z.object({ cardId: z.number(), status: z.enum(["open", "completed"]) }))
       .mutation(async ({ input }) => {
-        // Atualiza o cartão principal
+        // Atualiza apenas o cartão específico solicitado
         const { error } = await supabase
           .from("cards")
           .update({ status: input.status, updated_at: new Date().toISOString() })
@@ -1261,26 +1261,6 @@ export const appRouter = router({
         if (error) {
           console.error("[Database] Status update failed:", error);
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-        }
-
-        // Sincronizar com espelhos
-        try {
-          const { data: mirrors } = await supabase
-            .from("mirrored_cards")
-            .select("*")
-            .or(`original_card_id.eq.${input.cardId},mirror_card_id.eq.${input.cardId}`);
-
-          if (mirrors && mirrors.length > 0) {
-            const relatedCardIds = mirrors.flatMap(m => [m.original_card_id, m.mirror_card_id])
-              .filter(id => id !== input.cardId);
-
-            await supabase
-              .from("cards")
-              .update({ status: input.status, updated_at: new Date().toISOString() })
-              .in("id", relatedCardIds);
-          }
-        } catch (e) {
-          console.error("[Mirror Sync] Status sync failed:", e);
         }
 
         return { success: true };

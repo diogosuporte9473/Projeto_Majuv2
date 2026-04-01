@@ -223,9 +223,18 @@ export async function getUserBoards(userId: number) {
     const { data, error } = await query;
     if (error) throw error;
 
+    // 3. Buscar listas para cada board
+    const boardIds = data?.map(b => b.id) || [];
+    const { data: lists } = await supabase
+      .from("lists")
+      .select("id, board_id, name")
+      .in("board_id", boardIds)
+      .order("position", { ascending: true });
+
     return (data || []).map((b: any) => ({
       ...b,
       ownerId: b.owner_id,
+      lists: (lists || []).filter(l => l.board_id === b.id),
       // Se created_at não existir no banco, retornamos a data atual para não quebrar a UI
       createdAt: b.created_at || b.createdAt || new Date().toISOString(),
       updatedAt: b.updated_at || b.updatedAt || new Date().toISOString()
