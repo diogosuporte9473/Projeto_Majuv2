@@ -134,8 +134,8 @@ function BrandingSettings() {
 
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `logo-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `branding/${fileName}`;
+      const fileName = `logo-${Date.now()}.${fileExt}`;
+      const filePath = fileName; // Removido o prefixo 'branding/' pois já estamos no bucket branding
 
       const { data, error: uploadError } = await supabase.storage
         .from('branding')

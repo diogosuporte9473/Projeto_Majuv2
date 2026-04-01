@@ -645,32 +645,28 @@ export default function CardDetailModal({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 py-0.5">
-                  {card?.startDate && (
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/5 border border-blue-500/10">
-                      <Calendar className="w-3 h-3 text-blue-400" />
-                      <span className="text-[11px] font-medium text-gray-400">
-                        Início: <span className="text-gray-200">{format(new Date(card.startDate), "dd 'de' MMM, yyyy", { locale: ptBR })}</span>
-                      </span>
+                  {(card?.startDate || card?.dueDate) ? (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/20 shadow-sm">
+                      <CalendarDays className="w-3.5 h-3.5 text-accent" />
+                      <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-tight">
+                        {card?.startDate && (
+                          <span className="text-gray-200">
+                            Início: <span className="text-white">{format(new Date(card.startDate), "dd MMM yyyy", { locale: ptBR })}</span>
+                          </span>
+                        )}
+                        {card?.startDate && card?.dueDate && (
+                          <span className="text-accent/40">•</span>
+                        )}
+                        {card?.dueDate && (
+                          <span className={cn(isOverdue ? "text-red-400" : "text-gray-200")}>
+                            Prazo: <span className={cn(isOverdue ? "text-red-400" : "text-white")}>
+                              {format(new Date(card.dueDate), "dd MMM yyyy", { locale: ptBR })}
+                            </span>
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  
-                  {card?.dueDate && (
-                    <div className={cn(
-                      "flex items-center gap-1.5 px-2 py-1 rounded-md border",
-                      isOverdue 
-                        ? "bg-red-500/10 border-red-500/20 animate-pulse" 
-                        : "bg-green-500/5 border-green-500/10"
-                    )}>
-                      <Clock className={cn("w-3 h-3", isOverdue ? "text-red-400" : "text-green-400")} />
-                      <span className="text-[11px] font-medium text-gray-400">
-                        Entrega: <span className={cn(isOverdue ? "text-red-400 font-bold" : "text-gray-200")}>
-                          {format(new Date(card.dueDate), "dd 'de' MMM, yyyy", { locale: ptBR })}
-                        </span>
-                      </span>
-                    </div>
-                  )}
-
-                  {!card?.startDate && !card?.dueDate && (
+                  ) : (
                     <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest opacity-60">Sem datas definidas</span>
                   )}
                 </div>
@@ -712,27 +708,46 @@ export default function CardDetailModal({
                         <MoveHorizontal size={14} className="text-amber-400" /> Mover para outro quadro
                       </DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
-                        <DropdownMenuSubContent className="w-56 bg-[#1a1a1a] border-[#333] p-1">
-                          {userBoards?.map((b: any) => (
-                            <DropdownMenuSub key={b.id}>
-                              <DropdownMenuSubTrigger className="flex items-center gap-2.5 p-2.5 hover:bg-white/5 cursor-pointer text-[11px] font-bold text-gray-300">
-                                {b.name}
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuPortal>
-                                <DropdownMenuSubContent className="w-56 bg-[#1a1a1a] border-[#333] p-1">
-                                  {b.lists?.map((l: any) => (
-                                    <DropdownMenuItem 
-                                      key={l.id} 
-                                      onClick={() => handleMoveCard(l.id)}
-                                      className="flex items-center gap-2.5 p-2.5 hover:bg-white/5 cursor-pointer text-[10px] font-bold text-gray-400"
-                                    >
-                                      {l.name}
-                                    </DropdownMenuItem>
-                                  ))}
-                                </DropdownMenuSubContent>
-                              </DropdownMenuPortal>
-                            </DropdownMenuSub>
-                          ))}
+                        <DropdownMenuSubContent className="w-64 bg-[#1a1a1a] border-[#333] p-1.5 shadow-2xl">
+                          {userBoards?.map((b: any) => {
+                            const isCurrentBoard = b.id === boardId;
+                            return (
+                              <DropdownMenuSub key={b.id}>
+                                <DropdownMenuSubTrigger 
+                                  className={cn(
+                                    "flex items-center gap-2.5 p-3 rounded-md hover:bg-white/5 cursor-pointer text-[11px] font-black uppercase tracking-wider transition-all",
+                                    isCurrentBoard ? "bg-accent text-primary hover:bg-accent/90" : "text-gray-300"
+                                  )}
+                                >
+                                  {b.name}
+                                  {isCurrentBoard && <Check size={12} className="ml-auto" />}
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuPortal>
+                                  <DropdownMenuSubContent className="w-56 bg-[#1e1e1e] border-[#333] p-1.5 shadow-2xl ml-1">
+                                    <div className="px-2 py-1.5 mb-1 border-b border-[#333]">
+                                      <span className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Listas de Destino</span>
+                                    </div>
+                                    {b.lists && b.lists.length > 0 ? (
+                                      b.lists.map((l: any) => (
+                                        <DropdownMenuItem 
+                                          key={l.id} 
+                                          onClick={() => handleMoveCard(l.id)}
+                                          className="flex items-center gap-2.5 p-2.5 rounded hover:bg-accent/10 hover:text-accent cursor-pointer text-[10px] font-bold text-gray-400 transition-colors"
+                                        >
+                                          <LayoutGrid size={12} className="opacity-50" />
+                                          {l.name}
+                                        </DropdownMenuItem>
+                                      ))
+                                    ) : (
+                                      <div className="p-3 text-center">
+                                        <span className="text-[10px] text-gray-500 italic">Nenhuma lista encontrada</span>
+                                      </div>
+                                    )}
+                                  </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
+                              </DropdownMenuSub>
+                            );
+                          })}
                         </DropdownMenuSubContent>
                       </DropdownMenuPortal>
                     </DropdownMenuSub>
