@@ -312,6 +312,7 @@ export default function CardDetailModal({
     try {
       await updateDueDateMutation.mutateAsync({ cardId, dueDate: date });
       await utils.cards.getDetails.invalidate({ id: cardId });
+      await utils.cardDetails.getProjectDates.invalidate({ cardId });
       toast.success("Data de entrega atualizada");
     } catch (error) {
       toast.error("Erro ao atualizar data de entrega");
@@ -322,6 +323,7 @@ export default function CardDetailModal({
     try {
       await updateStartDateMutation.mutateAsync({ cardId, startDate: date });
       await utils.cards.getDetails.invalidate({ id: cardId });
+      await utils.cardDetails.getProjectDates.invalidate({ cardId });
       toast.success("Data de início atualizada");
     } catch (error) {
       toast.error("Erro ao atualizar data de início");
@@ -645,22 +647,24 @@ export default function CardDetailModal({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 py-0.5">
-                  {(card?.startDate || card?.dueDate) ? (
+                  {(card?.startDate || card?.dueDate || projectDates?.start_date || projectDates?.end_date) ? (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/20 shadow-sm">
                       <CalendarDays className="w-3.5 h-3.5 text-accent" />
                       <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-tight">
-                        {card?.startDate && (
+                        {(card?.startDate || projectDates?.start_date) && (
                           <span className="text-gray-200">
-                            Início: <span className="text-white">{format(new Date(card.startDate), "dd MMM yyyy", { locale: ptBR })}</span>
+                            Início: <span className="text-white">
+                              {format(new Date(card?.startDate || projectDates?.start_date), "dd MMM yyyy", { locale: ptBR })}
+                            </span>
                           </span>
                         )}
-                        {card?.startDate && card?.dueDate && (
+                        {(card?.startDate || projectDates?.start_date) && (card?.dueDate || projectDates?.end_date) && (
                           <span className="text-accent/40">•</span>
                         )}
-                        {card?.dueDate && (
+                        {(card?.dueDate || projectDates?.end_date) && (
                           <span className={cn(isOverdue ? "text-red-400" : "text-gray-200")}>
                             Prazo: <span className={cn(isOverdue ? "text-red-400" : "text-white")}>
-                              {format(new Date(card.dueDate), "dd MMM yyyy", { locale: ptBR })}
+                              {format(new Date(card?.dueDate || projectDates?.end_date), "dd MMM yyyy", { locale: ptBR })}
                             </span>
                           </span>
                         )}
@@ -972,7 +976,7 @@ export default function CardDetailModal({
                               type="date" 
                               className="bg-[#2a2a2a] border border-[#333] rounded-lg px-3.5 py-2.5 text-sm text-white w-full focus:ring-1 focus:ring-accent outline-none transition-all"
                               onChange={(e) => handleUpdateStartDate(e.target.value ? new Date(e.target.value) : null)}
-                              defaultValue={card?.startDate ? new Date(card.startDate).toISOString().split('T')[0] : ''}
+                              defaultValue={(card?.startDate || projectDates?.start_date) ? new Date(card?.startDate || projectDates?.start_date).toISOString().split('T')[0] : ''}
                             />
                           </div>
 
@@ -982,11 +986,11 @@ export default function CardDetailModal({
                               type="date" 
                               className="bg-[#2a2a2a] border border-[#333] rounded-lg px-3.5 py-2.5 text-sm text-white w-full focus:ring-1 focus:ring-accent outline-none transition-all"
                               onChange={(e) => handleUpdateDueDate(e.target.value ? new Date(e.target.value) : null)}
-                              defaultValue={card?.dueDate ? new Date(card.dueDate).toISOString().split('T')[0] : ''}
+                              defaultValue={(card?.dueDate || projectDates?.end_date) ? new Date(card?.dueDate || projectDates?.end_date).toISOString().split('T')[0] : ''}
                             />
                           </div>
 
-                          {(card?.startDate || card?.dueDate) && (
+                          {(card?.startDate || card?.dueDate || projectDates?.start_date || projectDates?.end_date) && (
                             <div className="pt-2">
                               <Button 
                                 variant="ghost" 
