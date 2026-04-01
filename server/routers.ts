@@ -1009,6 +1009,9 @@ export const appRouter = router({
 
         return {
           ...card,
+          startDate: card.start_date,
+          dueDate: card.due_date,
+          assignedTo: card.assigned_to,
           linkedBoards
         };
       }),
