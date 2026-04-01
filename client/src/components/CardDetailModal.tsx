@@ -654,7 +654,7 @@ export default function CardDetailModal({
                         {(card?.startDate || projectDates?.start_date) && (
                           <span className="text-gray-200">
                             Início: <span className="text-white">
-                              {format(new Date(card?.startDate || projectDates?.start_date), "dd MMM yyyy", { locale: ptBR })}
+                              {format(new Date(card?.startDate || projectDates?.start_date), "dd MMM yyyy", { locale: ptBR }).toUpperCase()}
                             </span>
                           </span>
                         )}
@@ -664,7 +664,7 @@ export default function CardDetailModal({
                         {(card?.dueDate || projectDates?.end_date) && (
                           <span className={cn(isOverdue ? "text-red-400" : "text-gray-200")}>
                             Prazo: <span className={cn(isOverdue ? "text-red-400" : "text-white")}>
-                              {format(new Date(card?.dueDate || projectDates?.end_date), "dd MMM yyyy", { locale: ptBR })}
+                              {format(new Date(card?.dueDate || projectDates?.end_date), "dd MMM yyyy", { locale: ptBR }).toUpperCase()}
                             </span>
                           </span>
                         )}
