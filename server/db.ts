@@ -363,6 +363,7 @@ export async function getListCards(listId: number) {
       return {
         ...card,
         listId: card.list_id,
+        startDate: card.start_date,
         dueDate: card.due_date,
         assignedTo: card.assigned_to,
         assignedToName: card.assignedToUser?.name || null,
@@ -402,6 +403,7 @@ export async function getCardById(cardId: number) {
     return {
       ...data,
       listId: data.list_id,
+      startDate: data.start_date,
       dueDate: data.due_date,
       assignedTo: data.assigned_to,
       assignedToName: (data as any).assignedToUser?.name || null,
