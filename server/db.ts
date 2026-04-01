@@ -245,17 +245,21 @@ export async function getUserBoards(userId: number) {
   }
 }
 
-export async function getBoardById(boardId: number, userId: number) {
+export async function getBoardById(boardId: number, userId?: number) {
   try {
-    const { data: user, error: userError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", userId)
-      .maybeSingle();
+    let userRole = "user";
+    if (userId) {
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle();
 
-    if (userError) {
-      console.error("[Database] Error checking user role for board access:", userError);
-      return null;
+      if (userError) {
+        console.error("[Database] Error checking user role for board access:", userError);
+      } else if (user) {
+        userRole = user.role;
+      }
     }
 
     const { data: board, error: boardError } = await supabase
@@ -267,7 +271,15 @@ export async function getBoardById(boardId: number, userId: number) {
     if (boardError || !board) return null;
 
     // Se for ADMIN, tem acesso total
-    if (user?.role === "admin") {
+    if (userRole === "admin") {
+      return {
+        ...board,
+        ownerId: board.owner_id
+      } as any;
+    }
+
+    // Se não houver userId (query pública/interna), retorna o board básico
+    if (!userId) {
       return {
         ...board,
         ownerId: board.owner_id

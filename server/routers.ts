@@ -980,7 +980,15 @@ export const appRouter = router({
           .from("cards")
           .select(`
             *,
-            list:list_id(id, name, board:board_id(id, name))
+            list:list_id(
+              id, 
+              name, 
+              board:board_id(
+                id, 
+                name,
+                owner:owner_id(id, name)
+              )
+            )
           `)
           .eq("id", input.id)
           .single();
@@ -1007,12 +1015,15 @@ export const appRouter = router({
           };
         }) || [];
 
+        const boardOwnerName = (card as any).list?.board?.owner?.name || "Desconhecido";
+
         return {
           ...card,
           startDate: card.start_date,
           dueDate: card.due_date,
           assignedTo: card.assigned_to,
-          linkedBoards
+          linkedBoards,
+          boardOwnerName
         };
       }),
 
@@ -1505,8 +1516,8 @@ export const appRouter = router({
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {
         const [groups, items] = await Promise.all([
-          supabase.from("card_checklist_groups").select("*").eq("card_id", input.cardId),
-          supabase.from("card_checklists").select("*").eq("card_id", input.cardId)
+          supabase.from("card_checklist_groups").select("*").eq("card_id", input.cardId).order("position", { ascending: true }),
+          supabase.from("card_checklists").select("*").eq("card_id", input.cardId).order("position", { ascending: true })
         ]);
 
         const checklistGroups = groups.data || [];
@@ -2181,7 +2192,7 @@ export const appRouter = router({
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
-        // Sincronizar com espelhos
+        // Sincronizar com espelhos e Trigger Realtime
         try {
           const { data: mirrors } = await supabase
             .from("mirrored_cards")
@@ -2198,8 +2209,12 @@ export const appRouter = router({
                 user_id: ctx.user.id,
                 content: input.content,
               });
+              // Trigger realtime update no card espelhado
+              await supabase.from("cards").update({ updated_at: new Date().toISOString() }).eq("id", cardId);
             }
           }
+          // Trigger realtime update no card original
+          await supabase.from("cards").update({ updated_at: new Date().toISOString() }).eq("id", input.cardId);
         } catch (e) {
           console.error("[Mirror Sync] Comment sync failed:", e);
         }
