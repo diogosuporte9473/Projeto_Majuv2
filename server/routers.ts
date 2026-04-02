@@ -599,10 +599,48 @@ export const appRouter = router({
     listAllTenants: protectedProcedure
       .query(async ({ ctx }) => {
         if (ctx.user.role !== 'master_admin') {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Master Admin" });
+          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
         }
         const { data } = await supabase.from("app_settings").select("*").order("domain");
         return data || [];
+      }),
+
+    createTenant: protectedProcedure
+      .input(z.object({
+        domain: z.string().min(3),
+        appName: z.string().min(1),
+        primaryColor: z.string().default("#4b4897")
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'master_admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Master Admin pode criar novos ambientes" });
+        }
+
+        const { data, error } = await supabase
+          .from("app_settings")
+          .insert({
+            domain: input.domain,
+            app_name: input.appName,
+            primary_color: input.primaryColor,
+            updated_at: new Date().toISOString()
+          })
+          .select("id")
+          .single();
+
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true, id: data.id };
+      }),
+
+    deleteTenant: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'master_admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Master Admin pode deletar ambientes" });
+        }
+        // Nota: O Supabase cuidará da integridade referencial ou você deve limpar os dados antes
+        const { error } = await supabase.from("app_settings").delete().eq("id", input.id);
+        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        return { success: true };
       }),
   }),
 
