@@ -1,14 +1,15 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { useRealtimeSync } from "@/_core/hooks/useRealtimeSync";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, LogOut, Settings, Users, ShieldAlert } from "lucide-react";
-import { useState } from "react";
+import { Plus, LogOut, Settings, Users, ShieldAlert, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useBranding } from "@/contexts/BrandingContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { toast } from "sonner";
 
 interface TrelloDashboardLayoutProps {
   children: React.ReactNode;
@@ -17,8 +18,18 @@ interface TrelloDashboardLayoutProps {
 export default function TrelloDashboardLayout({ children }: TrelloDashboardLayoutProps) {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
-  const { appName, appLogo } = useBranding();
+  const { appName, appLogo, setAppName } = useBranding();
   const { theme } = useTheme();
+  
+  const { data: brandingData } = trpc.branding.get.useQuery();
+  const [showSetupModal, setShowSetupModal] = useState(false);
+
+  useEffect(() => {
+    // Se for admin e o nome ainda for o padrão "Minha Empresa", força a configuração
+    if (user?.role === 'admin' && brandingData?.isNewTenant) {
+      setShowSetupModal(true);
+    }
+  }, [user, brandingData]);
   
   // Ativa sincronização global para a barra lateral (boards)
   useRealtimeSync();
@@ -27,6 +38,7 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
   const [showNewBoard, setShowNewBoard] = useState(false);
   const [newBoardName, setNewBoardName] = useState("");
   const createBoardMutation = trpc.boards.create.useMutation();
+  const updateBrandingMutation = trpc.branding.update.useMutation();
 
   const handleCreateBoard = async () => {
     if (!newBoardName.trim()) return;
@@ -185,6 +197,58 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
       <main className="flex-1 overflow-auto">
         {children}
       </main>
+
+      {/* Modal de Configuração Obrigatória da Empresa */}
+      {showSetupModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <Card className="w-full max-w-md p-8 border-accent shadow-2xl bg-[#1a1a1a]">
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mb-4">
+                <AlertTriangle className="w-8 h-8 text-accent" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Configure sua Empresa</h2>
+              <p className="text-gray-400 text-sm">
+                Detectamos que este é o primeiro acesso ao seu ambiente. 
+                Por favor, defina o nome da sua empresa para continuar.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase text-gray-500 tracking-wider">
+                  Nome da Empresa / Aplicação
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Maju Consultoria"
+                  className="w-full px-4 py-3 rounded-lg bg-[#2a2a2a] border border-[#333] text-white focus:ring-2 focus:ring-accent outline-none transition-all"
+                  value={newBoardName} // Reutilizando estado existente para o nome temporariamente
+                  onChange={(e) => setNewBoardName(e.target.value)}
+                />
+              </div>
+
+              <Button 
+                className="w-full py-6 bg-accent text-accent-foreground hover:bg-accent/90 font-bold text-lg"
+                disabled={!newBoardName || updateBrandingMutation.isPending}
+                onClick={async () => {
+                  try {
+                    await updateBrandingMutation.mutateAsync({
+                      appName: newBoardName
+                    });
+                    setAppName(newBoardName);
+                    setShowSetupModal(false);
+                    toast.success("Empresa configurada com sucesso!");
+                  } catch (e) {
+                    toast.error("Erro ao salvar configurações.");
+                  }
+                }}
+              >
+                {updateBrandingMutation.isPending ? "Salvando..." : "Confirmar e Começar"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
