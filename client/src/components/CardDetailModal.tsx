@@ -574,11 +574,14 @@ export default function CardDetailModal({
               )}
               
               <div className="flex flex-col gap-1 mt-1">
-                <p className="text-xs text-gray-400 flex items-center gap-1.5">
-                  na lista <span className="font-semibold text-gray-200 underline decoration-gray-600 underline-offset-4">{listName}</span>
-                </p>
+                  <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                    na lista <span className="font-semibold text-gray-200 underline decoration-gray-600 underline-offset-4">{listName}</span>
+                  </p>
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                    Situação Atual Responsável: <span className="text-accent">{card?.boardOwnerName || "..."}</span>
+                  </p>
 
-                {/* Seção de Responsável do Card */}
+                  {/* Seção de Responsável do Card */}
                 <div className="flex items-center gap-2.5 mt-1.5">
                   <div className="flex -space-x-2">
                     <Avatar className="h-7 w-7 border-2 border-[#1e1e1e] ring-1 ring-white/5">
