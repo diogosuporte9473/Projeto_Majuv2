@@ -191,95 +191,73 @@ export async function getUserById(id: number) {
 }
 
 // Board queries
-export async function getUserBoards(userId: number, domain?: string) {
+export async function getUserBoards(userId: number, tenantId?: string) {
   try {
-    // 1. Verificar role do usuário
-    const { data: user } = await supabase.from("users").select("role, tenant_id").eq("id", userId).maybeSingle();
+    const db = await getDb();
+    if (!db) return [];
+
+    // Se o usuário for master_admin, ele pode ver tudo (opcional, dependendo do requisito)
+    // Mas o requisito diz: "cada empresa (tenant) tem seus dados completamente isolados."
+    // Então mesmo master_admin deve estar dentro de um tenant ou ver apenas o seu.
     
-    // 2. Buscar o ID do tenant (domínio)
-    let tenantId = user?.tenant_id;
-    if (!tenantId && domain) {
-      const { data: tenant } = await supabase.from("app_settings").select("id").eq("domain", domain).maybeSingle();
-      tenantId = tenant?.id;
+    if (!tenantId) {
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      tenantId = user?.tenantId || undefined;
     }
 
-    // 3. MASTER_ADMIN vê tudo de todos os domínios
-    if (user?.role === "master_admin") {
-      const { data: boards } = await supabase.from("boards").select("*").order("name");
-      return boards || [];
-    }
+    if (!tenantId) return [];
 
-    // 4. Usuários normais vêem apenas o que pertence ao seu tenant
-    const { data: boards } = await supabase
-      .from("boards")
-      .select("*")
-      .eq("tenant_id", tenantId)
-      .or(`owner_id.eq.${userId},id.in.(select board_id from board_members where user_id = ${userId})`)
-      .order("name");
+    // Filtra por tenantId obrigatoriamente
+    const results = await db.select().from(boards).where(
+      and(
+        eq(boards.tenantId, tenantId),
+        or(
+          eq(boards.ownerId, userId),
+          // Subquery para membros do quadro
+          inArray(boards.id, 
+            db.select({ id: boardMembers.boardId })
+              .from(boardMembers)
+              .where(eq(boardMembers.userId, userId))
+          )
+        )
+      )
+    );
 
-    return boards || [];
+    return results;
   } catch (error) {
     console.error("[Database] getUserBoards failed:", error);
     return [];
   }
 }
 
-export async function getBoardById(boardId: number, userId?: number) {
+export async function getBoardById(boardId: number, userId?: number, tenantId?: string) {
   try {
-    let userRole = "user";
-    if (userId) {
-      const { data: user, error: userError } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", userId)
-        .maybeSingle();
+    const db = await getDb();
+    if (!db) return null;
 
-      if (userError) {
-        console.error("[Database] Error checking user role for board access:", userError);
-      } else if (user) {
-        userRole = user.role;
-      }
-    }
+    const [board] = await db.select().from(boards).where(eq(boards.id, boardId));
+    if (!board) return null;
 
-    const { data: board, error: boardError } = await supabase
-      .from("boards")
-      .select("*")
-      .eq("id", boardId)
-      .maybeSingle();
+    // Se o tenantId for passado, validar se o quadro pertence a ele
+    if (tenantId && board.tenantId !== tenantId) return null;
 
-    if (boardError || !board) return null;
+    // Se não houver userId, apenas retorna o quadro (se o tenant estiver ok)
+    if (!userId) return board;
 
-    // Se for ADMIN, tem acesso total
-    if (userRole === "admin") {
-      return {
-        ...board,
-        ownerId: board.owner_id
-      } as any;
-    }
+    // Se for o dono, ok
+    if (board.ownerId === userId) return board;
 
-    // Se não houver userId (query pública/interna), retorna o board básico
-    if (!userId) {
-      return {
-        ...board,
-        ownerId: board.owner_id
-      } as any;
-    }
+    // Verificar se é membro
+    const [membership] = await db.select().from(boardMembers).where(
+      and(
+        eq(boardMembers.boardId, boardId),
+        eq(boardMembers.userId, userId)
+      )
+    );
 
-    const isOwner = board.owner_id === userId;
-    
-    const { data: membership, error: memberError } = await supabase
-      .from("board_members")
-      .select("*")
-      .eq("board_id", boardId)
-      .eq("user_id", userId)
-      .maybeSingle();
+    if (!membership) return null;
 
-    if (!isOwner && !membership) return null;
-    
-    return {
-      ...board,
-      ownerId: board.owner_id
-    } as any;
+    return board;
   } catch (error) {
     console.error("[Database] getBoardById failed:", error);
     return null;

@@ -1,13 +1,46 @@
-import { pgTable, serial, text, timestamp, varchar, pgEnum, integer, boolean, uniqueIndex, bigint } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, varchar, pgEnum, integer, boolean, uniqueIndex, bigint, uuid } from "drizzle-orm/pg-core";
 
 /**
  * Enums para PostgreSQL
  */
 export const roleEnum = pgEnum("role", ["user", "admin", "master_admin"]);
+export const tenantRoleEnum = pgEnum("tenant_role", ["owner", "admin", "member", "viewer"]);
 export const memberRoleEnum = pgEnum("member_role", ["viewer", "editor", "admin"]);
 export const syncStatusEnum = pgEnum("sync_status", ["synced", "pending", "failed"]);
 export const notificationTypeEnum = pgEnum("notification_type", ["card_assigned", "card_updated", "card_mirrored", "due_date_alert", "comment_mention"]);
 export const fieldTypeEnum = pgEnum("field_type", ["text", "select", "date", "number"]);
+
+/**
+ * Tenants - Cada empresa/organização
+ */
+export const tenants = pgTable("tenants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  appLogoUrl: text("app_logo_url"),
+  primaryColor: text("primary_color").default("#4b4897"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Tenant = typeof tenants.$inferSelect;
+export type InsertTenant = typeof tenants.$inferInsert;
+
+/**
+ * User Tenants - Relacionamento N:N entre usuários e empresas
+ */
+export const userTenants = pgTable("user_tenants", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  role: tenantRoleEnum("role").default("member").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userTenantIdx: uniqueIndex("user_tenant_idx").on(table.userId, table.tenantId),
+}));
+
+export type UserTenant = typeof userTenants.$inferSelect;
+export type InsertUserTenant = typeof userTenants.$inferInsert;
 
 /**
  * Core user table backing auth flow.
@@ -15,11 +48,12 @@ export const fieldTypeEnum = pgEnum("field_type", ["text", "select", "date", "nu
 // Usuários - Adicionado role 'master_admin' e tenantId
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
+  authId: uuid("auth_id").unique(), // ID vindo do Supabase Auth
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
   role: roleEnum("role").default("user").notNull(),
-  tenantId: integer("tenant_id").references(() => appSettings.id),
+  tenantId: uuid("tenant_id").references(() => tenants.id), // Tenant atual/ativo
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   lastSignedIn: timestamp("last_signed_in", { withTimezone: true }).defaultNow().notNull(),
@@ -28,14 +62,14 @@ export const users = pgTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// Boards - Agora vinculados a um tenant (domínio)
+// Boards - Agora vinculados a um tenant
 export const boards = pgTable("boards", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
   color: text("color").default("#4b4897").notNull(),
   ownerId: integer("owner_id").references(() => users.id).notNull(),
-  tenantId: integer("tenant_id").references(() => appSettings.id).notNull(),
+  tenantId: uuid("tenant_id").references(() => tenants.id).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -72,6 +106,7 @@ export type InsertBoardMember = typeof boardMembers.$inferInsert;
 export const lists = pgTable("lists", {
   id: serial("id").primaryKey(),
   boardId: integer("board_id").notNull(),
+  tenantId: uuid("tenant_id").references(() => tenants.id).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -87,6 +122,7 @@ export const cardStatusEnum = pgEnum("card_status", ["open", "completed"]);
 export const cards = pgTable("cards", {
   id: serial("id").primaryKey(),
   listId: integer("list_id").notNull(),
+  tenantId: uuid("tenant_id").references(() => tenants.id).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   position: integer("position").notNull().default(0),
@@ -122,6 +158,7 @@ export type InsertMirroredCard = typeof mirroredCards.$inferInsert;
 export const cardComments = pgTable("card_comments", {
   id: serial("id").primaryKey(),
   cardId: integer("card_id").notNull(),
+  tenantId: uuid("tenant_id").references(() => tenants.id).notNull(),
   userId: integer("user_id").notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -135,6 +172,7 @@ export type InsertCardComment = typeof cardComments.$inferInsert;
 export const cardAttachments = pgTable("card_attachments", {
   id: serial("id").primaryKey(),
   cardId: integer("card_id").notNull(),
+  tenantId: uuid("tenant_id").references(() => tenants.id).notNull(),
   filename: varchar("filename", { length: 255 }).notNull(),
   fileUrl: text("file_url").notNull(),
   fileKey: varchar("file_key", { length: 255 }).notNull(),
@@ -151,6 +189,7 @@ export type InsertCardAttachment = typeof cardAttachments.$inferInsert;
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
+  tenantId: uuid("tenant_id").references(() => tenants.id).notNull(),
   type: notificationTypeEnum("type").notNull(),
   relatedCardId: integer("related_card_id"),
   relatedBoardId: integer("related_board_id"),
@@ -261,6 +300,7 @@ export type InsertNote = typeof notes.$inferInsert;
 // Checklist Templates - Modelos de checklists reutilizáveis
 export const checklistTemplates = pgTable("checklist_templates", {
   id: serial("id").primaryKey(),
+  tenantId: uuid("tenant_id").references(() => tenants.id).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   items: text("items").notNull(), // JSON string de array de strings
   isGlobal: boolean("is_global").default(false).notNull(),

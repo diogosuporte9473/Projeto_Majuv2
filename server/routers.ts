@@ -40,6 +40,8 @@ import {
   projectDates,
   notes,
   checklistTemplates,
+  tenants,
+  userTenants,
 } from "../drizzle/schema.js";
 import { invokeLLM, Message } from "./_core/llm.js";
 import { ENV } from "./_core/env.js";
@@ -51,6 +53,7 @@ import { supabase } from "./_core/supabase.js";
  */
 async function createAuditLog({
   userId,
+  tenantId,
   action,
   entityType,
   entityId,
@@ -58,6 +61,7 @@ async function createAuditLog({
   details
 }: {
   userId: number;
+  tenantId: string | null;
   action: 'create' | 'update' | 'archive' | 'delete' | 'restore';
   entityType: 'board' | 'card' | 'user';
   entityId: number;
@@ -67,6 +71,7 @@ async function createAuditLog({
   try {
     await supabase.from("audit_logs").insert({
       user_id: userId,
+      tenant_id: tenantId,
       action,
       entity_type: entityType,
       entity_id: entityId,
@@ -179,7 +184,6 @@ export const appRouter = router({
       .input(z.object({ username: z.string(), password: z.string() }))
       .mutation(async ({ input, ctx }) => {
         // 1. Tentar login via Supabase Auth
-        // Como o Supabase exige email, vamos transformar o username em email
         const email = input.username.includes('@') ? input.username : `${input.username}@projeto-maju.com`;
         
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -190,7 +194,6 @@ export const appRouter = router({
         if (authError) {
           console.warn("[Auth] Supabase login failed, trying Drizzle fallback:", authError.message);
           
-          // 2. Fallback para o banco Drizzle (usuários antigos)
           const user = await getUserByUsername(input.username);
           if (!user) {
             throw new TRPCError({ code: "UNAUTHORIZED", message: "User not found" });
@@ -201,7 +204,6 @@ export const appRouter = router({
             throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid password" });
           }
 
-          // Gerar token manual (comportamento antigo)
           const token = await new SignJWT({})
             .setProtectedHeader({ alg: "HS256" })
             .setSubject(user.id.toString())
@@ -218,14 +220,11 @@ export const appRouter = router({
           return user;
         }
 
-        // 3. Se o login no Supabase funcionou, buscar o usuário no Drizzle
-        // (Assume-se que o Supabase e o Drizzle estão em sincronia via Triggers ou manual)
         const user = await getUserByUsername(input.username);
         if (!user) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "User found in Auth but not in Database" });
         }
 
-        // EM VEZ DE GERAR TOKEN MANUAL, USAR O TOKEN DO SUPABASE
         const sessionToken = authData.session?.access_token;
         if (!sessionToken) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No access token returned from Supabase" });
@@ -248,7 +247,6 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const email = input.username.includes('@') ? input.username : `${input.username}@projeto-maju.com`;
 
-        // 1. Criar no Supabase Auth
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password: input.password,
@@ -267,74 +265,27 @@ export const appRouter = router({
           });
         }
 
-        // 2. Criar no banco Drizzle
         const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
         const hashedPassword = await bcrypt.hash(input.password, 10);
         
-        // Lógica de Tenant:
-        // 1. Verificar se já existe um tenant para este domínio
-        let tenantId: number | null = null;
-        const { data: existingTenant } = await supabase
-          .from("app_settings")
-          .select("id")
-          .eq("domain", ctx.domain)
-          .maybeSingle();
-
-        let userRole: "user" | "admin" | "master_admin" = "user";
-
-        if (!existingTenant) {
-          // Se não existe tenant para este domínio, este é o PRIMEIRO usuário (Admin)
-          const { data: newTenant, error: tenantError } = await supabase
-            .from("app_settings")
-            .upsert({
-              domain: ctx.domain,
-              app_name: "Minha Empresa",
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'domain' })
-            .select("id")
-            .single();
-
-          if (tenantError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao criar ambiente" });
-          tenantId = newTenant.id;
-          userRole = "admin";
-        } else {
-          tenantId = existingTenant.id;
-          userRole = "user";
-        }
-
-        // 3. Criar usuário usando o cliente Supabase diretamente (evita erros fatais de cache do Drizzle)
-        const { data: newUser, error: insertError } = await supabase
-          .from("users")
-          .insert({
-            username: input.username,
-            password: hashedPassword,
-            name: input.name || input.username.split('@')[0],
-            role: userRole,
-            tenant_id: tenantId,
-            last_signed_in: new Date().toISOString()
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error("[Database] User insert failed:", insertError);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: insertError.message });
-        }
+        const [user] = await db.insert(users).values({
+          authId: authData.user?.id, // Salva o ID do Supabase Auth
+          username: input.username,
+          password: hashedPassword,
+          name: input.name || input.username,
+          role: "user",
+        }).returning();
 
         const sessionToken = authData.session?.access_token;
-        if (!sessionToken) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Registration successful but no token returned" });
+        if (sessionToken) {
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.cookie(COOKIE_NAME, sessionToken, {
+            ...cookieOptions,
+            maxAge: (authData.session?.expires_in || 3600) * 1000,
+          });
         }
 
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, sessionToken, {
-          ...cookieOptions,
-          maxAge: (authData.session?.expires_in || 3600) * 1000,
-        });
-
-        return newUser;
+        return user;
       }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -345,22 +296,56 @@ export const appRouter = router({
     }),
   }),
 
+  tenant: router({
+    create: protectedProcedure
+      .input(z.object({ name: z.string().min(3) }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+
+        const slug = input.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+        
+        const [tenant] = await getDb().insert(tenants).values({
+          name: input.name,
+          slug,
+        }).returning();
+
+        await getDb().insert(userTenants).values({
+          userId: ctx.user.id,
+          tenantId: tenant.id,
+          role: "owner",
+        });
+
+        await getDb().update(users).set({
+          tenantId: tenant.id,
+        }).where(eq(users.id, ctx.user.id));
+
+        return tenant;
+      }),
+    mine: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user?.tenantId) return null;
+      const [tenant] = await getDb().select().from(tenants).where(eq(tenants.id, ctx.user.tenantId));
+      return tenant;
+    }),
+  }),
+
   // Board routers
   boards: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      return await getUserBoards(ctx.user.id);
+      return await getUserBoards(ctx.user.id, ctx.tenantId || undefined);
     }),
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        const board = await getBoardById(input.id, ctx.user.id);
+        const board = await getBoardById(input.id, ctx.user.id, ctx.tenantId || undefined);
         if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found or access denied" });
         return board;
       }),
     getMembers: protectedProcedure
       .input(z.object({ boardId: z.number() }))
       .query(async ({ ctx, input }) => {
-        const board = await getBoardById(input.boardId, ctx.user.id);
+        const board = await getBoardById(input.boardId, ctx.user.id, ctx.tenantId || undefined);
         if (!board) throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
 
         const { data, error } = await supabase
@@ -409,6 +394,7 @@ export const appRouter = router({
         // Registrar log
         await createAuditLog({
           userId: ctx.user.id,
+          tenantId: ctx.tenantId,
           action: 'create',
           entityType: 'board',
           entityId: board.id,
@@ -421,6 +407,7 @@ export const appRouter = router({
           .from("lists")
           .insert({
             board_id: board.id,
+            tenant_id: ctx.tenantId,
             name: "Caixa de Entrada",
             position: 0,
           });
@@ -460,6 +447,7 @@ export const appRouter = router({
         // Registrar log de atualização
         await createAuditLog({
           userId: ctx.user.id,
+          tenantId: ctx.tenantId,
           action: 'update',
           entityType: 'board',
           entityId: input.id,
@@ -582,26 +570,18 @@ export const appRouter = router({
 
   branding: router({
     get: publicProcedure.query(async ({ ctx }) => {
-      // Busca as configurações baseadas no domínio atual (ctx.domain)
-      const { data, error } = await supabase
-        .from("app_settings")
-        .select("*")
-        .eq("domain", ctx.domain)
-        .maybeSingle();
+      if (!ctx.tenantId) return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
       
-      if (error) {
-        console.error("[Branding] Error fetching settings:", error);
+      const [data] = await getDb().select().from(tenants).where(eq(tenants.id, ctx.tenantId));
+      
+      if (!data) {
         return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
       }
       
-      // Se não houver configurações ou o nome for o padrão, sinaliza como NOVO TENANT
-      const isNewTenant = !data || data.app_name === "Minha Empresa" || data.app_name === "Maju Tasks";
-      
       return {
-        appName: data?.app_name || "Maju Tasks",
-        appLogoUrl: data?.app_logo_url || null,
-        primaryColor: data?.primary_color || "#4b4897",
-        isNewTenant
+        appName: data.name || "Maju Tasks",
+        appLogoUrl: data.appLogoUrl || null,
+        primaryColor: data.primaryColor || "#4b4897",
       };
     }),
     
@@ -612,42 +592,33 @@ export const appRouter = router({
         primaryColor: z.string().optional()
       }))
       .mutation(async ({ ctx, input }) => {
-        // Apenas ADMIN do domínio ou MASTER_ADMIN podem alterar
-        if (ctx.user.role !== 'admin' && ctx.user.role !== 'master_admin') {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-        }
-
-        const updateData: any = { domain: ctx.domain };
-        if (input.appName !== undefined) updateData.app_name = input.appName;
-        if (input.appLogoUrl !== undefined) updateData.app_logo_url = input.appLogoUrl;
-        if (input.primaryColor !== undefined) updateData.primary_color = input.primaryColor;
-        updateData.updated_at = new Date().toISOString();
-
-        const { error } = await supabase
-          .from("app_settings")
-          .upsert(updateData, { onConflict: 'domain' });
-
-        if (error) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
-        }
+        if (!ctx.tenantId) throw new TRPCError({ code: "BAD_REQUEST" });
+        
+        // Apenas ADMIN do tenant ou MASTER_ADMIN podem alterar
+        // TODO: Validar role no user_tenants
+        
+        await getDb().update(tenants).set({
+          name: input.appName,
+          appLogoUrl: input.appLogoUrl,
+          primaryColor: input.primaryColor,
+          updatedAt: new Date(),
+        }).where(eq(tenants.id, ctx.tenantId));
 
         return { success: true };
       }),
 
-    // Rota exclusiva para Master Admin gerenciar todos os domínios
     listAllTenants: protectedProcedure
       .query(async ({ ctx }) => {
         if (ctx.user.role !== 'master_admin') {
           throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
         }
-        const { data } = await supabase.from("app_settings").select("*").order("domain");
-        return data || [];
+        return await getDb().select().from(tenants).orderBy(tenants.name);
       }),
 
     createTenant: protectedProcedure
       .input(z.object({
-        domain: z.string().min(3),
-        appName: z.string().min(1),
+        name: z.string().min(1),
+        slug: z.string().min(3),
         primaryColor: z.string().default("#4b4897")
       }))
       .mutation(async ({ ctx, input }) => {
@@ -655,30 +626,22 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Master Admin pode criar novos ambientes" });
         }
 
-        const { data, error } = await supabase
-          .from("app_settings")
-          .insert({
-            domain: input.domain,
-            app_name: input.appName,
-            primary_color: input.primaryColor,
-            updated_at: new Date().toISOString()
-          })
-          .select("id")
-          .single();
+        const [data] = await getDb().insert(tenants).values({
+          name: input.name,
+          slug: input.slug,
+          primaryColor: input.primaryColor,
+        }).returning();
 
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
         return { success: true, id: data.id };
       }),
 
     deleteTenant: protectedProcedure
-      .input(z.object({ id: z.number() }))
+      .input(z.object({ id: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== 'master_admin') {
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Master Admin pode deletar ambientes" });
         }
-        // Nota: O Supabase cuidará da integridade referencial ou você deve limpar os dados antes
-        const { error } = await supabase.from("app_settings").delete().eq("id", input.id);
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        await getDb().delete(tenants).where(eq(tenants.id, input.id));
         return { success: true };
       }),
   }),
@@ -705,7 +668,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const board = await getBoardById(input.boardId, ctx.user.id);
+        const board = await getBoardById(input.boardId, ctx.user.id, ctx.tenantId || undefined);
         if (!board) {
           throw new TRPCError({
             code: "NOT_FOUND",
@@ -721,6 +684,7 @@ export const appRouter = router({
           .from("lists")
           .insert({
             board_id: input.boardId,
+            tenant_id: ctx.tenantId,
             name: input.name,
             position,
           })
@@ -795,6 +759,7 @@ export const appRouter = router({
             .from("cards")
             .insert({
               list_id: input.listId,
+              tenant_id: ctx.tenantId,
               title: input.title,
               description: input.description || "",
               position,
@@ -815,6 +780,7 @@ export const appRouter = router({
           // Registrar log
           await createAuditLog({
             userId: ctx.user.id,
+            tenantId: ctx.tenantId,
             action: 'create',
             entityType: 'card',
             entityId: data.id,
@@ -884,6 +850,7 @@ export const appRouter = router({
         if (card) {
           await createAuditLog({
             userId: ctx.user.id,
+            tenantId: ctx.tenantId,
             action: 'update',
             entityType: 'card',
             entityId: input.id,
