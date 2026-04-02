@@ -288,29 +288,40 @@ export const appRouter = router({
           // Se não existe tenant para este domínio, este é o PRIMEIRO usuário (Admin)
           const { data: newTenant, error: tenantError } = await supabase
             .from("app_settings")
-            .insert({
+            .upsert({
               domain: ctx.domain,
-              app_name: "Minha Empresa", // Nome padrão para ser alterado depois
+              app_name: "Minha Empresa",
               updated_at: new Date().toISOString()
-            })
+            }, { onConflict: 'domain' })
             .select("id")
             .single();
 
           if (tenantError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao criar ambiente" });
           tenantId = newTenant.id;
-          userRole = "admin"; // Primeiro usuário do domínio vira Admin
+          userRole = "admin";
         } else {
           tenantId = existingTenant.id;
-          userRole = "user"; // Demais usuários entram como User padrão
+          userRole = "user";
         }
 
-        const [user] = await db.insert(users).values({
-          username: input.username,
-          password: hashedPassword,
-          name: input.name || input.username.split('@')[0],
-          role: userRole,
-          tenantId: tenantId,
-        }).returning();
+        // 3. Criar usuário usando o cliente Supabase diretamente (evita erros fatais de cache do Drizzle)
+        const { data: newUser, error: insertError } = await supabase
+          .from("users")
+          .insert({
+            username: input.username,
+            password: hashedPassword,
+            name: input.name || input.username.split('@')[0],
+            role: userRole,
+            tenant_id: tenantId,
+            last_signed_in: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("[Database] User insert failed:", insertError);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: insertError.message });
+        }
 
         const sessionToken = authData.session?.access_token;
         if (!sessionToken) {
@@ -323,7 +334,7 @@ export const appRouter = router({
           maxAge: (authData.session?.expires_in || 3600) * 1000,
         });
 
-        return user;
+        return newUser;
       }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -382,6 +393,7 @@ export const appRouter = router({
             description: input.description || "",
             color: input.color,
             owner_id: ctx.user.id,
+            tenant_id: ctx.user.tenantId, // Vincular ao tenant do usuário
           })
           .select("id")
           .single();
@@ -2567,12 +2579,26 @@ export const appRouter = router({
   admin: router({ 
     users: router({
       list: protectedProcedure.query(async ({ ctx }) => {
-        if (ctx.user.role !== 'admin') {
-          throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas administradores podem listar usuários' });
+        // MASTER_ADMIN vê todos os usuários do sistema
+        if (ctx.user.role === 'master_admin') {
+          const { data, error } = await supabase.from("users").select("id, username, name, role, createdAt").order("name");
+          if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+          return data || [];
         }
-        const { data, error } = await supabase.from("users").select("id, username, name, role, createdAt");
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-        return data || [];
+
+        // Admin local vê apenas usuários do MESMO TENANT
+        if (ctx.user.role === 'admin') {
+          const { data, error } = await supabase
+            .from("users")
+            .select("id, username, name, role, createdAt")
+            .eq("tenant_id", ctx.user.tenantId)
+            .order("name");
+          
+          if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+          return data || [];
+        }
+
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
       }),
       create: protectedProcedure
         .input(z.object({
@@ -2582,15 +2608,15 @@ export const appRouter = router({
           role: z.enum(['user', 'admin']).default('user'),
         }))
         .mutation(async ({ ctx, input }) => {
-          if (ctx.user.role !== 'admin') {
-            throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas administradores podem criar usuários' });
+          if (ctx.user.role !== 'admin' && ctx.user.role !== 'master_admin') {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
           }
           
           const hashedPassword = await bcrypt.hash(input.password, 10);
-          const email = input.username.includes('@') ? input.username : `${input.username}@projeto-maju.com`;
+          const email = input.username.includes('@') ? input.username : `${input.username}@${ctx.domain}`;
 
-          // Criar no Supabase Auth também para manter consistência se necessário
-          const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+          // Criar no Supabase Auth também
+          const { error: authError } = await supabase.auth.admin.createUser({
             email,
             password: input.password,
             email_confirm: true,
@@ -2606,6 +2632,7 @@ export const appRouter = router({
             password: hashedPassword,
             name: input.name,
             role: input.role,
+            tenant_id: ctx.user.tenantId, // Vincular ao mesmo ambiente do criador
           }).select("id").single();
 
           if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
