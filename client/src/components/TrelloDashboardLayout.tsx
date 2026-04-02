@@ -21,13 +21,16 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
   const { appName, appLogo, setAppName } = useBranding();
   const { theme } = useTheme();
   
-  const { data: brandingData } = trpc.branding.get.useQuery();
+  const { data: brandingData, refetch: refetchBranding } = trpc.branding.get.useQuery();
   const [showSetupModal, setShowSetupModal] = useState(false);
+  const [setupCompanyName, setSetupCompanyName] = useState("");
 
   useEffect(() => {
-    // Se for admin e o nome ainda for o padrão "Minha Empresa", força a configuração
+    // Se for admin e o nome ainda for o padrão, força a configuração
     if (user?.role === 'admin' && brandingData?.isNewTenant) {
       setShowSetupModal(true);
+    } else {
+      setShowSetupModal(false);
     }
   }, [user, brandingData]);
   
@@ -222,20 +225,21 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
                   type="text"
                   placeholder="Ex: Maju Consultoria"
                   className="w-full px-4 py-3 rounded-lg bg-[#2a2a2a] border border-[#333] text-white focus:ring-2 focus:ring-accent outline-none transition-all"
-                  value={newBoardName} // Reutilizando estado existente para o nome temporariamente
-                  onChange={(e) => setNewBoardName(e.target.value)}
+                  value={setupCompanyName}
+                  onChange={(e) => setSetupCompanyName(e.target.value)}
                 />
               </div>
 
               <Button 
                 className="w-full py-6 bg-accent text-accent-foreground hover:bg-accent/90 font-bold text-lg"
-                disabled={!newBoardName || updateBrandingMutation.isPending}
+                disabled={!setupCompanyName || updateBrandingMutation.isPending}
                 onClick={async () => {
                   try {
                     await updateBrandingMutation.mutateAsync({
-                      appName: newBoardName
+                      appName: setupCompanyName
                     });
-                    setAppName(newBoardName);
+                    setAppName(setupCompanyName);
+                    await refetchBranding();
                     setShowSetupModal(false);
                     toast.success("Empresa configurada com sucesso!");
                   } catch (e) {
