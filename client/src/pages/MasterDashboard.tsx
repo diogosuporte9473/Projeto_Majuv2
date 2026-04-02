@@ -18,7 +18,7 @@ export default function MasterDashboard() {
     onSuccess: () => {
       utils.branding.listAllTenants.invalidate();
       setShowNewForm(false);
-      setNewTenant({ domain: "", appName: "", primaryColor: "#4b4897" });
+      setNewTenant({ slug: "", name: "", primaryColor: "#4b4897" });
       toast.success("Novo ambiente criado com sucesso!");
     },
     onError: (err) => toast.error(`Erro ao criar: ${err.message}`)
@@ -32,7 +32,7 @@ export default function MasterDashboard() {
   });
 
   const [showNewForm, setShowNewForm] = useState(false);
-  const [newTenant, setNewTenant] = useState({ domain: "", appName: "", primaryColor: "#4b4897" });
+  const [newTenant, setNewTenant] = useState({ slug: "", name: "", primaryColor: "#4b4897" });
 
   // Proteção de rota
   if (!user || user.role !== 'master_admin') {
@@ -45,32 +45,32 @@ export default function MasterDashboard() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Painel Master</h1>
-            <p className="text-muted-foreground">Gerenciamento global de ambientes e domínios</p>
+            <p className="text-muted-foreground">Gerenciamento global de empresas (tenants)</p>
           </div>
           <Button onClick={() => setShowNewForm(!showNewForm)} className="bg-accent text-accent-foreground">
             <Plus className="w-4 h-4 mr-2" />
-            Novo Ambiente
+            Nova Empresa
           </Button>
         </div>
 
         {showNewForm && (
           <Card className="p-6 mb-8 border-accent/20 bg-accent/5">
-            <h3 className="text-lg font-semibold mb-4">Cadastrar Novo Cliente/Domínio</h3>
+            <h3 className="text-lg font-semibold mb-4">Cadastrar Novo Tenant</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-muted-foreground">Domínio (Host)</label>
+                <label className="text-xs font-bold uppercase text-muted-foreground">Slug (URL)</label>
                 <Input 
-                  placeholder="ex: cliente.maju.io" 
-                  value={newTenant.domain}
-                  onChange={e => setNewTenant({...newTenant, domain: e.target.value})}
+                  placeholder="ex: empresa-a" 
+                  value={newTenant.slug}
+                  onChange={e => setNewTenant({...newTenant, slug: e.target.value})}
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-muted-foreground">Nome da Aplicação</label>
+                <label className="text-xs font-bold uppercase text-muted-foreground">Nome da Empresa</label>
                 <Input 
-                  placeholder="Maju Tasks Cliente" 
-                  value={newTenant.appName}
-                  onChange={e => setNewTenant({...newTenant, appName: e.target.value})}
+                  placeholder="Empresa A LTDA" 
+                  value={newTenant.name}
+                  onChange={e => setNewTenant({...newTenant, name: e.target.value})}
                 />
               </div>
               <div className="space-y-2">
@@ -93,9 +93,9 @@ export default function MasterDashboard() {
               <Button variant="ghost" onClick={() => setShowNewForm(false)}>Cancelar</Button>
               <Button 
                 onClick={() => createTenantMutation.mutate(newTenant)}
-                disabled={!newTenant.domain || !newTenant.appName}
+                disabled={!newTenant.slug || !newTenant.name}
               >
-                Criar Ambiente
+                Criar Empresa
               </Button>
             </div>
           </Card>
@@ -104,29 +104,36 @@ export default function MasterDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {isLoading ? (
             <p>Carregando ambientes...</p>
-          ) : tenants?.map((tenant: any) => (
-            <Card key={tenant.id} className="p-5 border-border hover:border-accent/50 transition-colors">
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-2 bg-accent/10 rounded-lg">
-                  <Globe className="w-6 h-6 text-accent" />
+          ) : tenants?.map((t: any) => (
+            <Card key={t.id} className="p-6 border-accent/10 hover:border-accent/30 transition-colors">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
+                    style={{ backgroundColor: t.primaryColor || '#4b4897' }}
+                  >
+                    {t.name?.charAt(0)}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-foreground">{t.name}</h4>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Globe className="w-3 h-3" />
+                      {t.slug}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400" onClick={() => {
-                    if(confirm(`Deseja remover o ambiente ${tenant.domain}?`)) {
-                      deleteTenantMutation.mutate({ id: tenant.id });
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    if(confirm('Tem certeza que deseja remover este ambiente?')) {
+                      deleteTenantMutation.mutate({ id: t.id });
                     }
-                  }}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              <h3 className="font-bold text-lg mb-1">{tenant.app_name}</h3>
-              <p className="text-sm text-muted-foreground mb-4 font-mono">{tenant.domain}</p>
-              
-              <div className="flex items-center gap-2 pt-4 border-t border-border text-xs text-muted-foreground">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tenant.primary_color }} />
-                <span>Tema: {tenant.primary_color}</span>
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             </Card>
           ))}

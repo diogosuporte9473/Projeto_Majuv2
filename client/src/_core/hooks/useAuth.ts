@@ -56,11 +56,24 @@ export function useAuth(options?: UseAuthOptions) {
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
     if (meQuery.isLoading || logoutMutation.isPending) return;
-    if (state.user) return;
-    if (typeof window === "undefined") return;
-    if (window.location.pathname === redirectPath) return;
+    if (!state.user) {
+      if (window.location.pathname !== redirectPath) {
+        window.location.href = redirectPath;
+      }
+      return;
+    }
+    
+    // Se o usuário está logado mas não tem tenant, redireciona para onboarding
+    if (!state.user.tenantId && window.location.pathname !== "/onboarding") {
+      window.location.href = "/onboarding";
+      return;
+    }
 
-    window.location.href = redirectPath
+    // Se o usuário tem tenant e está no onboarding, redireciona para a home
+    if (state.user.tenantId && window.location.pathname === "/onboarding") {
+      window.location.href = "/";
+      return;
+    }
   }, [
     redirectOnUnauthenticated,
     redirectPath,

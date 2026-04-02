@@ -11,11 +11,13 @@ import Settings from "./pages/Settings";
 import BoardView from "./pages/BoardView";
 import Admin from "./pages/Admin";
 import MasterDashboard from "./pages/MasterDashboard";
+import Onboarding from "./pages/Onboarding";
 
 function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/onboarding"} component={Onboarding} />
       <Route path={"/board/:id"} component={BoardView} />
       <Route path={"/settings"} component={Settings} />
       <Route path={"/admin"} component={Admin} />
