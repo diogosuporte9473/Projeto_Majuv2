@@ -275,8 +275,10 @@ export const appRouter = router({
           password: hashedPassword,
           name: input.name || input.username,
           role: "user",
+          lastSignedIn: new Date(),
         }).returning();
 
+        // 3. Forçar login imediato na sessão após registro
         const sessionToken = authData.session?.access_token;
         if (sessionToken) {
           const cookieOptions = getSessionCookieOptions(ctx.req);
