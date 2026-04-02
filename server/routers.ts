@@ -536,47 +536,73 @@ export const appRouter = router({
   }),
 
   branding: router({
-    get: publicProcedure.query(async () => {
+    get: publicProcedure.query(async ({ ctx }) => {
+      // Busca as configurações baseadas no domínio atual (ctx.domain)
       const { data, error } = await supabase
         .from("app_settings")
         .select("*")
-        .eq("id", 1)
+        .eq("domain", ctx.domain)
         .maybeSingle();
       
       if (error) {
         console.error("[Branding] Error fetching settings:", error);
-        return { appName: "Maju Tasks", appLogoUrl: null };
+        return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
+      }
+      
+      // Se não houver configurações para este domínio, retorna um padrão
+      if (!data) {
+        return { 
+          appName: "Maju Tasks", 
+          appLogoUrl: null, 
+          primaryColor: "#4b4897",
+          isNewTenant: true 
+        };
       }
       
       return {
-        appName: data?.app_name || "Maju Tasks",
-        appLogoUrl: data?.app_logo_url || null
+        appName: data.app_name || "Maju Tasks",
+        appLogoUrl: data.app_logo_url || null,
+        primaryColor: data.primary_color || "#4b4897"
       };
     }),
+    
     update: protectedProcedure
       .input(z.object({
         appName: z.string().optional(),
-        appLogoUrl: z.string().nullable().optional()
+        appLogoUrl: z.string().nullable().optional(),
+        primaryColor: z.string().optional()
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== 'admin') {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem alterar as configurações da aplicação" });
+        // Apenas ADMIN do domínio ou MASTER_ADMIN podem alterar
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'master_admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
         }
 
-        const updateData: any = { id: 1 };
+        const updateData: any = { domain: ctx.domain };
         if (input.appName !== undefined) updateData.app_name = input.appName;
         if (input.appLogoUrl !== undefined) updateData.app_logo_url = input.appLogoUrl;
+        if (input.primaryColor !== undefined) updateData.primary_color = input.primaryColor;
         updateData.updated_at = new Date().toISOString();
 
         const { error } = await supabase
           .from("app_settings")
-          .upsert(updateData, { onConflict: 'id' });
+          .upsert(updateData, { onConflict: 'domain' });
 
         if (error) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
         }
 
         return { success: true };
+      }),
+
+    // Rota exclusiva para Master Admin gerenciar todos os domínios
+    listAllTenants: protectedProcedure
+      .query(async ({ ctx }) => {
+        if (ctx.user.role !== 'master_admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Master Admin" });
+        }
+        const { data } = await supabase.from("app_settings").select("*").order("domain");
+        return data || [];
       }),
   }),
 

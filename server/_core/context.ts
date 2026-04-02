@@ -6,12 +6,18 @@ export type TrpcContext = {
   req: any;
   res: any;
   user: User | null;
+  domain: string;
 };
 
 export async function createContext(
   opts: any
 ): Promise<TrpcContext> {
   let user: User | null = null;
+
+  // Identificar o tenant via domínio (host)
+  const host = opts.req.headers.host || "localhost";
+  // Em produção, você pode querer remover a porta (ex: localhost:3000 -> localhost)
+  const domain = host.split(':')[0];
 
   try {
     user = await sdk.authenticateRequest(opts.req);
@@ -29,5 +35,6 @@ export async function createContext(
     req: opts.req,
     res: opts.res,
     user,
+    domain,
   };
 }

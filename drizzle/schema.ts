@@ -3,7 +3,7 @@ import { pgTable, serial, text, timestamp, varchar, pgEnum, integer, boolean, un
 /**
  * Enums para PostgreSQL
  */
-export const roleEnum = pgEnum("role", ["user", "admin"]);
+export const roleEnum = pgEnum("role", ["user", "admin", "master_admin"]);
 export const memberRoleEnum = pgEnum("member_role", ["viewer", "editor", "admin"]);
 export const syncStatusEnum = pgEnum("sync_status", ["synced", "pending", "failed"]);
 export const notificationTypeEnum = pgEnum("notification_type", ["card_assigned", "card_updated", "card_mirrored", "due_date_alert", "comment_mention"]);
@@ -12,12 +12,14 @@ export const fieldTypeEnum = pgEnum("field_type", ["text", "select", "date", "nu
 /**
  * Core user table backing auth flow.
  */
+// Usuários - Adicionado role 'master_admin' e tenantId
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  name: text("name"),
+  name: text("name").notNull(),
   role: roleEnum("role").default("user").notNull(),
+  tenantId: integer("tenant_id").references(() => appSettings.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   lastSignedIn: timestamp("last_signed_in", { withTimezone: true }).defaultNow().notNull(),
@@ -26,13 +28,14 @@ export const users = pgTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// Boards table - Quadros de tarefas
+// Boards - Agora vinculados a um tenant (domínio)
 export const boards = pgTable("boards", {
   id: serial("id").primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
+  name: text("name").notNull(),
   description: text("description"),
-  color: varchar("color", { length: 7 }).default("#4b4897").notNull(),
-  ownerId: integer("owner_id").notNull(),
+  color: text("color").default("#4b4897").notNull(),
+  ownerId: integer("owner_id").references(() => users.id).notNull(),
+  tenantId: integer("tenant_id").references(() => appSettings.id).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -273,8 +276,10 @@ export type InsertChecklistTemplate = typeof checklistTemplates.$inferInsert;
 // App Settings - Configurações globais da aplicação (Branding)
 export const appSettings = pgTable("app_settings", {
   id: serial("id").primaryKey(),
+  domain: text("domain").unique().notNull(), // Domínio (ex: empresaA.com ou localhost)
   appName: text("app_name").default("Maju Tasks").notNull(),
   appLogoUrl: text("app_logo_url"),
+  primaryColor: text("primary_color").default("#4b4897"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

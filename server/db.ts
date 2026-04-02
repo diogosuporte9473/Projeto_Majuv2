@@ -190,55 +190,33 @@ export async function getUserById(id: number) {
 }
 
 // Board queries
-export async function getUserBoards(userId: number) {
+export async function getUserBoards(userId: number, domain?: string) {
   try {
-    // 1. Buscar usuário para checar role
-    const { data: user, error: userError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (userError) throw userError;
-
-    // 2. Buscar boards
-    let query = supabase.from("boards").select("*");
-
-    if (user?.role !== "admin") {
-      // Buscar boards onde é dono ou membro
-      const { data: memberships } = await supabase
-        .from("board_members")
-        .select("board_id")
-        .eq("user_id", userId);
-
-      const boardIds = memberships?.map(m => m.board_id) || [];
-      
-      if (boardIds.length > 0) {
-        query = query.or(`owner_id.eq.${userId},id.in.(${boardIds.join(",")})`);
-      } else {
-        query = query.eq("owner_id", userId);
-      }
+    // 1. Verificar role do usuário
+    const { data: user } = await supabase.from("users").select("role, tenant_id").eq("id", userId).maybeSingle();
+    
+    // 2. Buscar o ID do tenant (domínio)
+    let tenantId = user?.tenant_id;
+    if (!tenantId && domain) {
+      const { data: tenant } = await supabase.from("app_settings").select("id").eq("domain", domain).maybeSingle();
+      tenantId = tenant?.id;
     }
 
-    const { data, error } = await query;
-    if (error) throw error;
+    // 3. MASTER_ADMIN vê tudo de todos os domínios
+    if (user?.role === "master_admin") {
+      const { data: boards } = await supabase.from("boards").select("*").order("name");
+      return boards || [];
+    }
 
-    // 3. Buscar listas para cada board
-    const boardIds = data?.map(b => b.id) || [];
-    const { data: lists } = await supabase
-      .from("lists")
-      .select("id, board_id, name")
-      .in("board_id", boardIds)
-      .order("position", { ascending: true });
+    // 4. Usuários normais vêem apenas o que pertence ao seu tenant
+    const { data: boards } = await supabase
+      .from("boards")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .or(`owner_id.eq.${userId},id.in.(select board_id from board_members where user_id = ${userId})`)
+      .order("name");
 
-    return (data || []).map((b: any) => ({
-      ...b,
-      ownerId: b.owner_id,
-      lists: (lists || []).filter(l => l.board_id === b.id),
-      // Se created_at não existir no banco, retornamos a data atual para não quebrar a UI
-      createdAt: b.created_at || b.createdAt || new Date().toISOString(),
-      updatedAt: b.updated_at || b.updatedAt || new Date().toISOString()
-    }));
+    return boards || [];
   } catch (error) {
     console.error("[Database] getUserBoards failed:", error);
     return [];
