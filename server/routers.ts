@@ -272,11 +272,44 @@ export const appRouter = router({
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
         const hashedPassword = await bcrypt.hash(input.password, 10);
+        
+        // Lógica de Tenant:
+        // 1. Verificar se já existe um tenant para este domínio
+        let tenantId: number | null = null;
+        const { data: existingTenant } = await supabase
+          .from("app_settings")
+          .select("id")
+          .eq("domain", ctx.domain)
+          .maybeSingle();
+
+        let userRole: "user" | "admin" | "master_admin" = "user";
+
+        if (!existingTenant) {
+          // Se não existe tenant para este domínio, este é o PRIMEIRO usuário (Admin)
+          const { data: newTenant, error: tenantError } = await supabase
+            .from("app_settings")
+            .insert({
+              domain: ctx.domain,
+              app_name: "Minha Empresa", // Nome padrão para ser alterado depois
+              updated_at: new Date().toISOString()
+            })
+            .select("id")
+            .single();
+
+          if (tenantError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao criar ambiente" });
+          tenantId = newTenant.id;
+          userRole = "admin"; // Primeiro usuário do domínio vira Admin
+        } else {
+          tenantId = existingTenant.id;
+          userRole = "user"; // Demais usuários entram como User padrão
+        }
+
         const [user] = await db.insert(users).values({
           username: input.username,
           password: hashedPassword,
           name: input.name || input.username.split('@')[0],
-          role: "user",
+          role: userRole,
+          tenantId: tenantId,
         }).returning();
 
         const sessionToken = authData.session?.access_token;
