@@ -10,6 +10,7 @@ import Home from "./pages/Home";
 import Settings from "./pages/Settings";
 import BoardView from "./pages/BoardView";
 import Admin from "./pages/Admin";
+import MasterDashboard from "./pages/MasterDashboard";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path={"/board/:id"} component={BoardView} />
       <Route path={"/settings"} component={Settings} />
       <Route path={"/admin"} component={Admin} />
+      <Route path={"/master"} component={MasterDashboard} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

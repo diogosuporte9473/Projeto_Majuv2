@@ -3,7 +3,7 @@ import { useRealtimeSync } from "@/_core/hooks/useRealtimeSync";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, LogOut, Settings, Users } from "lucide-react";
+import { Plus, LogOut, Settings, Users, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -154,6 +154,12 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
         </nav>
 
         <div className="p-4 border-t border-primary-foreground/10 space-y-2">
+          {user?.role === 'master_admin' && (
+            <Link href="/master" className="flex items-center gap-2 p-2 rounded bg-accent/20 hover:bg-accent/30 text-accent transition-colors text-sm font-bold">
+              <ShieldAlert className="w-4 h-4" />
+              Painel Master
+            </Link>
+          )}
           {user?.role === 'admin' && (
             <Link href="/admin" className="flex items-center gap-2 p-2 rounded hover:bg-primary-foreground/10 transition-colors text-sm">
               <Users className="w-4 h-4" />
