@@ -74,7 +74,7 @@ export default function Home() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary to-primary/80 text-primary-foreground p-4">
         <div className="bg-white text-foreground p-8 rounded-xl shadow-2xl w-full max-w-md">
-          <h1 className="text-3xl font-bold mb-2 text-center text-primary">Maju Task Manager</h1>
+          <h1 className="text-3xl font-bold mb-2 text-center text-primary">Task Manager</h1>
           <p className="text-muted-foreground mb-8 text-center">
             {isSignUp ? t("home.authSubtitleSignup") : t("home.authSubtitleSignin")}
           </p>
