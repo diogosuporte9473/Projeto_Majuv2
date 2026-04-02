@@ -132,6 +132,8 @@ export async function getUserByUsername(username: string) {
       console.log(`[Database] Found user in Supabase: ${data.username}`);
       return {
         ...data,
+        tenantId: data.tenant_id,
+        authId: data.auth_id,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         lastSignedIn: data.last_signed_in
@@ -173,6 +175,8 @@ export async function getUserById(id: number) {
     if (data) {
       return {
         ...data,
+        tenantId: data.tenant_id,
+        authId: data.auth_id,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         lastSignedIn: data.last_signed_in
@@ -652,6 +656,8 @@ export async function getAllUsers() {
 
     return (data || []).map((user: any) => ({
       ...user,
+      tenantId: user.tenant_id,
+      authId: user.auth_id,
       createdAt: user.created_at,
       updatedAt: user.updated_at,
       lastSignedIn: user.last_signed_in

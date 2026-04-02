@@ -29,10 +29,11 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='tenant_id') THEN
     ALTER TABLE "users" ADD COLUMN "tenant_id" uuid REFERENCES "tenants"("id");
   ELSE
-    -- Se já existe mas o tipo é diferente (ex: integer), precisamos converter ou recriar
-    -- Para este script, vamos assumir que se já existe, o tipo está correto ou o usuário cuidará disso
-    -- Se for integer, o comando abaixo pode falhar, mas o RLS funcionará se o tipo for UUID.
-    ALTER TABLE "users" ALTER COLUMN "tenant_id" TYPE uuid USING tenant_id::uuid;
+    -- Se já existe mas o tipo é diferente (ex: integer), recriamos como UUID
+    IF (SELECT data_type FROM information_schema.columns WHERE table_name='users' AND column_name='tenant_id') <> 'uuid' THEN
+      ALTER TABLE "users" DROP COLUMN "tenant_id" CASCADE;
+      ALTER TABLE "users" ADD COLUMN "tenant_id" uuid REFERENCES "tenants"("id");
+    END IF;
   END IF;
 END $$;
 
@@ -43,7 +44,14 @@ DECLARE
 BEGIN 
   FOR t IN SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('boards', 'lists', 'cards', 'card_comments', 'card_attachments', 'notifications', 'checklist_templates')
   LOOP
-    EXECUTE format('ALTER TABLE %I ADD COLUMN IF NOT EXISTS tenant_id uuid REFERENCES tenants(id)', t);
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = t AND column_name = 'tenant_id') THEN
+      IF (SELECT data_type FROM information_schema.columns WHERE table_name = t AND column_name = 'tenant_id') <> 'uuid' THEN
+        EXECUTE format('ALTER TABLE %I DROP COLUMN tenant_id CASCADE', t);
+        EXECUTE format('ALTER TABLE %I ADD COLUMN tenant_id uuid REFERENCES tenants(id)', t);
+      END IF;
+    ELSE
+      EXECUTE format('ALTER TABLE %I ADD COLUMN tenant_id uuid REFERENCES tenants(id)', t);
+    END IF;
   END LOOP;
 END $$;
 
@@ -70,7 +78,7 @@ ALTER TABLE "checklist_templates" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation_policy ON "tenants";
 CREATE POLICY tenant_isolation_policy ON "tenants" FOR ALL USING (
-  id IN (SELECT tenant_id FROM user_tenants JOIN users ON users.id = user_tenants.user_id WHERE users.auth_id = auth.uid())
+  id IN (SELECT ut.tenant_id FROM user_tenants ut JOIN users u ON u.id = ut.user_id WHERE u.auth_id = auth.uid())
 );
 
 DROP POLICY IF EXISTS user_tenant_isolation_policy ON "user_tenants";

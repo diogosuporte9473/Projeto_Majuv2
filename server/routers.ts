@@ -266,6 +266,7 @@ export const appRouter = router({
         }
 
         const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
         const hashedPassword = await bcrypt.hash(input.password, 10);
         
         const [user] = await db.insert(users).values({
@@ -306,18 +307,21 @@ export const appRouter = router({
 
         const slug = input.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
         
-        const [tenant] = await getDb().insert(tenants).values({
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
+
+        const [tenant] = await db.insert(tenants).values({
           name: input.name,
           slug,
         }).returning();
 
-        await getDb().insert(userTenants).values({
+        await db.insert(userTenants).values({
           userId: ctx.user.id,
           tenantId: tenant.id,
           role: "owner",
         });
 
-        await getDb().update(users).set({
+        await db.update(users).set({
           tenantId: tenant.id,
         }).where(eq(users.id, ctx.user.id));
 
@@ -325,7 +329,9 @@ export const appRouter = router({
       }),
     mine: protectedProcedure.query(async ({ ctx }) => {
       if (!ctx.user?.tenantId) return null;
-      const [tenant] = await getDb().select().from(tenants).where(eq(tenants.id, ctx.user.tenantId));
+      const db = await getDb();
+      if (!db) return null;
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, ctx.user.tenantId));
       return tenant;
     }),
   }),
@@ -474,6 +480,7 @@ export const appRouter = router({
         // Registrar log de exclusão
         await createAuditLog({
           userId: ctx.user.id,
+          tenantId: ctx.tenantId,
           action: 'delete',
           entityType: 'board',
           entityId: input.id,
@@ -496,7 +503,7 @@ export const appRouter = router({
         const board = await getBoardById(input.boardId, ctx.user.id);
         if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found" });
 
-        if (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin') {
+        if (board.ownerId !== ctx.user.id && ctx.user.role !== 'admin') {
           throw new TRPCError({ code: "FORBIDDEN", message: "Only board owner or admin can add members" });
         }
 
@@ -572,7 +579,9 @@ export const appRouter = router({
     get: publicProcedure.query(async ({ ctx }) => {
       if (!ctx.tenantId) return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
       
-      const [data] = await getDb().select().from(tenants).where(eq(tenants.id, ctx.tenantId));
+      const db = await getDb();
+      if (!db) return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
+      const [data] = await db.select().from(tenants).where(eq(tenants.id, ctx.tenantId));
       
       if (!data) {
         return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
@@ -594,10 +603,10 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         if (!ctx.tenantId) throw new TRPCError({ code: "BAD_REQUEST" });
         
-        // Apenas ADMIN do tenant ou MASTER_ADMIN podem alterar
-        // TODO: Validar role no user_tenants
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
         
-        await getDb().update(tenants).set({
+        await db.update(tenants).set({
           name: input.appName,
           appLogoUrl: input.appLogoUrl,
           primaryColor: input.primaryColor,
@@ -612,7 +621,9 @@ export const appRouter = router({
         if (ctx.user.role !== 'master_admin') {
           throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
         }
-        return await getDb().select().from(tenants).orderBy(tenants.name);
+        const db = await getDb();
+        if (!db) return [];
+        return await db.select().from(tenants).orderBy(tenants.name);
       }),
 
     createTenant: protectedProcedure
@@ -626,7 +637,9 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Master Admin pode criar novos ambientes" });
         }
 
-        const [data] = await getDb().insert(tenants).values({
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
+        const [data] = await db.insert(tenants).values({
           name: input.name,
           slug: input.slug,
           primaryColor: input.primaryColor,
@@ -641,7 +654,9 @@ export const appRouter = router({
         if (ctx.user.role !== 'master_admin') {
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Master Admin pode deletar ambientes" });
         }
-        await getDb().delete(tenants).where(eq(tenants.id, input.id));
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
+        await db.delete(tenants).where(eq(tenants.id, input.id));
         return { success: true };
       }),
   }),
@@ -1491,6 +1506,7 @@ export const appRouter = router({
         if (card) {
           await createAuditLog({
             userId: ctx.user.id,
+            tenantId: ctx.tenantId,
             action: input.archived ? 'archive' : 'restore',
             entityType: 'card',
             entityId: input.id,
@@ -1891,6 +1907,7 @@ export const appRouter = router({
             const targetUserId = input.assignedUserId ?? ctx.user.id;
             await createAuditLog({
               userId: targetUserId,
+              tenantId: ctx.tenantId,
               action: "update",
               entityType: "card",
               entityId: updatedItem.card_id,
@@ -2574,7 +2591,7 @@ export const appRouter = router({
           }
           
           const hashedPassword = await bcrypt.hash(input.password, 10);
-          const email = input.username.includes('@') ? input.username : `${input.username}@${ctx.domain}`;
+          const email = input.username.includes('@') ? input.username : `${input.username}@projeto-maju.com`;
 
           // Criar no Supabase Auth também
           const { error: authError } = await supabase.auth.admin.createUser({
@@ -2640,7 +2657,7 @@ export const appRouter = router({
         .input(z.object({ boardId: z.number(), userId: z.number(), role: z.enum(['viewer', 'editor', 'admin']).default('viewer') }))
         .mutation(async ({ ctx, input }) => {
           const board = await getBoardById(input.boardId, ctx.user.id);
-          if (!board || (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin')) {
+          if (!board || (board.ownerId !== ctx.user.id && ctx.user.role !== 'admin')) {
             throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas o dono ou admin pode adicionar membros' });
           }
 
@@ -2657,7 +2674,7 @@ export const appRouter = router({
         .input(z.object({ boardId: z.number(), userId: z.number() }))
         .mutation(async ({ ctx, input }) => {
           const board = await getBoardById(input.boardId, ctx.user.id);
-          if (!board || (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin')) {
+          if (!board || (board.ownerId !== ctx.user.id && ctx.user.role !== 'admin')) {
             throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas o dono ou admin pode remover membros' });
           }
 
