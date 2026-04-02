@@ -62,6 +62,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     const values: InsertUser = {
       username: user.username,
       password: user.password,
+      name: user.name || user.username,
     };
     const updateSet: Record<string, unknown> = {};
 
