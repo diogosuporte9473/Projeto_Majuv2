@@ -594,20 +594,14 @@ export const appRouter = router({
         return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
       }
       
-      // Se não houver configurações para este domínio, retorna um padrão
-      if (!data) {
-        return { 
-          appName: "Maju Tasks", 
-          appLogoUrl: null, 
-          primaryColor: "#4b4897",
-          isNewTenant: true 
-        };
-      }
+      // Se não houver configurações ou o nome for o padrão, sinaliza como NOVO TENANT
+      const isNewTenant = !data || data.app_name === "Minha Empresa" || data.app_name === "Maju Tasks";
       
       return {
-        appName: data.app_name || "Maju Tasks",
-        appLogoUrl: data.app_logo_url || null,
-        primaryColor: data.primary_color || "#4b4897"
+        appName: data?.app_name || "Maju Tasks",
+        appLogoUrl: data?.app_logo_url || null,
+        primaryColor: data?.primary_color || "#4b4897",
+        isNewTenant
       };
     }),
     
