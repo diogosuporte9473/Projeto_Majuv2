@@ -111,15 +111,33 @@ export function useRealtimeSync(boardId?: number) {
         }
       );
 
-    channel.subscribe((status) => {
-      console.log(`[Supabase Realtime] Subscription status for ${boardId || 'global'}:`, status);
-      if (status === 'CHANNEL_ERROR') {
-        console.error("[Supabase Realtime] WebSocket connection error detected");
-      }
-    });
+    let retryTimeout: NodeJS.Timeout;
+
+    const subscribeChannel = () => {
+      channel.subscribe(async (status) => {
+        console.log(`[Supabase Realtime] Subscription status for ${boardId || 'global'}:`, status);
+        
+        if (status === 'CHANNEL_ERROR') {
+          console.error("[Supabase Realtime] WebSocket connection error detected, retrying in 5s...");
+          clearTimeout(retryTimeout);
+          retryTimeout = setTimeout(() => {
+            console.log("[Supabase Realtime] Re-subscribing...");
+            subscribeChannel();
+          }, 5000);
+        }
+        
+        if (status === 'TIMED_OUT') {
+          console.warn("[Supabase Realtime] Connection timed out, retrying...");
+          subscribeChannel();
+        }
+      });
+    };
+
+    subscribeChannel();
 
     return () => {
       console.log(`[Supabase Realtime] Unsubscribing from board: ${boardId || 'all'}`);
+      clearTimeout(retryTimeout);
       supabase.removeChannel(channel);
     };
   }, [boardId]);
