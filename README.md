@@ -45,7 +45,7 @@ Este aplicativo foi desenvolvido por **Diogo Martins**.
   - Campos personalizados.
   - Datas de Início e Entrega.
 - Compartilhamento de quadros com outros usuários.
-- Assistente Maju AI para suporte na organização.
+- Assistente DMS Tesk AI para suporte na organização.
 
 ---
 © 2026 Diogo Martins. Todos os direitos reservados.
