@@ -34,11 +34,23 @@ queryClient.getMutationCache().subscribe((event: any) => {
   }
 });
 
+import { supabase } from "@/lib/supabase";
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
+      async headers() {
+        // Busca a sessão ativa do Supabase no LocalStorage
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          return {
+            Authorization: `Bearer ${session.access_token}`,
+          };
+        }
+        return {};
+      },
       async fetch(input, init) {
         const response = await globalThis.fetch(input, {
           ...(init ?? {}),
