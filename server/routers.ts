@@ -325,6 +325,7 @@ export const appRouter = router({
 
         await db.update(users).set({
           tenantId: tenant.id,
+          role: "admin", // Torna o usuário administrador ao criar o tenant
         }).where(eq(users.id, ctx.user.id));
 
         return tenant;
