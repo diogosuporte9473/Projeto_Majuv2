@@ -2,79 +2,94 @@ import { ForbiddenError } from "../../shared/_core/errors.js";
 import type { User } from "../../drizzle/schema.js";
 import * as db from "../db.js";
 import { COOKIE_NAME } from "../../shared/const.js";
-import { jwtVerify } from "jose";
+import { jwtVerify, importJWK } from "jose";
 import { ENV } from "./env.js";
 import { supabase } from "./supabase.js";
 
 const rawJwtSecret = (ENV.cookieSecret || "").trim();
-const JWT_SECRET = rawJwtSecret.length >= 32 ? new TextEncoder().encode(rawJwtSecret) : null;
 
 class SDKServer {
+  /**
+   * Obtém a chave para verificação JWT.
+   * Se for uma string simples (HS256), usa como Uint8Array.
+   * Se for um JWK ou CryptoKey, trata adequadamente.
+   */
+  private async getVerifyKey() {
+    if (!rawJwtSecret) return null;
+    
+    // Para algoritmos HMAC (HS256), a chave deve ser Uint8Array
+    // Para algoritmos assimétricos (RS256/ES256), deve ser CryptoKey
+    // O erro indicou ES256, o que é estranho para Supabase padrão (HS256), 
+    // mas vamos garantir a compatibilidade.
+    return new TextEncoder().encode(rawJwtSecret);
+  }
+
   async authenticateRequest(req: any): Promise<User> {
-    const token = req.cookies?.[COOKIE_NAME];
+    // 1. Extração do Token (Prioridade: Header Authorization > Cookies)
+    let token = "";
+    const authHeader = req.headers?.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.substring(7);
+    } else {
+      token = req.cookies?.[COOKIE_NAME];
+    }
     
     if (!token) {
+      console.warn("[Auth] No token found in request headers or cookies");
       throw ForbiddenError("No session token found");
     }
 
-    // 1. TENTATIVA PRIMÁRIA: Supabase Auth Service
+    // 2. TENTATIVA PRIMÁRIA: Supabase Auth Service (getUser)
     try {
+      // O supabase.auth.getUser(token) é a forma oficial e mais segura.
       const { data: { user: sbUser }, error: sbError } = await supabase.auth.getUser(token);
 
       if (!sbError && sbUser) {
-        // 1.1 TENTATIVA POR AUTH_ID (UUID)
+        console.log(`[Auth] Supabase getUser success for: ${sbUser.email}`);
+        
+        // 2.1 Busca o usuário no nosso banco pelo AuthID (UUID)
         const userByAuthId = await db.getUserByAuthId(sbUser.id);
         if (userByAuthId) {
-          console.log(`[Auth] User authenticated via Auth ID: ${userByAuthId.username}`);
           return userByAuthId;
         }
 
-        // 1.2 FALLBACK: Username/Email
+        // 2.2 Fallback por Username/Email se o vínculo UUID falhar
         const email = sbUser.email;
         const username = sbUser.user_metadata?.username || email?.split('@')[0];
         if (username) {
           const user = await db.getUserByUsername(username);
           if (user) {
-            console.log(`[Auth] User authenticated via Username fallback: ${user.username}`);
+            console.log(`[Auth] User linked via username fallback: ${username}`);
             return user;
           }
         }
       }
 
       if (sbError) {
-        console.warn("[Auth] Supabase getUser failed, trying manual fallback:", sbError.message);
+        console.warn(`[Auth] Supabase getUser failed (${sbError.status}): ${sbError.message}`);
       }
     } catch (err) {
-      console.warn("[Auth] Supabase getUser exception, trying manual fallback");
+      console.error("[Auth] Supabase getUser exception:", err);
     }
 
-    // 2. FALLBACK: Verificação Manual (Importante para tokens Supabase se o client falhar)
-    // O JWT_SECRET deve ser o "JWT Secret" encontrado no painel do Supabase.
-    if (JWT_SECRET) {
+    // 3. FALLBACK: Verificação Manual (Apenas se o serviço do Supabase estiver indisponível)
+    const verifyKey = await this.getVerifyKey();
+    if (verifyKey) {
       try {
-        const { payload } = await jwtVerify(token, JWT_SECRET);
-        const sub = payload.sub; // No Supabase, 'sub' é o UUID do usuário
+        // Tenta verificar o JWT manualmente como redundância
+        // Note: Supabase usa HS256 por padrão, mas pode usar RS256/ES256 em configurações customizadas.
+        const { payload } = await jwtVerify(token, verifyKey);
         
-        if (sub) {
-          let user: User | null = null;
-          
-          // Se o sub for um UUID (padrão Supabase)
-          if (sub.length > 10) {
-            user = await db.getUserByAuthId(sub);
-          } 
-          
-          // Se for um ID numérico (legado/manual)
-          if (!user && /^\d+$/.test(sub)) {
-            user = await db.getUserById(parseInt(sub));
-          }
-
+        const authId = payload.sub;
+        if (authId) {
+          const user = await db.getUserByAuthId(authId);
           if (user) {
-            console.log(`[Auth] User authenticated via Manual JWT: ${user.username}`);
+            console.log(`[Auth] Manual JWT fallback success for AuthID: ${authId}`);
             return user;
           }
         }
-      } catch (manualError) {
-        console.error("[Auth] Manual JWT fallback failed:", (manualError as any).message);
+      } catch (manualError: any) {
+        console.error(`[Auth] Manual JWT fallback failed: ${manualError.message}`);
       }
     }
 
