@@ -279,6 +279,7 @@ export const appRouter = router({
         }).returning();
 
         // 3. Forçar login imediato na sessão após registro
+        // Usamos o token do Supabase para garantir que o sub claim seja o UUID correto
         const sessionToken = authData.session?.access_token;
         if (sessionToken) {
           const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -2597,7 +2598,7 @@ export const appRouter = router({
           const email = input.username.includes('@') ? input.username : `${input.username}@projeto-maju.com`;
 
           // Criar no Supabase Auth também
-          const { error: authError } = await supabase.auth.admin.createUser({
+          const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
             email,
             password: input.password,
             email_confirm: true,
@@ -2606,14 +2607,17 @@ export const appRouter = router({
 
           if (authError) {
             console.error("[Admin] Supabase Auth user creation failed:", authError.message);
+            throw new TRPCError({ code: 'BAD_REQUEST', message: `Erro no Auth: ${authError.message}` });
           }
 
           const { data, error } = await supabase.from("users").insert({
+            auth_id: authUser.user.id, // Salva o UUID correto do Auth
             username: input.username,
             password: hashedPassword,
             name: input.name,
             role: input.role,
             tenant_id: ctx.user.tenantId, // Vincular ao mesmo ambiente do criador
+            last_signed_in: new Date().toISOString()
           }).select("id").single();
 
           if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
