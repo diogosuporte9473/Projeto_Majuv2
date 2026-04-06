@@ -40,6 +40,8 @@ import {
   projectDates,
   notes,
   checklistTemplates,
+  tenants,
+  userTenants,
 } from "../drizzle/schema.js";
 import { invokeLLM, Message } from "./_core/llm.js";
 import { ENV } from "./_core/env.js";
@@ -51,6 +53,7 @@ import { supabase } from "./_core/supabase.js";
  */
 async function createAuditLog({
   userId,
+  tenantId,
   action,
   entityType,
   entityId,
@@ -58,6 +61,7 @@ async function createAuditLog({
   details
 }: {
   userId: number;
+  tenantId: string | null;
   action: 'create' | 'update' | 'archive' | 'delete' | 'restore';
   entityType: 'board' | 'card' | 'user';
   entityId: number;
@@ -67,6 +71,7 @@ async function createAuditLog({
   try {
     await supabase.from("audit_logs").insert({
       user_id: userId,
+      tenant_id: tenantId,
       action,
       entity_type: entityType,
       entity_id: entityId,
@@ -179,7 +184,6 @@ export const appRouter = router({
       .input(z.object({ username: z.string(), password: z.string() }))
       .mutation(async ({ input, ctx }) => {
         // 1. Tentar login via Supabase Auth
-        // Como o Supabase exige email, vamos transformar o username em email
         const email = input.username.includes('@') ? input.username : `${input.username}@projeto-maju.com`;
         
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -190,7 +194,6 @@ export const appRouter = router({
         if (authError) {
           console.warn("[Auth] Supabase login failed, trying Drizzle fallback:", authError.message);
           
-          // 2. Fallback para o banco Drizzle (usuários antigos)
           const user = await getUserByUsername(input.username);
           if (!user) {
             throw new TRPCError({ code: "UNAUTHORIZED", message: "User not found" });
@@ -201,7 +204,6 @@ export const appRouter = router({
             throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid password" });
           }
 
-          // Gerar token manual (comportamento antigo)
           const token = await new SignJWT({})
             .setProtectedHeader({ alg: "HS256" })
             .setSubject(user.id.toString())
@@ -218,14 +220,11 @@ export const appRouter = router({
           return user;
         }
 
-        // 3. Se o login no Supabase funcionou, buscar o usuário no Drizzle
-        // (Assume-se que o Supabase e o Drizzle estão em sincronia via Triggers ou manual)
         const user = await getUserByUsername(input.username);
         if (!user) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "User found in Auth but not in Database" });
         }
 
-        // EM VEZ DE GERAR TOKEN MANUAL, USAR O TOKEN DO SUPABASE
         const sessionToken = authData.session?.access_token;
         if (!sessionToken) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No access token returned from Supabase" });
@@ -248,7 +247,6 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const email = input.username.includes('@') ? input.username : `${input.username}@projeto-maju.com`;
 
-        // 1. Criar no Supabase Auth
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password: input.password,
@@ -267,28 +265,28 @@ export const appRouter = router({
           });
         }
 
-        // 2. Criar no banco Drizzle
         const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
         const hashedPassword = await bcrypt.hash(input.password, 10);
+        
         const [user] = await db.insert(users).values({
+          authId: authData.user?.id, // Salva o ID do Supabase Auth
           username: input.username,
           password: hashedPassword,
-          name: input.name || input.username.split('@')[0],
+          name: input.name || input.username,
           role: "user",
+          lastSignedIn: new Date(),
         }).returning();
 
+        // 3. Forçar login imediato na sessão após registro
         const sessionToken = authData.session?.access_token;
-        if (!sessionToken) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Registration successful but no token returned" });
+        if (sessionToken) {
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.cookie(COOKIE_NAME, sessionToken, {
+            ...cookieOptions,
+            maxAge: (authData.session?.expires_in || 3600) * 1000,
+          });
         }
-
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, sessionToken, {
-          ...cookieOptions,
-          maxAge: (authData.session?.expires_in || 3600) * 1000,
-        });
 
         return user;
       }),
@@ -301,22 +299,62 @@ export const appRouter = router({
     }),
   }),
 
+  tenant: router({
+    create: protectedProcedure
+      .input(z.object({ name: z.string().min(3) }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) {
+          throw new TRPCError({ code: "UNAUTHORIZED" });
+        }
+
+        const slug = input.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+        
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
+
+        const [tenant] = await db.insert(tenants).values({
+          name: input.name,
+          slug,
+        }).returning();
+
+        await db.insert(userTenants).values({
+          userId: ctx.user.id,
+          tenantId: tenant.id,
+          role: "owner",
+        });
+
+        await db.update(users).set({
+          tenantId: tenant.id,
+          role: "admin", // Torna o usuário administrador ao criar o tenant
+        }).where(eq(users.id, ctx.user.id));
+
+        return tenant;
+      }),
+    mine: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user?.tenantId) return null;
+      const db = await getDb();
+      if (!db) return null;
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, ctx.user.tenantId));
+      return tenant;
+    }),
+  }),
+
   // Board routers
   boards: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      return await getUserBoards(ctx.user.id);
+      return await getUserBoards(ctx.user.id, ctx.tenantId || undefined);
     }),
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        const board = await getBoardById(input.id, ctx.user.id);
+        const board = await getBoardById(input.id, ctx.user.id, ctx.tenantId || undefined);
         if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found or access denied" });
         return board;
       }),
     getMembers: protectedProcedure
       .input(z.object({ boardId: z.number() }))
       .query(async ({ ctx, input }) => {
-        const board = await getBoardById(input.boardId, ctx.user.id);
+        const board = await getBoardById(input.boardId, ctx.user.id, ctx.tenantId || undefined);
         if (!board) throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
 
         const { data, error } = await supabase
@@ -349,6 +387,7 @@ export const appRouter = router({
             description: input.description || "",
             color: input.color,
             owner_id: ctx.user.id,
+            tenant_id: ctx.user.tenantId, // Vincular ao tenant do usuário
           })
           .select("id")
           .single();
@@ -364,6 +403,7 @@ export const appRouter = router({
         // Registrar log
         await createAuditLog({
           userId: ctx.user.id,
+          tenantId: ctx.tenantId,
           action: 'create',
           entityType: 'board',
           entityId: board.id,
@@ -376,6 +416,7 @@ export const appRouter = router({
           .from("lists")
           .insert({
             board_id: board.id,
+            tenant_id: ctx.tenantId,
             name: "Caixa de Entrada",
             position: 0,
           });
@@ -415,6 +456,7 @@ export const appRouter = router({
         // Registrar log de atualização
         await createAuditLog({
           userId: ctx.user.id,
+          tenantId: ctx.tenantId,
           action: 'update',
           entityType: 'board',
           entityId: input.id,
@@ -441,6 +483,7 @@ export const appRouter = router({
         // Registrar log de exclusão
         await createAuditLog({
           userId: ctx.user.id,
+          tenantId: ctx.tenantId,
           action: 'delete',
           entityType: 'board',
           entityId: input.id,
@@ -463,7 +506,7 @@ export const appRouter = router({
         const board = await getBoardById(input.boardId, ctx.user.id);
         if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found" });
 
-        if (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin') {
+        if (board.ownerId !== ctx.user.id && ctx.user.role !== 'admin') {
           throw new TRPCError({ code: "FORBIDDEN", message: "Only board owner or admin can add members" });
         }
 
@@ -536,46 +579,87 @@ export const appRouter = router({
   }),
 
   branding: router({
-    get: publicProcedure.query(async () => {
-      const { data, error } = await supabase
-        .from("app_settings")
-        .select("*")
-        .eq("id", 1)
-        .maybeSingle();
+    get: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.tenantId) return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
       
-      if (error) {
-        console.error("[Branding] Error fetching settings:", error);
-        return { appName: "Maju Tasks", appLogoUrl: null };
+      const db = await getDb();
+      if (!db) return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
+      const [data] = await db.select().from(tenants).where(eq(tenants.id, ctx.tenantId));
+      
+      if (!data) {
+        return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
       }
       
       return {
-        appName: data?.app_name || "Maju Tasks",
-        appLogoUrl: data?.app_logo_url || null
+        appName: data.name || "Maju Tasks",
+        appLogoUrl: data.appLogoUrl || null,
+        primaryColor: data.primaryColor || "#4b4897",
       };
     }),
+    
     update: protectedProcedure
       .input(z.object({
         appName: z.string().optional(),
-        appLogoUrl: z.string().nullable().optional()
+        appLogoUrl: z.string().nullable().optional(),
+        primaryColor: z.string().optional()
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== 'admin') {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem alterar as configurações da aplicação" });
+        if (!ctx.tenantId) throw new TRPCError({ code: "BAD_REQUEST" });
+        
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
+        
+        await db.update(tenants).set({
+          name: input.appName,
+          appLogoUrl: input.appLogoUrl,
+          primaryColor: input.primaryColor,
+          updatedAt: new Date(),
+        }).where(eq(tenants.id, ctx.tenantId));
+
+        return { success: true };
+      }),
+
+    listAllTenants: protectedProcedure
+      .query(async ({ ctx }) => {
+        if (ctx.user.role !== 'master_admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+        }
+        const db = await getDb();
+        if (!db) return [];
+        return await db.select().from(tenants).orderBy(tenants.name);
+      }),
+
+    createTenant: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        slug: z.string().min(3),
+        primaryColor: z.string().default("#4b4897")
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'master_admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Master Admin pode criar novos ambientes" });
         }
 
-        const updateData: any = { id: 1 };
-        if (input.appName !== undefined) updateData.app_name = input.appName;
-        if (input.appLogoUrl !== undefined) updateData.app_logo_url = input.appLogoUrl;
-        updateData.updated_at = new Date().toISOString();
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
+        const [data] = await db.insert(tenants).values({
+          name: input.name,
+          slug: input.slug,
+          primaryColor: input.primaryColor,
+        }).returning();
 
-        const { error } = await supabase
-          .from("app_settings")
-          .upsert(updateData, { onConflict: 'id' });
+        return { success: true, id: data.id };
+      }),
 
-        if (error) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    deleteTenant: protectedProcedure
+      .input(z.object({ id: z.string().uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== 'master_admin') {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Master Admin pode deletar ambientes" });
         }
-
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database connection failed" });
+        await db.delete(tenants).where(eq(tenants.id, input.id));
         return { success: true };
       }),
   }),
@@ -602,7 +686,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const board = await getBoardById(input.boardId, ctx.user.id);
+        const board = await getBoardById(input.boardId, ctx.user.id, ctx.tenantId || undefined);
         if (!board) {
           throw new TRPCError({
             code: "NOT_FOUND",
@@ -618,6 +702,7 @@ export const appRouter = router({
           .from("lists")
           .insert({
             board_id: input.boardId,
+            tenant_id: ctx.tenantId,
             name: input.name,
             position,
           })
@@ -692,6 +777,7 @@ export const appRouter = router({
             .from("cards")
             .insert({
               list_id: input.listId,
+              tenant_id: ctx.tenantId,
               title: input.title,
               description: input.description || "",
               position,
@@ -712,6 +798,7 @@ export const appRouter = router({
           // Registrar log
           await createAuditLog({
             userId: ctx.user.id,
+            tenantId: ctx.tenantId,
             action: 'create',
             entityType: 'card',
             entityId: data.id,
@@ -781,6 +868,7 @@ export const appRouter = router({
         if (card) {
           await createAuditLog({
             userId: ctx.user.id,
+            tenantId: ctx.tenantId,
             action: 'update',
             entityType: 'card',
             entityId: input.id,
@@ -980,7 +1068,15 @@ export const appRouter = router({
           .from("cards")
           .select(`
             *,
-            list:list_id(id, name, board:board_id(id, name))
+            list:list_id(
+              id, 
+              name, 
+              board:board_id(
+                id, 
+                name,
+                owner:owner_id(id, name)
+              )
+            )
           `)
           .eq("id", input.id)
           .single();
@@ -1007,9 +1103,15 @@ export const appRouter = router({
           };
         }) || [];
 
+        const boardOwnerName = (card as any).list?.board?.owner?.name || "Desconhecido";
+
         return {
           ...card,
-          linkedBoards
+          startDate: card.start_date,
+          dueDate: card.due_date,
+          assignedTo: card.assigned_to,
+          linkedBoards,
+          boardOwnerName
         };
       }),
 
@@ -1407,6 +1509,7 @@ export const appRouter = router({
         if (card) {
           await createAuditLog({
             userId: ctx.user.id,
+            tenantId: ctx.tenantId,
             action: input.archived ? 'archive' : 'restore',
             entityType: 'card',
             entityId: input.id,
@@ -1502,8 +1605,8 @@ export const appRouter = router({
       .input(z.object({ cardId: z.number() }))
       .query(async ({ input }) => {
         const [groups, items] = await Promise.all([
-          supabase.from("card_checklist_groups").select("*").eq("card_id", input.cardId),
-          supabase.from("card_checklists").select("*").eq("card_id", input.cardId)
+          supabase.from("card_checklist_groups").select("*").eq("card_id", input.cardId).order("position", { ascending: true }),
+          supabase.from("card_checklists").select("*").eq("card_id", input.cardId).order("position", { ascending: true })
         ]);
 
         const checklistGroups = groups.data || [];
@@ -1807,6 +1910,7 @@ export const appRouter = router({
             const targetUserId = input.assignedUserId ?? ctx.user.id;
             await createAuditLog({
               userId: targetUserId,
+              tenantId: ctx.tenantId,
               action: "update",
               entityType: "card",
               entityId: updatedItem.card_id,
@@ -2178,7 +2282,7 @@ export const appRouter = router({
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
-        // Sincronizar com espelhos
+        // Sincronizar com espelhos e Trigger Realtime
         try {
           const { data: mirrors } = await supabase
             .from("mirrored_cards")
@@ -2195,8 +2299,12 @@ export const appRouter = router({
                 user_id: ctx.user.id,
                 content: input.content,
               });
+              // Trigger realtime update no card espelhado
+              await supabase.from("cards").update({ updated_at: new Date().toISOString() }).eq("id", cardId);
             }
           }
+          // Trigger realtime update no card original
+          await supabase.from("cards").update({ updated_at: new Date().toISOString() }).eq("id", input.cardId);
         } catch (e) {
           console.error("[Mirror Sync] Comment sync failed:", e);
         }
@@ -2452,12 +2560,26 @@ export const appRouter = router({
   admin: router({ 
     users: router({
       list: protectedProcedure.query(async ({ ctx }) => {
-        if (ctx.user.role !== 'admin') {
-          throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas administradores podem listar usuários' });
+        // MASTER_ADMIN vê todos os usuários do sistema
+        if (ctx.user.role === 'master_admin') {
+          const { data, error } = await supabase.from("users").select("id, username, name, role, createdAt").order("name");
+          if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+          return data || [];
         }
-        const { data, error } = await supabase.from("users").select("id, username, name, role, createdAt");
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-        return data || [];
+
+        // Admin local vê apenas usuários do MESMO TENANT
+        if (ctx.user.role === 'admin') {
+          const { data, error } = await supabase
+            .from("users")
+            .select("id, username, name, role, createdAt")
+            .eq("tenant_id", ctx.user.tenantId)
+            .order("name");
+          
+          if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+          return data || [];
+        }
+
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
       }),
       create: protectedProcedure
         .input(z.object({
@@ -2467,15 +2589,15 @@ export const appRouter = router({
           role: z.enum(['user', 'admin']).default('user'),
         }))
         .mutation(async ({ ctx, input }) => {
-          if (ctx.user.role !== 'admin') {
-            throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas administradores podem criar usuários' });
+          if (ctx.user.role !== 'admin' && ctx.user.role !== 'master_admin') {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
           }
           
           const hashedPassword = await bcrypt.hash(input.password, 10);
           const email = input.username.includes('@') ? input.username : `${input.username}@projeto-maju.com`;
 
-          // Criar no Supabase Auth também para manter consistência se necessário
-          const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+          // Criar no Supabase Auth também
+          const { error: authError } = await supabase.auth.admin.createUser({
             email,
             password: input.password,
             email_confirm: true,
@@ -2491,6 +2613,7 @@ export const appRouter = router({
             password: hashedPassword,
             name: input.name,
             role: input.role,
+            tenant_id: ctx.user.tenantId, // Vincular ao mesmo ambiente do criador
           }).select("id").single();
 
           if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
@@ -2537,7 +2660,7 @@ export const appRouter = router({
         .input(z.object({ boardId: z.number(), userId: z.number(), role: z.enum(['viewer', 'editor', 'admin']).default('viewer') }))
         .mutation(async ({ ctx, input }) => {
           const board = await getBoardById(input.boardId, ctx.user.id);
-          if (!board || (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin')) {
+          if (!board || (board.ownerId !== ctx.user.id && ctx.user.role !== 'admin')) {
             throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas o dono ou admin pode adicionar membros' });
           }
 
@@ -2554,7 +2677,7 @@ export const appRouter = router({
         .input(z.object({ boardId: z.number(), userId: z.number() }))
         .mutation(async ({ ctx, input }) => {
           const board = await getBoardById(input.boardId, ctx.user.id);
-          if (!board || (board.owner_id !== ctx.user.id && ctx.user.role !== 'admin')) {
+          if (!board || (board.ownerId !== ctx.user.id && ctx.user.role !== 'admin')) {
             throw new TRPCError({ code: 'FORBIDDEN', message: 'Apenas o dono ou admin pode remover membros' });
           }
 
