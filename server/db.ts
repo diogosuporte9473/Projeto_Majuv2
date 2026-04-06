@@ -26,17 +26,17 @@ let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  
+  if (!_db && connectionString) {
     try {
-      // DEBUG: Log the database URL format to check Vercel env vars
-      const urlForLogging = process.env.DATABASE_URL.replace(/:([^:]+)@/, ':[REDACTED]@');
-      console.log("[Database] Attempting to connect with URL format:", urlForLogging);
-
-      console.log("[Database] Connecting to:", process.env.DATABASE_URL.split('@')[1] || "local");
-      const queryClient = postgres(process.env.DATABASE_URL, {
+      // DEBUG: Log which environment variable is being used
+      console.log("[Database] Connecting using:", process.env.POSTGRES_URL ? "POSTGRES_URL (Vercel Integration)" : "DATABASE_URL");
+      
+      const queryClient = postgres(connectionString, {
         connect_timeout: 10,
         max: 10,
-        prepare: false, // Necessário para modo Transaction do Supavisor/PgBouncer
+        prepare: false,
       });
       _db = drizzle(queryClient);
     } catch (error) {
