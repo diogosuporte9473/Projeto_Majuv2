@@ -160,6 +160,40 @@ export async function getUserByUsername(username: string) {
   }
 }
 
+export async function getUserByAuthId(authId: string) {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("auth_id", authId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[Database] Error fetching user by Auth ID via REST:", error);
+    }
+
+    if (data) {
+      return {
+        ...data,
+        tenantId: data.tenant_id,
+        authId: data.auth_id,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        lastSignedIn: data.last_signed_in
+      } as any;
+    }
+
+    // Fallback para Drizzle
+    const db = await getDb();
+    if (!db) return undefined;
+    const results = await db.select().from(users).where(eq(users.authId, authId)).limit(1);
+    return results[0] || undefined;
+  } catch (error) {
+    console.error("[Database] getUserByAuthId failed:", error);
+    return undefined;
+  }
+}
+
 export async function getUserById(id: number) {
   try {
     const { data, error } = await supabase

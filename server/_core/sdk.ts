@@ -2,26 +2,43 @@ import { ForbiddenError } from "../../shared/_core/errors.js";
 import type { User } from "../../drizzle/schema.js";
 import * as db from "../db.js";
 import { COOKIE_NAME } from "../../shared/const.js";
-import { jwtVerify, importJWK } from "jose";
+import { jwtVerify, createRemoteJWKSet, decodeJwt } from "jose";
 import { ENV } from "./env.js";
 import { supabase } from "./supabase.js";
 
 const rawJwtSecret = (ENV.cookieSecret || "").trim();
+const JWKS_URL = ENV.supabaseJwksUrl || `${ENV.supabaseUrl}/auth/v1/.well-known/jwks.json`;
+
+// Cache para o JWKSet remoto para evitar buscas repetitivas por requisição
+let remoteJWKSet: any = null;
+function getRemoteJWKSet() {
+  if (!remoteJWKSet && JWKS_URL) {
+    remoteJWKSet = createRemoteJWKSet(new URL(JWKS_URL));
+  }
+  return remoteJWKSet;
+}
 
 class SDKServer {
-  /**
-   * Obtém a chave para verificação JWT.
-   * Se for uma string simples (HS256), usa como Uint8Array.
-   * Se for um JWK ou CryptoKey, trata adequadamente.
-   */
-  private async getVerifyKey() {
-    if (!rawJwtSecret) return null;
-    
-    // Para algoritmos HMAC (HS256), a chave deve ser Uint8Array
-    // Para algoritmos assimétricos (RS256/ES256), deve ser CryptoKey
-    // O erro indicou ES256, o que é estranho para Supabase padrão (HS256), 
-    // mas vamos garantir a compatibilidade.
-    return new TextEncoder().encode(rawJwtSecret);
+  private async getVerifyKey(token: string) {
+    try {
+      const header = decodeJwt(token) as any;
+      
+      // Se for HS256 (Padrão Supabase local), usamos o segredo do projeto
+      if (header?.alg === "HS256") {
+        if (!rawJwtSecret) return null;
+        return new TextEncoder().encode(rawJwtSecret);
+      }
+      
+      // Se for RS256 ou ES256, usamos o JWKS remoto do Supabase Auth
+      if (header?.alg === "RS256" || header?.alg === "ES256") {
+        return getRemoteJWKSet();
+      }
+      
+      return null;
+    } catch (err) {
+      console.error("[Auth] Failed to decode JWT header:", err);
+      return null;
+    }
   }
 
   async authenticateRequest(req: any): Promise<User> {
@@ -69,15 +86,14 @@ class SDKServer {
         console.warn(`[Auth] Supabase getUser failed (${sbError.status}): ${sbError.message}`);
       }
     } catch (err) {
-      console.error("[Auth] Supabase getUser exception:", err);
+      console.error("[Auth] Supabase getUser exception, trying manual fallback:", err);
     }
 
-    // 3. FALLBACK: Verificação Manual (Apenas se o serviço do Supabase estiver indisponível)
-    const verifyKey = await this.getVerifyKey();
+    // 3. FALLBACK: Verificação Manual (Apenas se o serviço do Supabase estiver indisponível ou falhar)
+    const verifyKey = await this.getVerifyKey(token);
     if (verifyKey) {
       try {
         // Tenta verificar o JWT manualmente como redundância
-        // Note: Supabase usa HS256 por padrão, mas pode usar RS256/ES256 em configurações customizadas.
         const { payload } = await jwtVerify(token, verifyKey);
         
         const authId = payload.sub;

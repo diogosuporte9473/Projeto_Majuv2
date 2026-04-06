@@ -109,6 +109,11 @@ const auditRouter = router({
         .from("audit_logs")
         .select("*, users(name, username)", { count: "exact" });
 
+      // Filtro obrigatório de Tenant (exceto para Master Admin)
+      if (ctx.user.role !== 'master_admin') {
+        query = query.eq("tenant_id", ctx.user.tenantId);
+      }
+
       if (input.userId) query = query.eq("user_id", input.userId);
       if (input.action) query = query.eq("action", input.action);
       if (input.startDate) query = query.gte("created_at", input.startDate);
@@ -2561,23 +2566,34 @@ export const appRouter = router({
   admin: router({ 
     users: router({
       list: protectedProcedure.query(async ({ ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database connection failed' });
+
         // MASTER_ADMIN vê todos os usuários do sistema
         if (ctx.user.role === 'master_admin') {
-          const { data, error } = await supabase.from("users").select("id, username, name, role, createdAt").order("name");
-          if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-          return data || [];
+          const results = await db.select({
+            id: users.id,
+            username: users.username,
+            name: users.name,
+            role: users.role,
+            createdAt: users.createdAt
+          }).from(users).orderBy(users.name);
+          return results;
         }
 
         // Admin local vê apenas usuários do MESMO TENANT
         if (ctx.user.role === 'admin') {
-          const { data, error } = await supabase
-            .from("users")
-            .select("id, username, name, role, createdAt")
-            .eq("tenant_id", ctx.user.tenantId)
-            .order("name");
+          const results = await db.select({
+            id: users.id,
+            username: users.username,
+            name: users.name,
+            role: users.role,
+            createdAt: users.createdAt
+          }).from(users)
+            .where(eq(users.tenantId, ctx.user.tenantId || ""))
+            .orderBy(users.name);
           
-          if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-          return data || [];
+          return results;
         }
 
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
@@ -2621,6 +2637,16 @@ export const appRouter = router({
           }).select("id").single();
 
           if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+
+          // IMPORTANTE: Também vincular na tabela user_tenants para isolamento RLS
+          if (ctx.user.tenantId) {
+            await supabase.from("user_tenants").insert({
+              user_id: data.id,
+              tenant_id: ctx.user.tenantId,
+              role: input.role === 'admin' ? 'admin' : 'member'
+            });
+          }
+
           return { id: data.id };
         }),
       update: protectedProcedure
