@@ -53,7 +53,7 @@ export default function Admin() {
   const grantPermissionMutation = trpc.admin.boards.addMember.useMutation();
   const revokePermissionMutation = trpc.admin.boards.removeMember.useMutation();
 
-  if (user?.role !== "admin") {
+  if (user?.role !== "admin" && user?.role !== "master_admin") {
     return (
       <TrelloDashboardLayout>
         <div className="p-8">

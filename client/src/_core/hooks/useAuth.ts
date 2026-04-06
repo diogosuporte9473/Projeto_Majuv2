@@ -65,14 +65,14 @@ export function useAuth(options?: UseAuthOptions) {
     }
     
     // 2. Redirecionamento para Onboarding se não tiver tenant
-    // Isso deve acontecer SEMPRE que o usuário estiver logado, independente do redirectOnUnauthenticated
-    if (!state.user.tenantId && window.location.pathname !== "/onboarding") {
+    // Master Admin e usuários já vinculados não precisam de onboarding
+    if (state.user.role !== 'master_admin' && !state.user.tenantId && window.location.pathname !== "/onboarding") {
       window.location.href = "/onboarding";
       return;
     }
 
-    // 3. Se o usuário já tem tenant e está no onboarding, manda pra home
-    if (state.user.tenantId && window.location.pathname === "/onboarding") {
+    // 3. Se o usuário já tem tenant ou é master admin e está no onboarding, manda pra home
+    if ((state.user.tenantId || state.user.role === 'master_admin') && window.location.pathname === "/onboarding") {
       window.location.href = "/";
       return;
     }
