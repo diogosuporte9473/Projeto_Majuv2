@@ -103,19 +103,28 @@ DROP POLICY IF EXISTS "users_update_own_profile" ON "users";
 
 -- Criamos uma política permissiva apenas para o INSERT (necessário para o registro)
 -- O Supabase Auth criará o usuário primeiro, e o servidor fará o insert na tabela public.users.
+DROP POLICY IF EXISTS "permit_insert_for_registration" ON "users";
 CREATE POLICY "permit_insert_for_registration" ON "users"
   FOR INSERT 
   WITH CHECK (true);
 
 -- Criamos políticas restritivas para SELECT e UPDATE (segurança de dados)
+DROP POLICY IF EXISTS "users_see_own_profile" ON "users";
 CREATE POLICY "users_see_own_profile" ON "users"
   FOR SELECT
   USING (auth_id = auth.uid());
 
+DROP POLICY IF EXISTS "users_update_own_profile" ON "users";
 CREATE POLICY "users_update_own_profile" ON "users"
   FOR UPDATE
   USING (auth_id = auth.uid())
   WITH CHECK (auth_id = auth.uid());
+
+-- Permitir que o servidor (usuário postgres) veja os registros para o 'returning' do Drizzle
+DROP POLICY IF EXISTS "server_select_all_users" ON "users";
+CREATE POLICY "server_select_all_users" ON "users"
+  FOR SELECT
+  USING (current_user = 'postgres');
 
 -- 3. Business Tables RLS Helper Functions
 -- Atualizadas para serem mais resilientes
