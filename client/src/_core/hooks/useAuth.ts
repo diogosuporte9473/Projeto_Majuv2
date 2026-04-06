@@ -54,22 +54,24 @@ export function useAuth(options?: UseAuthOptions) {
   ]);
 
   useEffect(() => {
-    if (!redirectOnUnauthenticated) return;
     if (meQuery.isLoading || logoutMutation.isPending) return;
+    
+    // 1. Redirecionamento se não autenticado
     if (!state.user) {
-      if (window.location.pathname !== redirectPath) {
+      if (redirectOnUnauthenticated && window.location.pathname !== redirectPath) {
         window.location.href = redirectPath;
       }
       return;
     }
     
-    // Se o usuário está logado mas não tem tenant, redireciona para onboarding
+    // 2. Redirecionamento para Onboarding se não tiver tenant
+    // Isso deve acontecer SEMPRE que o usuário estiver logado, independente do redirectOnUnauthenticated
     if (!state.user.tenantId && window.location.pathname !== "/onboarding") {
       window.location.href = "/onboarding";
       return;
     }
 
-    // Se o usuário tem tenant e está no onboarding, redireciona para a home
+    // 3. Se o usuário já tem tenant e está no onboarding, manda pra home
     if (state.user.tenantId && window.location.pathname === "/onboarding") {
       window.location.href = "/";
       return;
