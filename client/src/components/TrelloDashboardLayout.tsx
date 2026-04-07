@@ -107,18 +107,18 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
                 {user?.role === 'master_admin' ? (
                   // Agrupamento por Tenant para Master Admin
                   Object.entries(
-                    boards.reduce((acc, board) => {
+                    (boards || []).reduce((acc: Record<string, any[]>, board) => {
                       const tenant = (board as any).tenantName || "Geral";
                       if (!acc[tenant]) acc[tenant] = [];
                       acc[tenant].push(board);
                       return acc;
-                    }, {} as Record<string, typeof boards>)
+                    }, {})
                   ).map(([tenant, tenantBoards]) => (
                     <div key={tenant} className="space-y-1">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-primary-foreground/40 px-3 py-1 bg-primary-foreground/5 rounded-sm mb-1">
                         {tenant}
                       </p>
-                      {tenantBoards.map((board) => (
+                      {(tenantBoards as any[]).map((board: any) => (
                         <Link key={board.id} href={`/board/${board.id}`} className="block p-2 rounded-lg hover:bg-primary-foreground/10 transition-colors text-sm font-bold" style={{ color: 'var(--sidebar-board-text)' }}>
                           <div className="flex items-center gap-2">
                             <div
@@ -134,7 +134,7 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
                 ) : (
                   // Listagem normal para usuários comuns
                   <div className="space-y-1">
-                    {boards.map((board) => (
+                    {(boards || []).map((board: any) => (
                       <Link key={board.id} href={`/board/${board.id}`} className="block p-3 rounded-lg hover:bg-primary-foreground/10 transition-colors text-sm font-bold" style={{ color: 'var(--sidebar-board-text)' }}>
                         <div className="flex items-center gap-2">
                           <div
