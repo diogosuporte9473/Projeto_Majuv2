@@ -409,11 +409,18 @@ export async function getListCards(listId: number) {
   try {
     const { data, error } = await supabase
       .from("cards")
-      .select("*, assignedToUser:users!assigned_to(name)")
+      .select("*, assignedToUser:users(name)")
       .eq("list_id", listId)
       .eq("archived", false);
-      // Removido .order("position") temporariamente para evitar erro 42703 se a coluna não existir
-    if (error) throw error;
+    
+    if (error) {
+      console.error("[Database] Error fetching cards via REST:", error);
+      // Fallback para Drizzle
+      const db = await getDb();
+      if (!db) return [];
+      const results = await db.select().from(cards).where(and(eq(cards.listId, listId), eq(cards.archived, false)));
+      return results;
+    }
 
     const cardsRaw = data || [];
 
@@ -472,7 +479,7 @@ export async function getCardById(cardId: number) {
     const { data, error } = await supabase
       .from("cards")
       // Inclui join para obter o nome do responsável no `cards.getDetails`
-      .select("*, assignedToUser:users!assigned_to(name)")
+      .select("*, assignedToUser:users(name)")
       .eq("id", cardId)
       .maybeSingle();
 
