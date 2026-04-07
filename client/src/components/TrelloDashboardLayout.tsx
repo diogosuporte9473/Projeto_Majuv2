@@ -103,18 +103,50 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
                 ))}
               </div>
             ) : boards && boards.length > 0 ? (
-              <div className="space-y-2">
-                {boards.map((board) => (
-                  <Link key={board.id} href={`/board/${board.id}`} className="block p-3 rounded-lg hover:bg-primary-foreground/10 transition-colors text-sm font-bold" style={{ color: 'var(--sidebar-board-text)' }}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: board.color }}
-                      />
-                      <span className="truncate">{board.name}</span>
+              <div className="space-y-4">
+                {user?.role === 'master_admin' ? (
+                  // Agrupamento por Tenant para Master Admin
+                  Object.entries(
+                    boards.reduce((acc, board) => {
+                      const tenant = (board as any).tenantName || "Geral";
+                      if (!acc[tenant]) acc[tenant] = [];
+                      acc[tenant].push(board);
+                      return acc;
+                    }, {} as Record<string, typeof boards>)
+                  ).map(([tenant, tenantBoards]) => (
+                    <div key={tenant} className="space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-primary-foreground/40 px-3 py-1 bg-primary-foreground/5 rounded-sm mb-1">
+                        {tenant}
+                      </p>
+                      {tenantBoards.map((board) => (
+                        <Link key={board.id} href={`/board/${board.id}`} className="block p-2 rounded-lg hover:bg-primary-foreground/10 transition-colors text-sm font-bold" style={{ color: 'var(--sidebar-board-text)' }}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: board.color }}
+                            />
+                            <span className="truncate">{board.name}</span>
+                          </div>
+                        </Link>
+                      ))}
                     </div>
-                  </Link>
-                ))}
+                  ))
+                ) : (
+                  // Listagem normal para usuários comuns
+                  <div className="space-y-1">
+                    {boards.map((board) => (
+                      <Link key={board.id} href={`/board/${board.id}`} className="block p-3 rounded-lg hover:bg-primary-foreground/10 transition-colors text-sm font-bold" style={{ color: 'var(--sidebar-board-text)' }}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: board.color }}
+                          />
+                          <span className="truncate">{board.name}</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-xs text-primary-foreground/60">{t("layout.noBoardsYet")}</p>

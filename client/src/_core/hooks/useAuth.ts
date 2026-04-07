@@ -24,11 +24,14 @@ export function useAuth(options?: UseAuthOptions) {
     try {
       await logoutMutation.mutateAsync();
       utils.auth.me.setData(undefined, null);
+      // Redireciona manualmente para a tela de login após logout
+      window.location.href = getLoginUrl();
     } catch (error: unknown) {
       if (
         error instanceof TRPCClientError &&
         error.data?.code === "UNAUTHORIZED"
       ) {
+        window.location.href = getLoginUrl();
         return;
       }
       throw error;
