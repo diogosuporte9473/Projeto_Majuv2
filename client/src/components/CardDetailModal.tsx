@@ -1705,6 +1705,17 @@ export default function CardDetailModal({
                         {card?.created_at ? format(new Date(card.created_at), "dd/MM/yyyy") : "-"}
                       </span>
                     </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest flex-shrink-0">Data de Entrega</span>
+                      <span className={cn(
+                        "text-[9px] font-black truncate",
+                        isOverdue ? "text-red-400" : "text-gray-300"
+                      )}>
+                        {(card?.dueDate || projectDates?.end_date) 
+                          ? format(new Date(card?.dueDate || projectDates?.end_date), "dd/MM/yyyy") 
+                          : "Não definida"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
