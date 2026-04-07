@@ -376,12 +376,29 @@ export const appRouter = router({
         const board = await getBoardById(input.boardId, ctx.user.id, ctx.tenantId || undefined, ctx.user.role);
         if (!board) throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
 
+        // Tenta com join explícito
         const { data, error } = await supabase
           .from("board_members")
           .select("user_id, role, users!user_id(name, username)")
           .eq("board_id", input.boardId);
 
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        if (error) {
+          console.error("[Database] Error in getMembers via REST:", error);
+          
+          // Fallback: busca membros sem o join e depois resolve os nomes
+          const { data: simpleData, error: simpleError } = await supabase
+            .from("board_members")
+            .select("user_id, role")
+            .eq("board_id", input.boardId);
+
+          if (simpleError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: simpleError.message });
+          
+          return simpleData.map((m: any) => ({
+            userId: m.user_id,
+            role: m.role,
+            userName: `Usuário ${m.user_id}`
+          }));
+        }
         
         return data.map((m: any) => ({
           userId: m.user_id,
@@ -1281,12 +1298,27 @@ export const appRouter = router({
     updateDueDate: protectedProcedure
       .input(z.object({ cardId: z.number(), dueDate: z.date().nullish() }))
       .mutation(async ({ input }) => {
+        const isoDate = input.dueDate ? input.dueDate.toISOString() : null;
+        
         const { error } = await supabase
           .from("cards")
-          .update({ due_date: input.dueDate ? input.dueDate.toISOString() : null, updated_at: new Date().toISOString() })
+          .update({ due_date: isoDate, updated_at: new Date().toISOString() })
           .eq("id", input.cardId);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar também com a tabela project_dates se existir
+        try {
+          await supabase
+            .from("project_dates")
+            .upsert({ 
+              card_id: input.cardId, 
+              end_date: isoDate,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'card_id' });
+        } catch (e) {
+          console.error("[Project Dates] Failed to update end_date:", e);
+        }
 
         // Sincronizar com espelhos
         try {
@@ -1301,8 +1333,19 @@ export const appRouter = router({
 
             await supabase
               .from("cards")
-              .update({ due_date: input.dueDate ? input.dueDate.toISOString() : null, updated_at: new Date().toISOString() })
+              .update({ due_date: isoDate, updated_at: new Date().toISOString() })
               .in("id", relatedCardIds);
+              
+            // Sincronizar project_dates dos espelhos
+            for (const cardId of relatedCardIds) {
+              await supabase
+                .from("project_dates")
+                .upsert({ 
+                  card_id: cardId, 
+                  end_date: isoDate,
+                  updated_at: new Date().toISOString()
+                }, { onConflict: 'card_id' });
+            }
           }
         } catch (e) {
           console.error("[Mirror Sync] Due date sync failed:", e);
@@ -1314,12 +1357,27 @@ export const appRouter = router({
     updateStartDate: protectedProcedure
       .input(z.object({ cardId: z.number(), startDate: z.date().nullish() }))
       .mutation(async ({ input }) => {
+        const isoDate = input.startDate ? input.startDate.toISOString() : null;
+
         const { error } = await supabase
           .from("cards")
-          .update({ start_date: input.startDate ? input.startDate.toISOString() : null, updated_at: new Date().toISOString() })
+          .update({ start_date: isoDate, updated_at: new Date().toISOString() })
           .eq("id", input.cardId);
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+
+        // Sincronizar também com a tabela project_dates se existir
+        try {
+          await supabase
+            .from("project_dates")
+            .upsert({ 
+              card_id: input.cardId, 
+              start_date: isoDate,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'card_id' });
+        } catch (e) {
+          console.error("[Project Dates] Failed to update start_date:", e);
+        }
 
         // Sincronizar com espelhos
         try {
@@ -1334,8 +1392,19 @@ export const appRouter = router({
 
             await supabase
               .from("cards")
-              .update({ start_date: input.startDate ? input.startDate.toISOString() : null, updated_at: new Date().toISOString() })
+              .update({ start_date: isoDate, updated_at: new Date().toISOString() })
               .in("id", relatedCardIds);
+
+            // Sincronizar project_dates dos espelhos
+            for (const cardId of relatedCardIds) {
+              await supabase
+                .from("project_dates")
+                .upsert({ 
+                  card_id: cardId, 
+                  start_date: isoDate,
+                  updated_at: new Date().toISOString()
+                }, { onConflict: 'card_id' });
+            }
           }
         } catch (e) {
           console.error("[Mirror Sync] Start date sync failed:", e);
