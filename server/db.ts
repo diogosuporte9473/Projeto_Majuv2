@@ -229,8 +229,30 @@ export async function getUserById(id: number) {
 }
 
 // Board queries
-export async function getUserBoards(userId: number, tenantId?: string) {
+export async function getUserBoards(userId: number, tenantId?: string, userRole?: string) {
   try {
+    // Se for Master Admin, retorna todos os boards de todos os tenants com info do tenant
+    if (userRole === 'master_admin') {
+      const { data: boardsData, error: boardsError } = await supabase
+        .from("boards")
+        .select("*, tenants(name)");
+
+      if (boardsError) {
+        console.error("[Database] Error fetching all boards for master_admin:", boardsError);
+        return [];
+      }
+
+      return (boardsData || []).map(b => ({
+        ...b,
+        ownerId: b.owner_id,
+        tenantId: b.tenant_id,
+        tenantName: (b as any).tenants?.name || "Desconhecido",
+        createdAt: b.created_at,
+        updatedAt: b.updated_at
+      }));
+    }
+
+    // Lógica original para usuários comuns e admins de tenant
     // Se não temos tenantId, tentamos obter do usuário via Supabase REST
     if (!tenantId) {
       const { data: userData, error: userError } = await supabase
@@ -317,7 +339,7 @@ export async function getUserBoards(userId: number, tenantId?: string) {
   }
 }
 
-export async function getBoardById(boardId: number, userId?: number, tenantId?: string) {
+export async function getBoardById(boardId: number, userId?: number, tenantId?: string, userRole?: string) {
   try {
     // Tenta via Supabase REST primeiro
     const { data: board, error } = await supabase
@@ -335,6 +357,9 @@ export async function getBoardById(boardId: number, userId?: number, tenantId?: 
       const [drizzleBoard] = await db.select().from(boards).where(eq(boards.id, boardId));
       if (!drizzleBoard) return null;
       
+      // Se for Master Admin, acesso total
+      if (userRole === 'master_admin') return drizzleBoard;
+
       // Aplicar mesmas regras de validação ao board do Drizzle
       if (tenantId && drizzleBoard.tenantId !== tenantId) return null;
       if (!userId) return drizzleBoard;
@@ -354,6 +379,9 @@ export async function getBoardById(boardId: number, userId?: number, tenantId?: 
       createdAt: board.created_at,
       updatedAt: board.updated_at
     };
+
+    // Se for Master Admin, acesso total
+    if (userRole === 'master_admin') return normalizedBoard;
 
     // Se o tenantId for passado, validar se o quadro pertence a ele
     if (tenantId && normalizedBoard.tenantId !== tenantId) return null;

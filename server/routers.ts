@@ -103,7 +103,10 @@ const auditRouter = router({
     }))
     .query(async ({ ctx, input }) => {
       // O modal de "Atividades do Quadro" aparece para usuários autenticados.
-      // Não restringimos a admin aqui (filtro por board pode ser adicionado depois se desejar).
+      // Regra de Visibilidade:
+      // 1. Usuário comum vê apenas seu próprio histórico.
+      // 2. Admin do Tenant vê o histórico de todos os usuários da sua empresa.
+      // 3. Master Admin vê tudo.
 
       let query = supabase
         .from("audit_logs")
@@ -112,9 +115,19 @@ const auditRouter = router({
       // Filtro obrigatório de Tenant (exceto para Master Admin)
       if (ctx.user.role !== 'master_admin') {
         query = query.eq("tenant_id", ctx.user.tenantId);
+
+        // Se não for admin do tenant, restringe para ver apenas o seu próprio ID
+        if (ctx.user.role !== 'admin') {
+          query = query.eq("user_id", ctx.user.id);
+        }
       }
 
-      if (input.userId) query = query.eq("user_id", input.userId);
+      if (input.userId) {
+        // Se um usuário comum tentar filtrar por outro ID, a regra acima (query.eq("user_id", ctx.user.id)) 
+        // já terá restringido a busca, então o resultado será vazio se input.userId !== ctx.user.id.
+        // Permitimos o filtro manual caso o Admin queira ver um usuário específico.
+        query = query.eq("user_id", input.userId);
+      }
       if (input.action) query = query.eq("action", input.action);
       if (input.startDate) query = query.gte("created_at", input.startDate);
       if (input.endDate) query = query.lte("created_at", input.endDate);
@@ -348,19 +361,19 @@ export const appRouter = router({
   // Board routers
   boards: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      return await getUserBoards(ctx.user.id, ctx.tenantId || undefined);
+      return await getUserBoards(ctx.user.id, ctx.tenantId || undefined, ctx.user.role);
     }),
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        const board = await getBoardById(input.id, ctx.user.id, ctx.tenantId || undefined);
+        const board = await getBoardById(input.id, ctx.user.id, ctx.tenantId || undefined, ctx.user.role);
         if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found or access denied" });
         return board;
       }),
     getMembers: protectedProcedure
       .input(z.object({ boardId: z.number() }))
       .query(async ({ ctx, input }) => {
-        const board = await getBoardById(input.boardId, ctx.user.id, ctx.tenantId || undefined);
+        const board = await getBoardById(input.boardId, ctx.user.id, ctx.tenantId || undefined, ctx.user.role);
         if (!board) throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
 
         const { data, error } = await supabase
@@ -1393,6 +1406,7 @@ export const appRouter = router({
             title: `${original.title} (Cópia)`,
             description: original.description,
             list_id: input.listId || original.list_id,
+            tenant_id: ctx.tenantId, // Vincular ao tenant do usuário
             position: original.position + 1,
             start_date: original.start_date,
             due_date: original.due_date,
@@ -1552,6 +1566,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const insertData: any = {
           card_id: input.cardId,
+          tenant_id: ctx.tenantId, // Vincular ao tenant do usuário
           filename: input.filename,
           file_url: input.fileUrl,
           mime_type: input.mimeType,
@@ -1584,6 +1599,7 @@ export const appRouter = router({
             for (const cardId of relatedCardIds) {
               await supabase.from("card_attachments").insert({
                 card_id: cardId,
+                tenant_id: ctx.tenantId, // Vincular ao tenant do usuário
                 filename: input.filename,
                 file_url: input.fileUrl,
                 file_key: input.fileKey,
@@ -2280,6 +2296,7 @@ export const appRouter = router({
           .from("card_comments")
           .insert({
             card_id: input.cardId,
+            tenant_id: ctx.tenantId, // Vincular ao tenant do usuário
             user_id: ctx.user.id,
             content: input.content,
           })
@@ -2302,6 +2319,7 @@ export const appRouter = router({
             for (const cardId of relatedCardIds) {
               await supabase.from("card_comments").insert({
                 card_id: cardId,
+                tenant_id: ctx.tenantId, // Vincular ao tenant do usuário
                 user_id: ctx.user.id,
                 content: input.content,
               });
@@ -2405,6 +2423,7 @@ export const appRouter = router({
             start_date: mirrorSettings.mirror_dates ? originalCard.start_date : null,
             due_date: mirrorSettings.mirror_dates ? originalCard.due_date : null,
             list_id: input.targetListId,
+            tenant_id: ctx.tenantId, // Vincular ao tenant do usuário
             position: 0,
             created_by: ctx.user.id
           })
@@ -2848,6 +2867,7 @@ export const appRouter = router({
         const { data, error } = await supabase
           .from("checklist_templates")
           .insert({
+            tenant_id: ctx.tenantId, // Vincular ao tenant do usuário
             name: input.name,
             items: JSON.stringify(input.items),
             is_global: input.isGlobal && ctx.user.role === 'admin',

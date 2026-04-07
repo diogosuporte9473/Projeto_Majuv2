@@ -12,12 +12,25 @@ CREATE TABLE IF NOT EXISTS "tenants" (
 -- 2. Criar Tabela de User Tenants (N:N)
 CREATE TABLE IF NOT EXISTS "user_tenants" (
   "id" serial PRIMARY KEY,
-  "user_id" integer NOT NULL,
+  "user_id" integer NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
   "tenant_id" uuid NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
   "role" text DEFAULT 'member' NOT NULL,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "user_tenant_idx" ON "user_tenants" ("user_id", "tenant_id");
+
+-- 2.1 Criar Tabela de Audit Logs
+CREATE TABLE IF NOT EXISTS "audit_logs" (
+  "id" serial PRIMARY KEY,
+  "user_id" integer REFERENCES "users"("id") ON DELETE SET NULL,
+  "tenant_id" uuid REFERENCES "tenants"("id") ON DELETE CASCADE,
+  "action" text NOT NULL,
+  "entity_type" text NOT NULL,
+  "entity_id" integer,
+  "entity_name" text,
+  "details" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
 
 -- 3. Adicionar colunas necessárias na tabela users
 DO $$ 
@@ -42,7 +55,7 @@ DO $$
 DECLARE
   t text;
 BEGIN 
-  FOR t IN SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('boards', 'lists', 'cards', 'card_comments', 'card_attachments', 'notifications', 'checklist_templates')
+  FOR t IN SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('boards', 'lists', 'cards', 'card_comments', 'card_attachments', 'notifications', 'checklist_templates', 'audit_logs')
   LOOP
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = t AND column_name = 'tenant_id') THEN
       IF (SELECT data_type FROM information_schema.columns WHERE table_name = t AND column_name = 'tenant_id') <> 'uuid' THEN
@@ -53,6 +66,17 @@ BEGIN
       EXECUTE format('ALTER TABLE %I ADD COLUMN tenant_id uuid REFERENCES tenants(id)', t);
     END IF;
   END LOOP;
+END $$;
+
+-- 4.1 Garantir Foreign Keys em board_members
+DO $$ 
+BEGIN 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='board_members_board_id_fkey') THEN
+    ALTER TABLE "board_members" ADD CONSTRAINT "board_members_board_id_fkey" FOREIGN KEY ("board_id") REFERENCES "boards"("id") ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='board_members_user_id_fkey') THEN
+    ALTER TABLE "board_members" ADD CONSTRAINT "board_members_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE;
+  END IF;
 END $$;
 
 -- 5. Vincular usuários existentes pelo e-mail (Opcional, mas ajuda no erro que você teve)
@@ -75,6 +99,7 @@ ALTER TABLE "card_comments" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "card_attachments" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "notifications" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "checklist_templates" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "audit_logs" ENABLE ROW LEVEL SECURITY;
 
 -- 1. Tenants: only users in the tenant can see it (Master Admin sees all)
 DROP POLICY IF EXISTS tenant_isolation_policy ON "tenants";
@@ -113,6 +138,19 @@ DROP POLICY IF EXISTS "users_see_own_profile" ON "users";
 CREATE POLICY "users_see_own_profile" ON "users"
   FOR SELECT
   USING (auth_id = auth.uid());
+
+DROP POLICY IF EXISTS "master_admin_see_all_users" ON "users";
+CREATE POLICY "master_admin_see_all_users" ON "users"
+  FOR SELECT
+  USING ((SELECT role FROM users WHERE auth_id = auth.uid()) = 'master_admin');
+
+DROP POLICY IF EXISTS "admins_see_tenant_users" ON "users";
+CREATE POLICY "admins_see_tenant_users" ON "users"
+  FOR SELECT
+  USING (
+    (SELECT role FROM users WHERE auth_id = auth.uid()) = 'admin'
+    AND tenant_id = (SELECT u.tenant_id FROM users u WHERE u.auth_id = auth.uid())
+  );
 
 DROP POLICY IF EXISTS "users_update_own_profile" ON "users";
 CREATE POLICY "users_update_own_profile" ON "users"
@@ -158,3 +196,9 @@ CREATE POLICY list_isolation_policy ON "lists" FOR ALL USING (tenant_id = get_cu
 
 DROP POLICY IF EXISTS card_isolation_policy ON "cards";
 CREATE POLICY card_isolation_policy ON "cards" FOR ALL USING (tenant_id = get_current_tenant_id());
+
+DROP POLICY IF EXISTS audit_log_isolation_policy ON "audit_logs";
+CREATE POLICY audit_log_isolation_policy ON "audit_logs" FOR ALL USING (
+  is_master_admin()
+  OR tenant_id = get_current_tenant_id()
+);

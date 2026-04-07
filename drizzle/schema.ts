@@ -93,14 +93,32 @@ export const boardMirrorSettings = pgTable("board_mirror_settings", {
 // Board Members - Controle de acesso por quadro
 export const boardMembers = pgTable("board_members", {
   id: serial("id").primaryKey(),
-  boardId: integer("board_id").notNull(),
-  userId: integer("user_id").notNull(),
+  boardId: integer("board_id").notNull().references(() => boards.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   role: memberRoleEnum("role").default("viewer").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type BoardMember = typeof boardMembers.$inferSelect;
 export type InsertBoardMember = typeof boardMembers.$inferInsert;
+
+/**
+ * Audit Logs - Registros de atividade para segurança e histórico
+ */
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+  action: text("action").notNull(), // 'create', 'update', 'archive', 'delete', 'restore'
+  entityType: text("entity_type").notNull(), // 'board', 'card', 'user'
+  entityId: integer("entity_id"),
+  entityName: text("entity_name"),
+  details: text("details"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
 
 // Lists table - Listas dentro de um quadro
 export const lists = pgTable("lists", {
