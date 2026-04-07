@@ -437,17 +437,26 @@ export async function getListCards(listId: number) {
   try {
     const { data, error } = await supabase
       .from("cards")
-      .select("*, assignedToUser:users(name)")
+      .select("*, assignedToUser:users!assigned_to(name)")
       .eq("list_id", listId)
       .eq("archived", false);
     
     if (error) {
       console.error("[Database] Error fetching cards via REST:", error);
-      // Fallback para Drizzle
-      const db = await getDb();
-      if (!db) return [];
-      const results = await db.select().from(cards).where(and(eq(cards.listId, listId), eq(cards.archived, false)));
-      return results;
+      // Fallback sem o join se falhar
+      const { data: simpleData, error: simpleError } = await supabase
+        .from("cards")
+        .select("*")
+        .eq("list_id", listId)
+        .eq("archived", false);
+      
+      if (simpleError) {
+        // Fallback final para Drizzle
+        const db = await getDb();
+        if (!db) return [];
+        return await db.select().from(cards).where(and(eq(cards.listId, listId), eq(cards.archived, false)));
+      }
+      return simpleData || [];
     }
 
     const cardsRaw = data || [];
@@ -506,20 +515,25 @@ export async function getCardById(cardId: number) {
   try {
     const { data, error } = await supabase
       .from("cards")
-      // Inclui join para obter o nome do responsável no `cards.getDetails`
-      .select("*, assignedToUser:users(name)")
+      // Inclui join para obter o nome do responsável
+      .select("*, assignedToUser:users!assigned_to(name)")
       .eq("id", cardId)
       .maybeSingle();
 
-    if (error) {
-      console.error("[Database] Error fetching card by ID via REST:", error);
+    if (error || !data) {
+      if (error) console.error("[Database] Error fetching card by ID via REST:", error);
+      
+      // Fallback sem join
+      const { data: simpleData } = await supabase.from("cards").select("*").eq("id", cardId).maybeSingle();
+      if (simpleData) return { ...simpleData, listId: simpleData.list_id };
+
+      // Fallback para Drizzle
       const db = await getDb();
       if (!db) return null;
       const results = await db.select().from(cards).where(eq(cards.id, cardId)).limit(1);
-      return results[0] || null;
+      if (!results[0]) return null;
+      return results[0];
     }
-
-    if (!data) return null;
 
     return {
       ...data,
@@ -569,10 +583,14 @@ export async function getCardComments(cardId: number) {
   try {
     const { data, error } = await supabase
       .from("card_comments")
-      .select("*, user:users(id, name, username)")
+      .select("*, user:users!user_id(id, name, username)")
       .eq("card_id", cardId);
 
-    if (error) throw error;
+    if (error) {
+      console.error("[Database] Error fetching card comments via REST:", error);
+      const { data: simpleData } = await supabase.from("card_comments").select("*").eq("card_id", cardId);
+      return (simpleData || []).map((c: any) => ({ ...c, cardId: c.card_id, userId: c.user_id }));
+    }
     return (data || []).map((comment: any) => ({
       ...comment,
       cardId: comment.card_id,
@@ -667,7 +685,7 @@ export async function getBoardMembers(boardId: number) {
   try {
     const { data, error } = await supabase
       .from("board_members")
-      .select("*, user:users(*)")
+      .select("*, user:users!user_id(*)")
       .eq("board_id", boardId);
 
     if (error) {

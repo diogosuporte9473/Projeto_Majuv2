@@ -110,7 +110,7 @@ const auditRouter = router({
 
       let query = supabase
         .from("audit_logs")
-        .select("*, users(name, username)", { count: "exact" });
+        .select("*, users!user_id(name, username)", { count: "exact" });
 
       // Filtro obrigatório de Tenant (exceto para Master Admin)
       if (ctx.user.role !== 'master_admin') {
@@ -378,7 +378,7 @@ export const appRouter = router({
 
         const { data, error } = await supabase
           .from("board_members")
-          .select("user_id, role, users(name, username)")
+          .select("user_id, role, users!user_id(name, username)")
           .eq("board_id", input.boardId);
 
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
@@ -1083,6 +1083,7 @@ export const appRouter = router({
     getDetails: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
+        // Tenta obter o card com as relações usando Supabase REST
         const { data: card, error } = await supabase
           .from("cards")
           .select(`
@@ -1093,14 +1094,20 @@ export const appRouter = router({
               board:board_id(
                 id, 
                 name,
-                owner:owner_id(id, name)
+                owner:users!owner_id(id, name)
               )
             )
           `)
           .eq("id", input.id)
-          .single();
+          .maybeSingle();
 
-        if (error) throw new TRPCError({ code: "NOT_FOUND", message: "Card not found" });
+        if (error || !card) {
+          console.error("[Database] Error in getDetails via REST:", error);
+          // Se falhar o join complexo, tentamos via getCardById que é mais robusto
+          const simpleCard = await getCardById(input.id);
+          if (!simpleCard) throw new TRPCError({ code: "NOT_FOUND", message: "Card not found" });
+          return simpleCard;
+        }
 
         const { data: mirrors } = await supabase
           .from("mirrored_cards")
@@ -1116,8 +1123,8 @@ export const appRouter = router({
           const isOriginal = m.original_card_id === input.id;
           const board = isOriginal ? m.mirror_board : m.original_board;
           return {
-            id: board.id,
-            name: board.name,
+            id: board?.id,
+            name: board?.name,
             type: isOriginal ? "Filial" : "Matriz"
           };
         }) || [];
@@ -2278,13 +2285,24 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const { data, error } = await supabase
           .from("card_comments")
-          .select("*, users(name, username)")
+          .select("*, users!user_id(name, username)")
           .eq("card_id", input.cardId)
           .order("created_at", { ascending: true });
 
-        if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+        if (error) {
+          console.error("[Database] Error in getComments via REST:", error);
+          // Fallback para uma busca simples se o join falhar
+          const { data: simpleData, error: simpleError } = await supabase
+            .from("card_comments")
+            .select("*")
+            .eq("card_id", input.cardId)
+            .order("created_at", { ascending: true });
+          
+          if (simpleError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: simpleError.message });
+          return (simpleData || []).map((c: any) => ({ ...c, userName: "Usuário" }));
+        }
         
-        return data.map((c: any) => ({
+        return (data || []).map((c: any) => ({
           ...c,
           userName: c.users?.name || c.users?.username || "Usuário"
         }));
