@@ -105,6 +105,7 @@ export default function CardDetailModal({
   const updateStatusMutation = trpc.cardDetails.updateStatus.useMutation();
   const upsertCustomFieldMutation = trpc.cardDetails.upsertCustomField.useMutation();
   const createMirrorMutation = trpc.cardDetails.createMirror.useMutation();
+  const copyChecklistGroupMutation = trpc.cardDetails.copyChecklistGroup.useMutation();
   const archiveCardMutation = trpc.cardDetails.archiveCard.useMutation();
   const deleteCardMutation = trpc.cards.delete.useMutation();
   const cloneCardMutation = trpc.cardDetails.cloneCard.useMutation();
@@ -293,6 +294,19 @@ export default function CardDetailModal({
       toast.success("Checklist removido");
     } catch (error) {
       toast.error("Erro ao remover checklist");
+    }
+  };
+
+  const handleCopyChecklistGroup = async (groupId: number) => {
+    try {
+      await copyChecklistGroupMutation.mutateAsync({ 
+        groupId, 
+        targetCardId: cardId 
+      });
+      await utils.cardDetails.getChecklists.invalidate({ cardId });
+      toast.success("Checklist copiado com sucesso");
+    } catch (error) {
+      toast.error("Erro ao copiar checklist");
     }
   };
 
@@ -1179,6 +1193,16 @@ export default function CardDetailModal({
                             <div className="text-xs font-black text-accent bg-accent/10 px-4 py-2 rounded-full border border-accent/20 shadow-sm shadow-accent/5">
                               {Math.round(groupProgress)}%
                             </div>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => handleCopyChecklistGroup(group.id)}
+                              className="text-gray-500 hover:text-accent h-10 px-4 rounded-xl hover:bg-accent/5 transition-all font-bold"
+                              title="Copiar este checklist"
+                            >
+                              <Copy size={16} className="mr-2" />
+                              Copiar
+                            </Button>
                             <Button 
                               variant="ghost" 
                               size="sm" 

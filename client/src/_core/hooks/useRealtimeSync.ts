@@ -1,10 +1,13 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "./useAuth";
 
 export function useRealtimeSync(boardId?: number) {
   const utils = trpc.useUtils();
   const utilsRef = useRef(utils);
+  const { user } = useAuth();
+  const tenantId = user?.tenantId;
 
   useEffect(() => {
     // Mantém a referência atual sem re-iniciar a assinatura do realtime a cada render.
@@ -12,16 +15,18 @@ export function useRealtimeSync(boardId?: number) {
   }, [utils]);
 
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log(`[Supabase Realtime] Subscribing to changes for board: ${boardId || "all"}`);
+    if (!tenantId) return;
 
-    // Configura o canal de tempo real com identificador único para evitar conflitos
+    // eslint-disable-next-line no-console
+    console.log(`[Supabase Realtime] Subscribing to changes for tenant: ${tenantId}, board: ${boardId || "all"}`);
+
+    // Configura o canal de tempo real com identificador único para o tenant
     const channel = supabase
-      .channel(`db-changes-${boardId || 'global'}`)
-      // Escuta mudanças na tabela de cartões
+      .channel(`db-changes-${tenantId}-${boardId || 'global'}`)
+      // Escuta mudanças na tabela de cartões (Filtrado por tenant)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "cards" },
+        { event: "*", schema: "public", table: "cards", filter: `tenant_id=eq.${tenantId}` },
         (payload) => {
           console.log("[Realtime] Cards change detected:", payload.eventType);
           utilsRef.current.cards.getByList.invalidate();
@@ -30,10 +35,10 @@ export function useRealtimeSync(boardId?: number) {
           }
         }
       )
-      // Escuta mudanças na tabela de listas
+      // Escuta mudanças na tabela de listas (Filtrado por tenant)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "lists" },
+        { event: "*", schema: "public", table: "lists", filter: `tenant_id=eq.${tenantId}` },
         () => {
           console.log("[Realtime] Lists change detected");
           if (boardId) {
@@ -41,19 +46,22 @@ export function useRealtimeSync(boardId?: number) {
           }
         }
       )
-      // Escuta mudanças na tabela de quadros
+      // Escuta mudanças na tabela de quadros (Filtrado por tenant)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "boards" },
+        { event: "*", schema: "public", table: "boards", filter: `tenant_id=eq.${tenantId}` },
         () => {
           console.log("[Realtime] Boards change detected");
           utilsRef.current.boards.list.invalidate();
+          utilsRef.current.boards.listAll.invalidate();
           if (boardId) {
             utilsRef.current.boards.get.invalidate({ id: boardId });
           }
         }
       )
       // Escuta mudanças nos detalhes do cartão (labels, checklists, etc)
+      // Tabelas secundárias não têm tenant_id direto, então ouvimos globalmente
+      // mas o impacto é limitado aos cards do tenant que o usuário já carregou.
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "card_labels" },
@@ -67,6 +75,14 @@ export function useRealtimeSync(boardId?: number) {
         { event: "*", schema: "public", table: "card_checklists" },
         () => {
           console.log("[Realtime] Checklists change detected");
+          utilsRef.current.cardDetails.getChecklists.invalidate();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "card_checklist_groups" },
+        () => {
+          console.log("[Realtime] Checklist groups change detected");
           utilsRef.current.cardDetails.getChecklists.invalidate();
         }
       )
@@ -102,43 +118,28 @@ export function useRealtimeSync(boardId?: number) {
           utilsRef.current.cardDetails.getAttachments.invalidate();
         }
       )
+      // Mudanças no Tenant (Branding, etc)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "mirrored_cards" },
+        { event: "*", schema: "public", table: "tenants", filter: `id=eq.${tenantId}` },
         () => {
-          console.log("[Realtime] Mirrored cards change detected");
-          if (boardId) utilsRef.current.cardDetails.getMirroredCards.invalidate({ boardId });
+          console.log("[Realtime] Tenant branding change detected");
+          utilsRef.current.branding.get.invalidate();
         }
-      );
-
-    let retryTimeout: NodeJS.Timeout;
-
-    const subscribeChannel = () => {
-      channel.subscribe(async (status) => {
-        console.log(`[Supabase Realtime] Subscription status for ${boardId || 'global'}:`, status);
-        
-        if (status === 'CHANNEL_ERROR') {
-          console.error("[Supabase Realtime] WebSocket connection error detected, retrying in 5s...");
-          clearTimeout(retryTimeout);
-          retryTimeout = setTimeout(() => {
-            console.log("[Supabase Realtime] Re-subscribing...");
-            subscribeChannel();
-          }, 5000);
+      )
+      // Mudanças nos Usuários (Novos usuários no tenant)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users", filter: `tenant_id=eq.${tenantId}` },
+        () => {
+          console.log("[Realtime] Users change detected");
+          utilsRef.current.cardDetails.getCardUsers.invalidate();
         }
-        
-        if (status === 'TIMED_OUT') {
-          console.warn("[Supabase Realtime] Connection timed out, retrying...");
-          subscribeChannel();
-        }
-      });
-    };
-
-    subscribeChannel();
+      )
+      .subscribe();
 
     return () => {
-      console.log(`[Supabase Realtime] Unsubscribing from board: ${boardId || 'all'}`);
-      clearTimeout(retryTimeout);
       supabase.removeChannel(channel);
     };
-  }, [boardId]);
+  }, [boardId, tenantId]);
 }
