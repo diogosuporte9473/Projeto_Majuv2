@@ -13,7 +13,7 @@ import {
   AlignLeft, LayoutGrid, Clock, Copy, Archive, Trash, 
   MessageSquare, Paperclip, Send, MoreVertical, Maximize2, Minimize2, 
   CalendarDays, User as UserIcon, Edit2, FileText, ImageIcon,
-  Check, ChevronsUpDown, MoreHorizontal, MoveHorizontal
+  Check, ChevronsUpDown, MoreHorizontal, MoveHorizontal, RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -85,6 +85,39 @@ export default function CardDetailModal({
     { boardId: boardId ?? 0 },
     { enabled: !!boardId && isOpen } as any
   );
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const promises: any[] = [
+        utils.cardDetails.getDetails.invalidate({ id: cardId }),
+        utils.cardDetails.getLabels.invalidate({ cardId }),
+        utils.cardDetails.getChecklists.invalidate({ cardId }),
+        utils.cardDetails.getComments.invalidate({ cardId }),
+        utils.cardDetails.getAttachments.invalidate({ cardId }),
+        utils.cardDetails.getCustomFields.invalidate({ cardId }),
+        utils.cardDetails.getProjectDates.invalidate({ cardId }),
+        utils.cardDetails.getCardMirrors.invalidate({ cardId }),
+        (utils as any).checklistTemplates.list.invalidate(),
+        utils.cardDetails.getCardUsers.invalidate({ cardId }),
+        utils.boards.getMembers.invalidate({ boardId: boardId ?? 0 }),
+        utils.boards.listAll.invalidate(),
+      ];
+
+      if (selectedBoardId) {
+        promises.push(utils.lists.getByBoard.invalidate({ boardId: parseInt(selectedBoardId) }));
+      }
+
+      await Promise.all(promises);
+      toast.success(isEnglish ? "Card updated" : "Cartão atualizado");
+    } catch (error) {
+      toast.error(isEnglish ? "Error updating card" : "Erro ao atualizar cartão");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Mutations
   const addLabelMutation = trpc.cardDetails.addLabel.useMutation();
@@ -783,6 +816,17 @@ export default function CardDetailModal({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="hover:bg-accent/10 h-9 w-9 rounded-lg text-gray-400 transition-all"
+                  title={isEnglish ? "Refresh" : "Atualizar"}
+                >
+                  <RefreshCw size={18} className={cn(isRefreshing && "animate-spin")} />
+                </Button>
 
                 <Button 
                   variant="ghost" 
