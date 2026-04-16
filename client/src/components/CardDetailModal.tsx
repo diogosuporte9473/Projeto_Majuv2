@@ -137,7 +137,7 @@ export default function CardDetailModal({
   const [templateName, setTemplateName] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
-  const { data: userBoards } = trpc.boards.list.useQuery();
+  const { data: userBoards } = trpc.boards.listAll.useQuery();
   const { data: targetLists } = trpc.lists.getByBoard.useQuery(
     { boardId: parseInt(selectedBoardId) },
     { enabled: !!selectedBoardId }

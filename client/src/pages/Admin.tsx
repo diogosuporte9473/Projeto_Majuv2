@@ -32,7 +32,7 @@ export default function Admin() {
   );
 
   const { data: users, isLoading: usersLoading } = trpc.admin.users.list.useQuery();
-  const { data: boards } = trpc.boards.list.useQuery();
+  const { data: boards } = trpc.boards.listAll.useQuery();
   const { data: boardMembers, isLoading: membersLoading } = trpc.boards.getMembers.useQuery(
     { boardId: selectedBoardId || 0 },
     { enabled: !!selectedBoardId && user?.role === "admin" } as any
