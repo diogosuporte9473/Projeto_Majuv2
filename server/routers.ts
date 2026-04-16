@@ -1938,6 +1938,66 @@ export const appRouter = router({
           if (insertItemsError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: insertItemsError.message });
         }
 
+        // 5. Espelhar o Clone para cards relacionados (se houver espelhamento)
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("original_card_id, mirror_card_id")
+            .or(`original_card_id.eq.${input.targetCardId},mirror_card_id.eq.${input.targetCardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors
+              .flatMap((m: any) => [m.original_card_id, m.mirror_card_id])
+              .filter((cardId: any) => cardId !== input.targetCardId);
+
+            const cloneTitle = `${group.title} (Cópia)`;
+
+            for (const relatedCardId of relatedCardIds) {
+              // Verifica se já existe um grupo com este nome no card espelhado
+              const { data: existingGroup } = await supabase
+                .from("card_checklist_groups")
+                .select("id")
+                .eq("card_id", relatedCardId)
+                .eq("title", cloneTitle)
+                .maybeSingle();
+
+              if (!existingGroup) {
+                const { data: targetGroups } = await supabase
+                  .from("card_checklist_groups")
+                  .select("position")
+                  .eq("card_id", relatedCardId);
+                
+                const targetPos = (targetGroups?.length || 0);
+
+                const { data: mirroredGroup, error: mirrGroupErr } = await supabase
+                  .from("card_checklist_groups")
+                  .insert({
+                    card_id: relatedCardId,
+                    title: cloneTitle,
+                    position: targetPos
+                  })
+                  .select("id")
+                  .single();
+
+                if (!mirrGroupErr && mirroredGroup && items && items.length > 0) {
+                  const mirroredItems = items.map(item => ({
+                    card_id: relatedCardId,
+                    group_id: mirroredGroup.id,
+                    title: item.title,
+                    position: item.position,
+                    completed: false,
+                    assigned_user_id: item.assigned_user_id
+                  }));
+
+                  await supabase.from("card_checklists").insert(mirroredItems);
+                }
+              }
+            }
+          }
+        } catch (syncError) {
+          console.error("[Mirror Sync] Cloned checklist sync failed:", syncError);
+        }
+
         return { id: newGroup.id };
       }),
     addChecklist: protectedProcedure
