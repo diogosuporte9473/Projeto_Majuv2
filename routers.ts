@@ -22,6 +22,7 @@ import {
   getCardCustomFields,
   getMirroredCards,
   getUserByUsername,
+  getAllTenantBoards,
   getDb,
 } from "./db.js";
 import {
@@ -344,10 +345,14 @@ export const appRouter = router({
     list: protectedProcedure.query(async ({ ctx }) => {
       return await getUserBoards(ctx.user.id, ctx.tenantId || undefined);
     }),
+    listAll: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.tenantId) return [];
+      return await getAllTenantBoards(ctx.tenantId);
+    }),
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        const board = await getBoardById(input.id, ctx.user.id, ctx.tenantId || undefined);
+        const board = await getBoardById(input.id, ctx.user.id, ctx.tenantId || undefined, ctx.user.role, true);
         if (!board) throw new TRPCError({ code: "NOT_FOUND", message: "Board not found or access denied" });
         return board;
       }),
@@ -669,7 +674,7 @@ export const appRouter = router({
     getByBoard: protectedProcedure
       .input(z.object({ boardId: z.number() }))
       .query(async ({ ctx, input }) => {
-        const board = await getBoardById(input.boardId, ctx.user.id);
+        const board = await getBoardById(input.boardId, ctx.user.id, ctx.tenantId || undefined, ctx.user.role, true);
         if (!board) {
           throw new TRPCError({
             code: "NOT_FOUND",

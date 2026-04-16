@@ -339,7 +339,32 @@ export async function getUserBoards(userId: number, tenantId?: string, userRole?
   }
 }
 
-export async function getBoardById(boardId: number, userId?: number, tenantId?: string, userRole?: string) {
+export async function getAllTenantBoards(tenantId: string) {
+  try {
+    const { data: boardsData, error: boardsError } = await supabase
+      .from("boards")
+      .select("*")
+      .eq("tenant_id", tenantId);
+
+    if (boardsError) {
+      console.error("[Database] Error fetching all tenant boards:", boardsError);
+      return [];
+    }
+
+    return (boardsData || []).map(b => ({
+      ...b,
+      ownerId: b.owner_id,
+      tenantId: b.tenant_id,
+      createdAt: b.created_at,
+      updatedAt: b.updated_at
+    }));
+  } catch (error) {
+    console.error("[Database] getAllTenantBoards failed:", error);
+    return [];
+  }
+}
+
+export async function getBoardById(boardId: number, userId?: number, tenantId?: string, userRole?: string, permissive: boolean = false) {
   try {
     // Tenta via Supabase REST primeiro
     const { data: board, error } = await supabase
@@ -360,8 +385,13 @@ export async function getBoardById(boardId: number, userId?: number, tenantId?: 
       // Se for Master Admin, acesso total
       if (userRole === 'master_admin') return drizzleBoard;
 
-      // Aplicar mesmas regras de validação ao board do Drizzle
+      // Validação de Tenant (obrigatória)
       if (tenantId && drizzleBoard.tenantId !== tenantId) return null;
+      
+      // Se for permissivo (ex: para espelhamento), permite acesso se for do mesmo tenant
+      if (permissive) return drizzleBoard;
+
+      // Se não for permissivo, exige ser dono ou membro
       if (!userId) return drizzleBoard;
       if (drizzleBoard.ownerId === userId) return drizzleBoard;
       
@@ -383,8 +413,11 @@ export async function getBoardById(boardId: number, userId?: number, tenantId?: 
     // Se for Master Admin, acesso total
     if (userRole === 'master_admin') return normalizedBoard;
 
-    // Se o tenantId for passado, validar se o quadro pertence a ele
+    // Validação de Tenant (obrigatória)
     if (tenantId && normalizedBoard.tenantId !== tenantId) return null;
+
+    // Se for permissivo (ex: para espelhamento), permite acesso se for do mesmo tenant
+    if (permissive) return normalizedBoard;
 
     // Se não houver userId, apenas retorna o quadro (se o tenant estiver ok)
     if (!userId) return normalizedBoard;
