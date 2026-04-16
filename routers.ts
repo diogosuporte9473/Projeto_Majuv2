@@ -588,18 +588,23 @@ export const appRouter = router({
 
   branding: router({
     get: publicProcedure.query(async ({ ctx }) => {
-      if (!ctx.tenantId) return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
+      // Se for usuário Master, o nome da aplicação deve ser "Dms Security"
+      // Conforme solicitação: "remova esse nome das aplicão todo usuario Master tem que aparecer Dms Security."
+      const isMaster = ctx.user?.role === 'master_admin';
+      const defaultName = isMaster ? "Dms Security" : "Maju Tasks";
+
+      if (!ctx.tenantId) return { appName: defaultName, appLogoUrl: null, primaryColor: "#4b4897" };
       
       const db = await getDb();
-      if (!db) return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
+      if (!db) return { appName: defaultName, appLogoUrl: null, primaryColor: "#4b4897" };
       const [data] = await db.select().from(tenants).where(eq(tenants.id, ctx.tenantId));
       
       if (!data) {
-        return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
+        return { appName: defaultName, appLogoUrl: null, primaryColor: "#4b4897" };
       }
       
       return {
-        appName: data.name || "Maju Tasks",
+        appName: isMaster ? "Dms Security" : (data.name || "Maju Tasks"),
         appLogoUrl: data.appLogoUrl || null,
         primaryColor: data.primaryColor || "#4b4897",
       };
@@ -1836,6 +1841,66 @@ export const appRouter = router({
             .insert(newItems);
 
           if (insertItemsError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: insertItemsError.message });
+        }
+
+        // 5. Espelhar o Clone para cards relacionados (se houver espelhamento)
+        try {
+          const { data: mirrors } = await supabase
+            .from("mirrored_cards")
+            .select("original_card_id, mirror_card_id")
+            .or(`original_card_id.eq.${input.targetCardId},mirror_card_id.eq.${input.targetCardId}`);
+
+          if (mirrors && mirrors.length > 0) {
+            const relatedCardIds = mirrors
+              .flatMap((m: any) => [m.original_card_id, m.mirror_card_id])
+              .filter((cardId: any) => cardId !== input.targetCardId);
+
+            const cloneTitle = `${group.title} (Cópia)`;
+
+            for (const relatedCardId of relatedCardIds) {
+              // Verifica se já existe um grupo com este nome no card espelhado
+              const { data: existingGroup } = await supabase
+                .from("card_checklist_groups")
+                .select("id")
+                .eq("card_id", relatedCardId)
+                .eq("title", cloneTitle)
+                .maybeSingle();
+
+              if (!existingGroup) {
+                const { data: targetGroups } = await supabase
+                  .from("card_checklist_groups")
+                  .select("position")
+                  .eq("card_id", relatedCardId);
+                
+                const targetPos = (targetGroups?.length || 0);
+
+                const { data: mirroredGroup, error: mirrGroupErr } = await supabase
+                  .from("card_checklist_groups")
+                  .insert({
+                    card_id: relatedCardId,
+                    title: cloneTitle,
+                    position: targetPos
+                  })
+                  .select("id")
+                  .single();
+
+                if (!mirrGroupErr && mirroredGroup && items && items.length > 0) {
+                  const mirroredItems = items.map(item => ({
+                    card_id: relatedCardId,
+                    group_id: mirroredGroup.id,
+                    title: item.title,
+                    position: item.position,
+                    completed: false,
+                    assigned_user_id: item.assigned_user_id
+                  }));
+
+                  await supabase.from("card_checklists").insert(mirroredItems);
+                }
+              }
+            }
+          }
+        } catch (syncError) {
+          console.error("[Mirror Sync] Cloned checklist sync failed:", syncError);
         }
 
         return { id: newGroup.id };

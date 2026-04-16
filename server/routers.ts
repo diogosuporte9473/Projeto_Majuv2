@@ -626,18 +626,23 @@ export const appRouter = router({
 
   branding: router({
     get: publicProcedure.query(async ({ ctx }) => {
-      if (!ctx.tenantId) return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
+      // Se for usuário Master, o nome da aplicação deve ser "Dms Security"
+      // Conforme solicitação: "remova esse nome das aplicão todo usuario Master tem que aparecer Dms Security."
+      const isMaster = ctx.user?.role === 'master_admin';
+      const defaultName = isMaster ? "Dms Security" : "Maju Tasks";
+
+      if (!ctx.tenantId) return { appName: defaultName, appLogoUrl: null, primaryColor: "#4b4897" };
       
       const db = await getDb();
-      if (!db) return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
+      if (!db) return { appName: defaultName, appLogoUrl: null, primaryColor: "#4b4897" };
       const [data] = await db.select().from(tenants).where(eq(tenants.id, ctx.tenantId));
       
       if (!data) {
-        return { appName: "Maju Tasks", appLogoUrl: null, primaryColor: "#4b4897" };
+        return { appName: defaultName, appLogoUrl: null, primaryColor: "#4b4897" };
       }
       
       return {
-        appName: data.name || "Maju Tasks",
+        appName: isMaster ? "Dms Security" : (data.name || "Maju Tasks"),
         appLogoUrl: data.appLogoUrl || null,
         primaryColor: data.primaryColor || "#4b4897",
       };
