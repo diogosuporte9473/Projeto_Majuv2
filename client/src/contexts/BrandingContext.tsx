@@ -17,7 +17,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     staleTime: Infinity,
   });
 
-  const [appName, setAppNameState] = useState('Maju Tasks');
+  const [appName, setAppNameState] = useState('Sistema');
   const [appLogo, setAppLogoState] = useState<string | null>(null);
   const [primaryColor, setPrimaryColorState] = useState('#4b4897');
 

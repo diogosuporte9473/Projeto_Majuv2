@@ -7,11 +7,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useBranding } from "@/contexts/BrandingContext";
 
 export default function Onboarding() {
   const [, setLocation] = useLocation();
   const [name, setName] = useState("");
   const { refresh } = useAuth();
+  const { appName } = useBranding();
   
   const createTenant = trpc.tenant.create.useMutation({
     onSuccess: async () => {
@@ -34,7 +36,7 @@ export default function Onboarding() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Bem-vindo ao Maju Tasks</CardTitle>
+          <CardTitle>Bem-vindo ao {appName}</CardTitle>
           <CardDescription>
             Para começar, precisamos criar o perfil da sua empresa.
           </CardDescription>

@@ -73,7 +73,9 @@ export default function TrelloDashboardLayout({ children }: TrelloDashboardLayou
               </h1>
             </div>
           </Link>
-          <p className="text-sm text-primary-foreground/70 mt-1">{t("layout.taskManager")}</p>
+          <p className="text-sm text-primary-foreground/70 mt-1">
+            {user?.role === 'master_admin' ? "Sistema de Segurança" : t("layout.taskManager")}
+          </p>
         </div>
 
         <div className="p-4 border-b border-primary-foreground/10">
