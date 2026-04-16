@@ -359,21 +359,24 @@ export const appRouter = router({
     getMembers: protectedProcedure
       .input(z.object({ boardId: z.number() }))
       .query(async ({ ctx, input }) => {
-        const board = await getBoardById(input.boardId, ctx.user.id, ctx.tenantId || undefined);
+        const board = await getBoardById(input.boardId, ctx.user.id, ctx.tenantId || undefined, ctx.user.role, true);
         if (!board) throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
 
         const { data, error } = await supabase
           .from("board_members")
-          .select("user_id, role, users(name, username)")
+          .select("user_id, role, users(name, username, role)")
           .eq("board_id", input.boardId);
 
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
         
-        return data.map((m: any) => ({
-          userId: m.user_id,
-          role: m.role,
-          userName: m.users?.name || m.users?.username || `User ${m.user_id}`
-        }));
+        // Filtra para remover master_admin da listagem de membros do quadro para atribuição
+        return (data || [])
+          .filter((m: any) => m.users?.role !== 'master_admin')
+          .map((m: any) => ({
+            userId: m.user_id,
+            role: m.role,
+            userName: m.users?.name || m.users?.username || `User ${m.user_id}`
+          }));
       }),
     create: protectedProcedure
       .input(
@@ -1451,9 +1454,13 @@ export const appRouter = router({
 
     getCardUsers: protectedProcedure
       .input(z.object({ cardId: z.number() }))
-      .query(async () => {
-        // Retorna todos os usuários para permitir atribuição no checklist sem restrição de board
-        const { data, error } = await supabase.from("users").select("id, name, username");
+      .query(async ({ ctx }) => {
+        // Retorna todos os usuários do mesmo tenant (exceto master_admin) para permitir atribuição no checklist
+        const { data, error } = await supabase
+          .from("users")
+          .select("id, name, username, role")
+          .eq("tenant_id", ctx.tenantId)
+          .neq("role", "master_admin");
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
         return data;
       }),
@@ -1772,6 +1779,66 @@ export const appRouter = router({
         }
 
         return { success: true };
+      }),
+    copyChecklistGroup: protectedProcedure
+      .input(z.object({ groupId: z.number(), targetCardId: z.number() }))
+      .mutation(async ({ input }) => {
+        // 1. Buscar o grupo original
+        const { data: group, error: groupError } = await supabase
+          .from("card_checklist_groups")
+          .select("*")
+          .eq("id", input.groupId)
+          .single();
+
+        if (groupError || !group) throw new TRPCError({ code: "NOT_FOUND", message: "Checklist group not found" });
+
+        // 2. Buscar itens do grupo original
+        const { data: items, error: itemsError } = await supabase
+          .from("card_checklists")
+          .select("*")
+          .eq("group_id", input.groupId);
+
+        if (itemsError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: itemsError.message });
+
+        // 3. Criar novo grupo no card de destino
+        const { data: currentGroups } = await supabase
+          .from("card_checklist_groups")
+          .select("position")
+          .eq("card_id", input.targetCardId);
+        
+        const nextPosition = (currentGroups?.length || 0);
+
+        const { data: newGroup, error: newGroupError } = await supabase
+          .from("card_checklist_groups")
+          .insert({
+            card_id: input.targetCardId,
+            title: `${group.title} (Cópia)`,
+            position: nextPosition
+          })
+          .select("id")
+          .single();
+
+        if (newGroupError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: newGroupError.message });
+
+        // 4. Inserir itens no novo grupo
+        if (items && items.length > 0) {
+          const newItems = items.map(item => ({
+            card_id: input.targetCardId,
+            group_id: newGroup.id,
+            title: item.title,
+            position: item.position,
+            completed: false, // Inicia como não concluído na cópia
+            assigned_user_id: item.assigned_user_id
+          }));
+
+          const { error: insertItemsError } = await supabase
+            .from("card_checklists")
+            .insert(newItems);
+
+          if (insertItemsError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: insertItemsError.message });
+        }
+
+        return { id: newGroup.id };
       }),
     addChecklist: protectedProcedure
       .input(z.object({ 
