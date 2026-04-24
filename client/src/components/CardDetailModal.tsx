@@ -264,7 +264,7 @@ export default function CardDetailModal({
         title: editedTitle,
       });
       setIsEditingTitle(false);
-      await utils.cards.getDetails.invalidate({ id: cardId });
+      await utils.cardDetails.getDetails.invalidate({ id: cardId });
       await utils.cards.getByList.invalidate();
       toast.success("Título do cartão atualizado");
     } catch (error) {
@@ -394,7 +394,7 @@ export default function CardDetailModal({
   const handleUpdateDueDate = async (date: Date | null) => {
     try {
       await updateDueDateMutation.mutateAsync({ cardId, dueDate: date });
-      await utils.cards.getDetails.invalidate({ id: cardId });
+      await utils.cardDetails.getDetails.invalidate({ id: cardId });
       await utils.cardDetails.getProjectDates.invalidate({ cardId });
       toast.success("Data de entrega atualizada");
     } catch (error) {
@@ -405,7 +405,7 @@ export default function CardDetailModal({
   const handleUpdateStartDate = async (date: Date | null) => {
     try {
       await updateStartDateMutation.mutateAsync({ cardId, startDate: date });
-      await utils.cards.getDetails.invalidate({ id: cardId });
+      await utils.cardDetails.getDetails.invalidate({ id: cardId });
       await utils.cardDetails.getProjectDates.invalidate({ cardId });
       toast.success("Data de início atualizada");
     } catch (error) {
@@ -692,7 +692,7 @@ export default function CardDetailModal({
                                 onSelect={() => {
                                   // Atualiza responsável do cartão para "nenhum" e força refetch das listas
                                   updateAssignedToMutation.mutate({ cardId, userId: null });
-                                  utils.cards.getDetails.invalidate({ id: cardId });
+                                  utils.cardDetails.getDetails.invalidate({ id: cardId });
                                   (utils as any).cards.getByList.invalidate();
                                   toast.success("Responsável removido");
                                 }}
@@ -709,7 +709,7 @@ export default function CardDetailModal({
                                   onSelect={() => {
                                     // Atualiza responsável do cartão e força refetch das listas
                                     updateAssignedToMutation.mutate({ cardId, userId: u.id || u.userId });
-                                    utils.cards.getDetails.invalidate({ id: cardId });
+                                    utils.cardDetails.getDetails.invalidate({ id: cardId });
                                     (utils as any).cards.getByList.invalidate();
                                     toast.success(`Atribuído a ${u.name || u.userName}`);
                                   }}
@@ -1073,7 +1073,7 @@ export default function CardDetailModal({
                               type="date" 
                               className="bg-[#2a2a2a] border border-[#333] rounded-lg px-3.5 py-2.5 text-sm text-white w-full focus:ring-1 focus:ring-accent outline-none transition-all"
                               onChange={(e) => handleUpdateStartDate(e.target.value ? new Date(e.target.value) : null)}
-                              defaultValue={(card?.startDate || projectDates?.start_date) ? new Date(card?.startDate || projectDates?.start_date).toISOString().split('T')[0] : ''}
+                              value={(card?.startDate || projectDates?.start_date) ? new Date(card?.startDate || projectDates?.start_date).toISOString().split('T')[0] : ''}
                             />
                           </div>
 
@@ -1083,7 +1083,7 @@ export default function CardDetailModal({
                               type="date" 
                               className="bg-[#2a2a2a] border border-[#333] rounded-lg px-3.5 py-2.5 text-sm text-white w-full focus:ring-1 focus:ring-accent outline-none transition-all"
                               onChange={(e) => handleUpdateDueDate(e.target.value ? new Date(e.target.value) : null)}
-                              defaultValue={(card?.dueDate || projectDates?.end_date) ? new Date(card?.dueDate || projectDates?.end_date).toISOString().split('T')[0] : ''}
+                              value={(card?.dueDate || projectDates?.end_date) ? new Date(card?.dueDate || projectDates?.end_date).toISOString().split('T')[0] : ''}
                             />
                           </div>
 
@@ -1464,7 +1464,7 @@ export default function CardDetailModal({
                                                 type="date"
                                                 className="bg-[#2a2a2a] border border-[#333] rounded-lg px-3.5 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-accent/30 transition-all"
                                                 onChange={(e) => handleUpdateChecklistItem(item.id, { dueDate: e.target.value ? new Date(e.target.value) : null })}
-                                                defaultValue={item.due_date ? new Date(item.due_date).toISOString().split('T')[0] : ''}
+                                                value={item.due_date ? new Date(item.due_date).toISOString().split('T')[0] : ''}
                                               />
                                               {item.due_date && (
                                                 <button
