@@ -801,7 +801,9 @@ export async function getProjectDate(cardId: number) {
       ...data,
       cardId: data.card_id,
       projectStartDate: data.project_start_date,
-      projectEndDate: data.project_end_date
+      projectEndDate: data.project_end_date,
+      start_date: data.project_start_date,
+      end_date: data.project_end_date
     };
   } catch (error) {
     console.error("[Database] getProjectDate failed:", error);

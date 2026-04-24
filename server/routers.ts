@@ -1328,7 +1328,7 @@ export const appRouter = router({
             .from("project_dates")
             .upsert({ 
               card_id: input.cardId, 
-              end_date: isoDate,
+              project_end_date: isoDate,
               updated_at: new Date().toISOString()
             }, { onConflict: 'card_id' });
         } catch (e) {
@@ -1357,7 +1357,7 @@ export const appRouter = router({
                 .from("project_dates")
                 .upsert({ 
                   card_id: cardId, 
-                  end_date: isoDate,
+                  project_end_date: isoDate,
                   updated_at: new Date().toISOString()
                 }, { onConflict: 'card_id' });
             }
@@ -1387,7 +1387,7 @@ export const appRouter = router({
             .from("project_dates")
             .upsert({ 
               card_id: input.cardId, 
-              start_date: isoDate,
+              project_start_date: isoDate,
               updated_at: new Date().toISOString()
             }, { onConflict: 'card_id' });
         } catch (e) {
@@ -1416,7 +1416,7 @@ export const appRouter = router({
                 .from("project_dates")
                 .upsert({ 
                   card_id: cardId, 
-                  start_date: isoDate,
+                  project_start_date: isoDate,
                   updated_at: new Date().toISOString()
                 }, { onConflict: 'card_id' });
             }
