@@ -2441,7 +2441,16 @@ export const appRouter = router({
           .select("*")
           .eq("card_id", input.cardId)
           .maybeSingle();
-        return data || null;
+        
+        if (!data) return null;
+
+        return {
+          ...data,
+          projectStartDate: data.project_start_date,
+          projectEndDate: data.project_end_date,
+          start_date: data.project_start_date,
+          end_date: data.project_end_date
+        };
       }),
     upsertProjectDates: protectedProcedure
       .input(z.object({
@@ -2454,8 +2463,9 @@ export const appRouter = router({
           .from("project_dates")
           .upsert({
             card_id: input.cardId,
-            start_date: input.startDate ? input.startDate.toISOString() : null,
-            end_date: input.endDate ? input.endDate.toISOString() : null,
+            project_start_date: input.startDate ? input.startDate.toISOString() : null,
+            project_end_date: input.endDate ? input.endDate.toISOString() : null,
+            updated_at: new Date().toISOString()
           }, { onConflict: 'card_id' });
 
         if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
@@ -2476,8 +2486,9 @@ export const appRouter = router({
                 .from("project_dates")
                 .upsert({
                   card_id: cardId,
-                  start_date: input.startDate ? input.startDate.toISOString() : null,
-                  end_date: input.endDate ? input.endDate.toISOString() : null,
+                  project_start_date: input.startDate ? input.startDate.toISOString() : null,
+                  project_end_date: input.endDate ? input.endDate.toISOString() : null,
+                  updated_at: new Date().toISOString()
                 }, { onConflict: 'card_id' });
             }
           }
