@@ -984,6 +984,7 @@ function ListColumn({ listId, listName, boardId }: { listId: number; listName: s
                       dueDate={card.dueDate ? new Date(card.dueDate) : undefined}
                       listName={listName}
                       assignedToName={card.assignedToName}
+                      labels={card.labels}
                       checklistCount={card.checklistCount}
                       completedChecklistCount={card.completedChecklistCount}
                       attachmentCount={card.attachmentCount}

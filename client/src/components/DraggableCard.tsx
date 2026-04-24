@@ -110,11 +110,11 @@ export function DraggableCard({
         >
           {/* Labels Section */}
           {labels.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-0.5">
+            <div className="flex flex-wrap gap-1 mb-1.5">
               {labels.map((label) => (
                 <div
                   key={label.id}
-                  className="h-1.5 w-8 rounded-full transition-all group-hover:w-10"
+                  className="h-1.5 w-6 rounded-full transition-all group-hover:h-2.5 group-hover:w-10 shadow-sm ring-1 ring-white/5"
                   style={{ backgroundColor: label.color }}
                   title={label.label}
                 />
@@ -139,7 +139,13 @@ export function DraggableCard({
             <div className="flex items-center gap-3">
               {/* Dates */}
               {(startDate || dueDate) && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {startDate && (
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] font-black uppercase tracking-tight">
+                      <CalendarDays size={10} />
+                      <span>{format(new Date(startDate), "dd/MM", { locale: ptBR })}</span>
+                    </div>
+                  )}
                   {dueDate && (
                     <div className={cn(
                       "flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tight",
@@ -147,16 +153,10 @@ export function DraggableCard({
                         ? "bg-red-500/10 text-red-400 border border-red-500/20" 
                         : isDueToday 
                           ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                          : "bg-accent/10 text-accent/80 border border-accent/20"
+                          : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                     )}>
                       <Clock size={10} className={cn(isOverdue && "animate-pulse")} />
-                      <span>{format(new Date(dueDate), "dd 'de' MMM", { locale: ptBR })}</span>
-                    </div>
-                  )}
-                  {startDate && !dueDate && (
-                    <div className="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase tracking-tight">
-                      <CalendarDays size={10} className="text-blue-400/60" />
-                      <span>{format(new Date(startDate), "dd 'de' MMM", { locale: ptBR })}</span>
+                      <span>{format(new Date(dueDate), "dd/MM", { locale: ptBR })}</span>
                     </div>
                   )}
                 </div>
