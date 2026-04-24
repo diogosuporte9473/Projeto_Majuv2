@@ -69,21 +69,57 @@ export default function CardDetailModal({
   const { language } = useLanguage();
   const isEnglish = language === "en";
 
+  // Polling interval for "full time" updates (5 seconds)
+  const REFETCH_INTERVAL = 5000;
+
   // Queries
-  const { data: card, isLoading: cardLoading } = trpc.cardDetails.getDetails.useQuery({ id: cardId });
-  const { data: labels } = trpc.cardDetails.getLabels.useQuery({ cardId });
-  const { data: checklists, isLoading: checklistsLoading } = trpc.cardDetails.getChecklists.useQuery({ cardId });
-  const { data: comments } = trpc.cardDetails.getComments.useQuery({ cardId });
-  const { data: attachments } = trpc.cardDetails.getAttachments.useQuery({ cardId });
-  const { data: customFields } = trpc.cardDetails.getCustomFields.useQuery({ cardId });
-  const { data: projectDates } = trpc.cardDetails.getProjectDates.useQuery({ cardId });
-  const { data: mirrors } = trpc.cardDetails.getCardMirrors.useQuery({ cardId });
-  const { data: templates } = trpc.checklistTemplates.list.useQuery();
-  const { data: allUsers } = trpc.cardDetails.getCardUsers.useQuery({ cardId });
+  const { data: card, isLoading: cardLoading } = trpc.cardDetails.getDetails.useQuery(
+    { id: cardId },
+    { refetchInterval: REFETCH_INTERVAL }
+  );
+  const { data: labels } = trpc.cardDetails.getLabels.useQuery(
+    { cardId },
+    { refetchInterval: REFETCH_INTERVAL }
+  );
+  const { data: checklists, isLoading: checklistsLoading } = trpc.cardDetails.getChecklists.useQuery(
+    { cardId },
+    { refetchInterval: REFETCH_INTERVAL }
+  );
+  const { data: comments } = trpc.cardDetails.getComments.useQuery(
+    { cardId },
+    { refetchInterval: REFETCH_INTERVAL }
+  );
+  const { data: attachments } = trpc.cardDetails.getAttachments.useQuery(
+    { cardId },
+    { refetchInterval: REFETCH_INTERVAL }
+  );
+  const { data: customFields } = trpc.cardDetails.getCustomFields.useQuery(
+    { cardId },
+    { refetchInterval: REFETCH_INTERVAL }
+  );
+  const { data: projectDates } = trpc.cardDetails.getProjectDates.useQuery(
+    { cardId },
+    { refetchInterval: REFETCH_INTERVAL }
+  );
+  const { data: mirrors } = trpc.cardDetails.getCardMirrors.useQuery(
+    { cardId },
+    { refetchInterval: REFETCH_INTERVAL }
+  );
+  const { data: templates } = trpc.checklistTemplates.list.useQuery(
+    undefined,
+    { refetchInterval: REFETCH_INTERVAL }
+  );
+  const { data: allUsers } = trpc.cardDetails.getCardUsers.useQuery(
+    { cardId },
+    { refetchInterval: REFETCH_INTERVAL }
+  );
   // Para não-admins (ou quando preferir restringir ao quadro), buscamos membros do quadro.
   const { data: boardMembers } = trpc.boards.getMembers.useQuery(
     { boardId: boardId ?? 0 },
-    { enabled: !!boardId && isOpen } as any
+    { 
+      enabled: !!boardId && isOpen,
+      refetchInterval: REFETCH_INTERVAL 
+    } as any
   );
 
   const [isRefreshing, setIsRefreshing] = useState(false);
