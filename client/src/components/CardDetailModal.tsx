@@ -733,24 +733,24 @@ export default function CardDetailModal({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 py-0.5">
-                  {(card?.startDate || card?.dueDate || projectDates?.start_date || projectDates?.end_date) ? (
+                  {(card?.startDate || card?.start_date || card?.dueDate || card?.due_date || projectDates?.projectStartDate || projectDates?.start_date || projectDates?.projectEndDate || projectDates?.end_date) ? (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/20 shadow-sm">
                       <CalendarDays className="w-3.5 h-3.5 text-accent" />
                       <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-tight">
-                        {(card?.startDate || projectDates?.start_date) && (
+                        {(card?.startDate || card?.start_date || projectDates?.projectStartDate || projectDates?.start_date) && (
                           <span className="text-gray-200">
                             Início: <span className="text-white">
-                              {format(new Date(card?.startDate || projectDates?.start_date), "dd MMM yyyy", { locale: ptBR }).toUpperCase()}
+                              {format(new Date(card?.startDate || card?.start_date || projectDates?.projectStartDate || projectDates?.start_date || ""), "dd MMM yyyy", { locale: ptBR }).toUpperCase()}
                             </span>
                           </span>
                         )}
-                        {(card?.startDate || projectDates?.start_date) && (card?.dueDate || projectDates?.end_date) && (
+                        {(card?.startDate || card?.start_date || projectDates?.projectStartDate || projectDates?.start_date) && (card?.dueDate || card?.due_date || projectDates?.projectEndDate || projectDates?.end_date) && (
                           <span className="text-accent/40">•</span>
                         )}
-                        {(card?.dueDate || projectDates?.end_date) && (
+                        {(card?.dueDate || card?.due_date || projectDates?.projectEndDate || projectDates?.end_date) && (
                           <span className={cn(isOverdue ? "text-red-400" : "text-gray-200")}>
                             Prazo: <span className={cn(isOverdue ? "text-red-400" : "text-white")}>
-                              {format(new Date(card?.dueDate || projectDates?.end_date), "dd MMM yyyy", { locale: ptBR }).toUpperCase()}
+                              {format(new Date(card?.dueDate || card?.due_date || projectDates?.projectEndDate || projectDates?.end_date || ""), "dd MMM yyyy", { locale: ptBR }).toUpperCase()}
                             </span>
                           </span>
                         )}
@@ -1073,7 +1073,15 @@ export default function CardDetailModal({
                               type="date" 
                               className="bg-[#2a2a2a] border border-[#333] rounded-lg px-3.5 py-2.5 text-sm text-white w-full focus:ring-1 focus:ring-accent outline-none transition-all"
                               onChange={(e) => handleUpdateStartDate(e.target.value ? new Date(e.target.value) : null)}
-                              value={(card?.startDate || projectDates?.start_date) ? new Date(card?.startDate || projectDates?.start_date).toISOString().split('T')[0] : ''}
+                              value={(() => {
+                                const dateValue = card?.startDate || card?.start_date || projectDates?.projectStartDate || projectDates?.start_date;
+                                if (!dateValue) return '';
+                                try {
+                                  return new Date(dateValue).toISOString().split('T')[0];
+                                } catch (e) {
+                                  return '';
+                                }
+                              })()}
                             />
                           </div>
 
@@ -1083,11 +1091,19 @@ export default function CardDetailModal({
                               type="date" 
                               className="bg-[#2a2a2a] border border-[#333] rounded-lg px-3.5 py-2.5 text-sm text-white w-full focus:ring-1 focus:ring-accent outline-none transition-all"
                               onChange={(e) => handleUpdateDueDate(e.target.value ? new Date(e.target.value) : null)}
-                              value={(card?.dueDate || projectDates?.end_date) ? new Date(card?.dueDate || projectDates?.end_date).toISOString().split('T')[0] : ''}
+                              value={(() => {
+                                const dateValue = card?.dueDate || card?.due_date || projectDates?.projectEndDate || projectDates?.end_date;
+                                if (!dateValue) return '';
+                                try {
+                                  return new Date(dateValue).toISOString().split('T')[0];
+                                } catch (e) {
+                                  return '';
+                                }
+                              })()}
                             />
                           </div>
 
-                          {(card?.startDate || card?.dueDate || projectDates?.start_date || projectDates?.end_date) && (
+                          {(card?.startDate || card?.start_date || card?.dueDate || card?.due_date || projectDates?.projectStartDate || projectDates?.start_date || projectDates?.projectEndDate || projectDates?.end_date) && (
                             <div className="pt-2">
                               <Button 
                                 variant="ghost" 
