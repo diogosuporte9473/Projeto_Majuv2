@@ -501,7 +501,7 @@ export async function getListCards(listId: number) {
     // Coleta todos os IDs de cartão desta lista para buscar contagens em lote
     const cardIds = cardsRaw.map((c: any) => c.id);
 
-    const [checklistsRes, attachmentsRes] = await Promise.all([
+    const [checklistsRes, attachmentsRes, labelsRes] = await Promise.all([
       supabase
         .from("card_checklists")
         .select("card_id, completed")
@@ -510,14 +510,20 @@ export async function getListCards(listId: number) {
         .from("card_attachments")
         .select("card_id")
         .in("card_id", cardIds),
+      supabase
+        .from("card_labels")
+        .select("*")
+        .in("card_id", cardIds),
     ]);
 
     const checklistItems = checklistsRes.data || [];
     const attachmentItems = attachmentsRes.data || [];
+    const labelItems = labelsRes.data || [];
 
     return cardsRaw.map((card: any) => {
       const cardChecklistItems = checklistItems.filter((i: any) => i.card_id === card.id);
       const cardAttachments = attachmentItems.filter((a: any) => a.card_id === card.id);
+      const cardLabels = labelItems.filter((l: any) => l.card_id === card.id);
 
       const checklistCount = cardChecklistItems.length;
       const completedChecklistCount = cardChecklistItems.filter((i: any) => i.completed).length;
@@ -536,6 +542,7 @@ export async function getListCards(listId: number) {
         checklistCount,
         completedChecklistCount,
         attachmentCount,
+        labels: cardLabels,
       };
     });
   } catch (error) {
